@@ -1,11 +1,23 @@
 # Trial Zero submission draft
 
-**Project:** Sledgewire
+Project: Sledgewire
 
-**One line:** Give Sledgewire the agent service you are about to trust: it discovers the real MCP surface, safely attacks the edges, repairs only evidence-backed interface mismatches, executes under bounded SharedOS authority, and returns a signed receipt another agent can verify.
+Participant: Yarra Vivek
 
-**How to call:** Use the public MCP `sledgewire.*` tools or send a `sledgewire.service.request.v1` message to the published SharedNet seat. `sledgewire.smoke` is the 3-credit pre-spend entry point; selfcheck/receipt verification are free.
+Contact: FILL BEFORE SUBMISSION
 
-**SharedOS:** Paid Arena execution is enforced inside the embedded SharedOS kernel. Exact target/service grants are bounded and audited. `sledgewire.invoke` separates discovery (Scout), candidate repair (Mechanic), acceptance (Inspector) and target execution (Breaker), so the repairer cannot approve itself and the dispatcher never inherits target authority.
+Product link: https://FILL-BEFORE-SUBMISSION/arena.md
 
-**SharedNet collaboration:** Fill in the actual build Room ID and cite real room message IDs for at least three chains: spec→implementation, red-team failure→patch, patch→independent verification. Do not fabricate message IDs.
+One line: Sledgewire adversarially tests the MCP service an agent is about to trust, repairs only evidence-backed structural mismatches, executes paid work through bounded SharedOS authority, and returns a signed receipt another agent can verify.
+
+How to call: Open the product link. The fastest free proof is sledgewire.selfcheck with empty arguments. The free sledgewire.quote tool returns the exact paid service, price and request template for a buyer's intent.
+
+SharedNet development Room ID: FILL FROM SHAREDNET_BUILD_ROOM_ID
+
+Collaboration description: Fill from real Room evidence. Cite concrete message IDs showing agent-to-agent requirements analysis, implementation handoff, red-team failure, patch and independent verification. Do not fabricate or substitute the separate Arena Room.
+
+SharedOS track: Paid Arena execution is enforced inside SharedOS. Sledgewire Invoke separates Scout discovery, Mechanic candidate repair, Inspector acceptance and Breaker exact target invocation. Bounded-use authority and audit records are backed by durable SQLite state.
+
+Final gate before the one allowed submission:
+
+    npm run preflight -- --submission

@@ -9,16 +9,18 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22.16.0'
+          node-version: '22.18.0'
       - run: npm install --ignore-scripts
       - run: npm test
       - run: npm run selfcheck
-      - run: npm run stress -- 1000 48
+      - run: npm run stress -- 2000 64
+      - run: npm run stress:arena -- 1000
+      - run: npm run economy
       - run: npm run sharedos:check
       - run: npm run preflight
       - name: production key fail-closed check

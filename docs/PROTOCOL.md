@@ -1,22 +1,49 @@
-# Arena message protocol
+# Arena service protocol
+
+## Free discovery
+
+Call the public MCP tools sledgewire.selfcheck and sledgewire.quote without payment.
+
+Quote intents:
+
+- preflight
+- adversarial
+- repair_execute
+- compare
+- certify
+- full_dossier
+
+## Paid Room request
 
 Initial request:
 
-```json
-{
-  "type": "sledgewire.service.request.v1",
-  "request_id": "buyer-unique-id",
-  "service": "sledgewire.smoke",
-  "input": {"endpoint": "https://seller.example/mcp"}
-}
-```
+    {
+      "type": "sledgewire.service.request.v1",
+      "request_id": "buyer-unique-id",
+      "service": "sledgewire.smoke",
+      "input": {"endpoint": "https://seller.example/mcp"}
+    }
 
-Without payment Sledgewire replies with `sledgewire.payment_required.v1` containing `price_credits`, `payee`, `memo` and `pay_command`.
+Without payment Sledgewire replies with sledgewire.payment_required.v1 containing exact price, payee, official Arena Room ID, and request-specific memo.
 
-Paid request repeats the same fields and adds:
+The buyer pays through SharedNet in that official Arena context, then resends the identical request with:
 
-```json
-{"payment_txn_id":"txn_XXXXXXXXXX"}
-```
+    {"payment_txn_id":"txn_XXXXXXXXXX"}
 
-A successful response is `sledgewire.service.response.v1` and includes the SharedOS trace id plus a signed receipt. Retries of the exact completed request return the cached response. The same transaction cannot purchase another request.
+Sledgewire reads the native credit-transfer ledger from its own authenticated SharedNet Instance perspective and requires:
+
+- buyer Instance equals the Room message sender;
+- transfer is incoming to the Sledgewire Principal/address perspective;
+- amount equals catalog price;
+- room_id equals SHAREDNET_ARENA_ROOM_ID;
+- memo equals sledgewire:<request_id>:<service>.
+
+Then the request is atomically bound to the transaction before any paid work starts.
+
+Successful delivery is sledgewire.service.response.v1 and carries a SharedOS trace plus Ed25519 receipt.
+
+Exact completed retries return the cached response. Same transaction plus another request is refused. In-flight duplicate requests never trigger a second execution.
+
+## Free Room questions
+
+Messages explicitly addressing Sledgewire can ask for demo, proof, prices, catalog or basic explanation. The provider returns the one-link /arena.md URL and the relevant free call rather than forcing a purchase.
