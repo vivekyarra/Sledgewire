@@ -6,15 +6,15 @@ This report separates executed CI evidence from live-event facts. It does not cl
 
 ## Current green code evidence
 
-Evidence commit: `927ad48173e189abc1c6e743935c405eb82c88bd`
+Evidence commit: `2ed1c802ade7569f9b313ae143140b2ca5f95a4d`
 
-GitHub Actions run: `36176411707`
+GitHub Actions run: `36177103375`
 
-- Automated tests: **220 / 220 passed**, 0 failed, 0 skipped.
+- Automated tests: **224 / 224 passed**, 0 failed, 0 skipped.
 - Hostile/current-protocol selfcheck: **VERIFIED**, signed receipt verification true, profile `sledgewire.selfcheck.v4`.
-- MCP stress: **10,000 / 10,000** complete Smoke workflows at concurrency **128**, **0 failures**; p50 **144 ms**, p95 **157 ms**, p99 **262 ms**, total **11.893 s**.
+- MCP stress: **10,000 / 10,000** complete Smoke workflows at concurrency **128**, **0 failures**; p50 **144 ms**, p95 **162 ms**, p99 **258 ms**, total **11.912 s**.
 - Arena ledger/replay stress: **10,000 claims**, **10,000 cached retries**, **500 wrong-buyer attempts rejected**, **0 duplicate paid executions**, total **1.476 s**.
-- Duplicate storm: **33,000 authorization attempts** across 1,000 purchases at fanout 16: 1,000 unique claims, 15,000 in-flight duplicate refusals, 16,000 cached replays, 1,000 transaction-reuse refusals, only **1,000 ledger reads**, **0 duplicate paid executions**, total **1.447 s**.
+- Duplicate storm: **33,000 authorization attempts** across 1,000 purchases at fanout 16: 1,000 unique claims, 15,000 in-flight duplicate refusals, 16,000 cached replays, 1,000 transaction-reuse refusals, only **1,000 ledger reads**, **0 duplicate paid executions**, total **1.443 s**.
 - SharedOS check: deny true, allow true, exhausted `maxUses` denied, **9 audit events**.
 - Static preflight: **READY**.
 - Production missing signing key fails closed; persistent key succeeds.
@@ -39,7 +39,8 @@ These timings are GitHub Actions/local fixture measurements only. They are not S
 13. **Public MCP Host-header gap.** Production MCP now restricts Host/authority to the configured public origin plus explicit trusted proxy authorities, complementing the existing Origin guard.
 14. **Live proof was manual.** A buyer-side `arena:rehearse` flow now automates a real second-seat 3-credit Smoke purchase, signed delivery verification, independent `sledgewire.trace` verification and exact cached retry; it writes a redacted mode-0600 evidence packet.
 15. **Split-process deployment risk.** A checked-in two-process Docker Compose topology forces the public server and Arena daemon onto the same persistent SQLite/WAL volume and shared signing key.
-16. Earlier hardening remains active: explicit active-probe safety, destructive authorization, exact-target SharedOS grants, unknown-outcome no-retry, poison-message dead-letter, DNS/IP pinning, expanded SSRF blocking, watch-mode single-message delivery, production paid-bypass refusal and restart-safe SQLite replay.
+16. **False-green deployment state.** The public server could be alive while the separate seller daemon was dead. The daemon now writes a 10-second heartbeat into the shared database; public `/ready` fails closed after 45 seconds, and live preflight checks both that readiness signal and the deployed signing-key identity.
+17. Earlier hardening remains active: explicit active-probe safety, destructive authorization, exact-target SharedOS grants, unknown-outcome no-retry, poison-message dead-letter, DNS/IP pinning, expanded SSRF blocking, watch-mode single-message delivery, production paid-bypass refusal and restart-safe SQLite replay.
 
 ## Live facts still required
 
