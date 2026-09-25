@@ -1,0 +1,3 @@
+{
+  "version":"sledgewire.catalog.v1","currency":"event_credits","services":{"sledgewire.smoke":{"price":3,"summary":"Discover a remote MCP service and perform one explicitly safe probe when supplied."},"sledgewire.assay":{"price":8,"summary":"Run bounded adversarial protocol checks without unsafe side effects."},"sledgewire.invoke":{"price":12,"summary":"Perform evidence-backed structural repair, independently validate it, and invoke the target."},"sledgewire.fleet":{"price":20,"summary":"Smoke-test up to six candidate MCP services with bounded concurrency."},"sledgewire.seal":{"price":25,"summary":"Produce a portable profile-versioned conformance packet for one MCP endpoint."}}
+}
