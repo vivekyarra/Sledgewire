@@ -1,2 +1,9 @@
 import {smoke} from './smoke.mjs';import {assay} from './assay.mjs';import {sha256} from '../receipts/receipt.mjs';
-export async function seal(endpoint,opts={}){const s=await smoke(endpoint,opts);const a=await assay(endpoint,opts);const map=[['MCP-INIT-001',s.checks.initialize],['MCP-CATALOG-001',s.checks.discovery],['MCP-PROBE-001',s.checks.safe_probe],['MCP-UNKNOWN-001',a.checks.unknown_tool],['MCP-ARGS-001',a.checks.invalid_arguments],['MCP-REPLAY-001',a.checks.replay]];const checks=map.map(([id,x])=>({id,status:x?.status??'unknown',reason:x?.reason??null,evidence_sha256:sha256(x??null)}));const state=checks.some(x=>x.status==='security_block')?'BLOCKED':checks.some(x=>x.status==='fail')?'INCOMPATIBLE':checks.some(x=>['warn','unknown'].includes(x.status))?'DEGRADED':'READY';return {service:'sledgewire.seal',profile:'sledgewire.mcp-conformance.v2',endpoint,state,checks,artifact_sha256:sha256({endpoint,checks}),non_claims:['semantic_correctness','global_security','legal_compliance','absence_of_vulnerabilities']};}
+
+export function sealFromReports(endpoint,s,a){
+  const map=[['MCP-INIT-001',s.checks.initialize],['MCP-CATALOG-001',s.checks.discovery],['MCP-PROBE-001',s.checks.safe_probe],['MCP-UNKNOWN-001',a.checks.unknown_tool],['MCP-ARGS-001',a.checks.invalid_arguments],['MCP-REPLAY-001',a.checks.replay]];
+  const checks=map.map(([id,x])=>({id,status:x?.status??'unknown',reason:x?.reason??null,evidence_sha256:sha256(x??null)}));
+  const state=checks.some(x=>x.status==='security_block')?'BLOCKED':checks.some(x=>x.status==='fail')?'INCOMPATIBLE':checks.some(x=>['warn','unknown'].includes(x.status))?'DEGRADED':'READY';
+  return {service:'sledgewire.seal',profile:'sledgewire.mcp-conformance.v3',endpoint,state,checks,artifact_sha256:sha256({endpoint,checks}),non_claims:['semantic_correctness','global_security','legal_compliance','absence_of_vulnerabilities']};
+}
+export async function seal(endpoint,opts={}){const s=await smoke(endpoint,opts);const a=await assay(endpoint,opts);return sealFromReports(endpoint,s,a);}

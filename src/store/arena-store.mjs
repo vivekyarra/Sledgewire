@@ -40,6 +40,16 @@ export class ArenaStore {
         attempts INTEGER NOT NULL DEFAULT 0,
         sent_at TEXT
       );
+      CREATE TABLE IF NOT EXISTS room_messages(
+        message_id TEXT PRIMARY KEY,
+        status TEXT NOT NULL,
+        error TEXT,
+        processed_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS metadata(
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
     `);
   }
   claim({requestId,txnId,fingerprint,service}){
@@ -71,4 +81,8 @@ export class ArenaStore {
   markAuditSent(id){this.db.prepare('UPDATE audit_outbox SET sent_at=? WHERE event_id=?').run(new Date().toISOString(),id);}
   bumpAuditAttempt(id){this.db.prepare('UPDATE audit_outbox SET attempts=attempts+1 WHERE event_id=?').run(id);}
   auditCount(){return this.db.prepare('SELECT COUNT(*) count FROM audit').get().count;}
+  roomMessageSeen(id){if(!id)return false;return Boolean(this.db.prepare('SELECT 1 FROM room_messages WHERE message_id=?').get(id));}
+  markRoomMessage(id,status='completed',error=null){if(!id)return;this.db.prepare(`INSERT INTO room_messages(message_id,status,error,processed_at) VALUES(?,?,?,?) ON CONFLICT(message_id) DO UPDATE SET status=excluded.status,error=excluded.error,processed_at=excluded.processed_at`).run(id,status,error,new Date().toISOString());}
+  getMeta(key){return this.db.prepare('SELECT value FROM metadata WHERE key=?').get(key)?.value??null;}
+  setMeta(key,value){this.db.prepare(`INSERT INTO metadata(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`).run(key,String(value));}
 }

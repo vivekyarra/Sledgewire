@@ -1,42 +1,59 @@
 # Trial Zero Arena runbook
 
-## One-sentence pitch
+## One sentence
 
-> Give me the service you are about to trust. Sledgewire calls the real MCP surface, attacks bounded failure modes, repairs only what evidence supports, executes under SharedOS authority, and gives you a receipt you can verify yourself.
+Give me the MCP service you are about to trust. Sledgewire calls the real surface, attacks bounded failure modes, repairs only what evidence supports, executes paid work under SharedOS authority, and gives you a receipt you can verify yourself.
 
-Do not lead with architecture. Run `selfcheck` or a 3-credit Smoke first.
+Do not lead with architecture.
 
-## Offer ladder
+## Before humans step away
 
-- `sledgewire.smoke` — **3** credits: fastest pre-spend check.
-- `sledgewire.assay` — **8** credits: adversarial checks when a concrete uncertainty remains.
-- `sledgewire.invoke` — **12** credits: evidence-backed structural repair + independent validation + actual invocation.
-- `sledgewire.fleet` — **20** credits: test several candidate services before routing spend.
-- `sledgewire.seal` — **25** credits: portable conformance packet a seller can show other buyers.
-- receipt verification/selfcheck — **free**.
+1. Freeze the exact green commit.
+2. Run npm run preflight -- --submission.
+3. Record the real development SHAREDNET_BUILD_ROOM_ID and collaboration evidence.
+4. Deploy HTTPS and verify /arena.md, /mcp and /public-key externally.
+5. Join the organizer-provided Arena Room with the competition Instance.
+6. Run npm run preflight -- --live.
+7. Start npm run arena:daemon.
+8. Start the representative agent with docs/ARENA_AGENT_PROMPT.md.
+9. Perform a real other-seat purchase and receipt verification.
+10. Reboot once and prove cursor/payment state survives.
 
-## Round 1 autonomous behavior
+## Arena 1
 
-1. Read the roster and choose at least three real peer services with concrete tasks.
-2. Use the smallest safe check that produces evidence; never invent a trust score.
-3. Preserve exact request/response hashes, state, reason and receipt.
-4. Critique competitors on observed behavior and clearly separate “not tested” from “failed.”
-5. Invite peers to verify Sledgewire receipts independently.
-6. Never use a destructive/replay probe unless the target explicitly marks it safe/idempotent or the request explicitly authorizes it.
+- Post one concise pitch and the one-link quickstart.
+- Use free selfcheck as the first demonstration.
+- Let peers verify the receipt.
+- Try peer services with real tasks and provide evidence-based critiques.
+- Respond to challenges with exact tests and traces.
+- Keep Room noise low.
 
-## Round 2 autonomous behavior
+## Arena 2
 
-1. Keep Smoke as the default 3-credit entry point.
-2. Upsell only from a real unresolved fact: hostile/ambiguous behavior → Assay; schema mismatch with evidence-backed repair path → Invoke; multiple candidate sellers → Fleet; seller wants portable proof → Seal.
-3. Exact completed retries are cached. Never charge or execute twice.
-4. If infrastructure cannot prove payment or SharedOS authority, fail closed rather than delivering a paid success.
-5. Keep latency budgets tighter than the event cap: Smoke p95 <25s, Assay <60s, Invoke <90s, Seal <150s, Fleet <180s.
+Paid menu: Smoke 3, Assay 8, Invoke 12, Fleet 20, Seal 25, Gauntlet 35. Free selector: sledgewire.quote.
 
-## Before Arena opens
+Only sell the service justified by the buyer's unresolved problem. Payment -> exact verification -> SharedOS -> signed delivery. No valid payment means no paid execution.
 
-- Run `npm run preflight -- --live`.
-- Confirm CI green on the exact commit.
-- Confirm `/health`, `/.well-known/agent.json`, `/catalog.json`, `/public-key`, and MCP initialize/list/call externally.
-- Confirm native SharedNet ledger verification from another seat.
-- Confirm a real SharedOS allow and deny trail for Sledgewire; if using Cloud preview, confirm the event integration supplied by organizers is visible.
-- Freeze code. Do not improvise permissions during autonomous rounds.
+## Internal latency targets
+
+| Service | p95 target | hard deadline |
+|---|---:|---:|
+| Smoke | <25s | 40s |
+| Assay | <60s | 90s |
+| Invoke | <90s | 120s |
+| Fleet | <180s | 240s |
+| Seal | <150s | 180s |
+| Gauntlet | <210s | 270s |
+
+## Stop conditions
+
+Do not enter autonomous competition until all are true:
+
+- zero unauthorized target actions in the hostile suite;
+- zero duplicate paid executions in replay stress;
+- production key persistent;
+- official Arena Room explicit and separate from build Room;
+- native SharedNet purse/ledger readable;
+- another seat can purchase and verify;
+- SharedOS allow/deny/maxUses check green;
+- 60-minute no-human rehearsal green.

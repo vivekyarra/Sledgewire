@@ -1,15 +1,59 @@
 import catalog from '../../catalog.json' with {type:'json'};
-import {smoke} from '../core/smoke.mjs';import {assay} from '../core/assay.mjs';import {invoke} from '../core/invoke.mjs';import {seal} from '../core/seal.mjs';import {fleet} from '../core/fleet.mjs';import {loadSigningMaterial,signReceipt,verifyReceipt} from '../receipts/receipt.mjs';
-const signing=loadSigningMaterial();export const PUBLIC=signing.publicKeyPem;export const PUBLIC_KEY_ID=signing.keyId;
-const schemaEndpoint={type:'string',minLength:8,maxLength:2048};const schemaProbe={type:'object'};
+import {smoke} from '../core/smoke.mjs';
+import {assay} from '../core/assay.mjs';
+import {invoke} from '../core/invoke.mjs';
+import {seal} from '../core/seal.mjs';
+import {fleet} from '../core/fleet.mjs';
+import {gauntlet} from '../core/gauntlet.mjs';
+import {quote} from '../core/quote.mjs';
+import {selfcheck} from '../core/selfcheck.mjs';
+import {loadSigningMaterial,signReceipt,verifyReceipt} from '../receipts/receipt.mjs';
+
+const signing=loadSigningMaterial();
+export const PUBLIC=signing.publicKeyPem;
+export const PUBLIC_KEY_ID=signing.keyId;
+const schemaEndpoint={type:'string',minLength:8,maxLength:2048};
+const schemaProbe={type:'object'};
+
 export const toolDefs=[
+ {name:'sledgewire.quote',description:'Free deterministic selector that returns the right Sledgewire service, exact price, and request template.',inputSchema:{type:'object',additionalProperties:false,required:['intent'],properties:{intent:{type:'string',enum:['preflight','adversarial','repair_execute','compare','certify','full_dossier']},endpoint:schemaEndpoint,targets:{type:'array',maxItems:6},tool:{type:'string'}}}},
+ {name:'sledgewire.selfcheck',description:'Free hostile-fixture demonstration of Sledgewire fail-closed behavior with a signed receipt.',inputSchema:{type:'object',additionalProperties:false,properties:{}}},
  {name:'sledgewire.smoke',description:'Discover and safely smoke-test a remote MCP endpoint.',inputSchema:{type:'object',additionalProperties:false,required:['endpoint'],properties:{endpoint:schemaEndpoint,probe:schemaProbe}}},
  {name:'sledgewire.assay',description:'Run bounded adversarial MCP protocol checks without claiming semantic truth.',inputSchema:{type:'object',additionalProperties:false,required:['endpoint'],properties:{endpoint:schemaEndpoint,probe:schemaProbe}}},
  {name:'sledgewire.invoke',description:'Perform bounded schema repair, independent validation, then invoke.',inputSchema:{type:'object',additionalProperties:false,required:['endpoint','request'],properties:{endpoint:schemaEndpoint,request:{type:'object'}}}},
- {name:'sledgewire.seal',description:'Run the v2 conformance profile and return a portable signed packet.',inputSchema:{type:'object',additionalProperties:false,required:['endpoint'],properties:{endpoint:schemaEndpoint,probe:schemaProbe}}},
  {name:'sledgewire.fleet',description:'Smoke-test up to six candidate MCP services with bounded concurrency.',inputSchema:{type:'object',additionalProperties:false,required:['targets'],properties:{targets:{type:'array',minItems:1,maxItems:6}}}},
+ {name:'sledgewire.seal',description:'Run the v3 conformance profile and return a portable signed packet.',inputSchema:{type:'object',additionalProperties:false,required:['endpoint'],properties:{endpoint:schemaEndpoint,probe:schemaProbe}}},
+ {name:'sledgewire.gauntlet',description:'Seller-grade full dossier: smoke, assay, optional repaired invocation, and portable conformance evidence.',inputSchema:{type:'object',additionalProperties:false,required:['endpoint'],properties:{endpoint:schemaEndpoint,probe:schemaProbe,request:{type:'object'}}}},
  {name:'sledgewire.verify',description:'Verify a Sledgewire Ed25519 receipt.',inputSchema:{type:'object',additionalProperties:false,required:['receipt','publicKeyPem'],properties:{receipt:{type:'object'},publicKeyPem:{type:'string'}}}}
 ];
-export async function handleTool(name,args={},internalOpts={}){if(name==='sledgewire.verify')return verifyReceipt(args.receipt,args.publicKeyPem);const opts={...internalOpts,targetPolicy:internalOpts.targetPolicy??{allowHttp:false,allowPrivate:false}};let payload;if(name==='sledgewire.smoke')payload=await smoke(args.endpoint,{...opts,probe:args.probe});else if(name==='sledgewire.assay')payload=await assay(args.endpoint,{...opts,probe:args.probe});else if(name==='sledgewire.invoke')payload=await invoke(args.endpoint,args.request,opts);else if(name==='sledgewire.seal')payload=await seal(args.endpoint,{...opts,probe:args.probe});else if(name==='sledgewire.fleet')payload=await fleet(args.targets,opts);else throw new Error('tool_not_found');return signReceipt({...payload,issued_at:new Date().toISOString(),receipt_version:'sledgewire.receipt.v2'},signing.privateKeyPem);}
-export async function handleRpc(msg,internalOpts={}){if(msg?.jsonrpc!=='2.0')return {jsonrpc:'2.0',id:msg?.id??null,error:{code:-32600,message:'Invalid Request'}};try{if(msg.method==='initialize')return {jsonrpc:'2.0',id:msg.id,result:{protocolVersion:'2025-06-18',capabilities:{tools:{}},serverInfo:{name:'sledgewire',version:'0.2.0'}}};if(msg.method==='notifications/initialized')return null;if(msg.method==='tools/list')return {jsonrpc:'2.0',id:msg.id,result:{tools:toolDefs}};if(msg.method==='tools/call'){const result=await handleTool(msg.params?.name,msg.params?.arguments??{},internalOpts);return {jsonrpc:'2.0',id:msg.id,result:{content:[{type:'text',text:JSON.stringify(result)}],structuredContent:result,isError:false}};}return {jsonrpc:'2.0',id:msg.id,error:{code:-32601,message:'Method not found'}};}catch(e){return {jsonrpc:'2.0',id:msg.id??null,error:{code:-32000,message:String(e.message||e)}};}}
+
+export async function handleTool(name,args={},internalOpts={}){
+  if(name==='sledgewire.verify')return verifyReceipt(args.receipt,args.publicKeyPem);
+  const opts={...internalOpts,targetPolicy:internalOpts.targetPolicy??{allowHttp:false,allowPrivate:false}};
+  let payload;
+  if(name==='sledgewire.quote')payload=quote(args);
+  else if(name==='sledgewire.selfcheck')payload=await selfcheck();
+  else if(name==='sledgewire.smoke')payload=await smoke(args.endpoint,{...opts,probe:args.probe});
+  else if(name==='sledgewire.assay')payload=await assay(args.endpoint,{...opts,probe:args.probe});
+  else if(name==='sledgewire.invoke')payload=await invoke(args.endpoint,args.request,opts);
+  else if(name==='sledgewire.fleet')payload=await fleet(args.targets,opts);
+  else if(name==='sledgewire.seal')payload=await seal(args.endpoint,{...opts,probe:args.probe});
+  else if(name==='sledgewire.gauntlet')payload=await gauntlet(args.endpoint,{...opts,probe:args.probe,request:args.request});
+  else throw new Error('tool_not_found');
+  return signReceipt({...payload,issued_at:new Date().toISOString(),receipt_version:'sledgewire.receipt.v3'},signing.privateKeyPem);
+}
+
+export async function handleRpc(msg,internalOpts={}){
+  if(msg?.jsonrpc!=='2.0')return {jsonrpc:'2.0',id:msg?.id??null,error:{code:-32600,message:'Invalid Request'}};
+  try{
+    if(msg.method==='initialize')return {jsonrpc:'2.0',id:msg.id,result:{protocolVersion:'2025-06-18',capabilities:{tools:{}},serverInfo:{name:'sledgewire',version:'0.3.0'}}};
+    if(msg.method==='notifications/initialized')return null;
+    if(msg.method==='tools/list')return {jsonrpc:'2.0',id:msg.id,result:{tools:toolDefs}};
+    if(msg.method==='tools/call'){
+      const result=await handleTool(msg.params?.name,msg.params?.arguments??{},internalOpts);
+      return {jsonrpc:'2.0',id:msg.id,result:{content:[{type:'text',text:JSON.stringify(result)}],structuredContent:result,isError:false}};
+    }
+    return {jsonrpc:'2.0',id:msg.id,error:{code:-32601,message:'Method not found'}};
+  }catch(e){return {jsonrpc:'2.0',id:msg.id??null,error:{code:-32000,message:String(e.message||e)}};}
+}
 export {catalog};

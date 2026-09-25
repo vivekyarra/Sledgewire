@@ -1,40 +1,43 @@
 # Trial Zero release checklist
 
-## Code gates — implemented
-- [x] Exact service schemas and prices live in one catalog.
-- [x] `@aicoo/sharedos` pinned to `1.0.0-preview`.
-- [x] Canonical dispatcher/scout/breaker/mechanic/inspector role identities defined.
-- [x] Purpose fixed to `sledgewire.test-repair-and-invoke-agent-services`.
-- [x] Atomic bounded-use SharedOS store + durable audit/outbox.
-- [x] SharedNet native ledger adapter and Room watcher handler.
-- [x] Buyer/payee/price/room/request/service memo binding.
-- [x] Restart-safe SQLite payment/request state model.
-- [x] Production fail-closed signing-key policy.
-- [x] Connection-time DNS pinning + redirect refusal.
-- [x] Bounded concurrency for Fleet.
-- [x] Profile-versioned Seal check IDs.
-- [x] CI: tests, hostile selfcheck, load run, SharedOS allow/deny check, static preflight.
+## Static code gates
 
-## Live P0 — must pass before competition
-- [ ] Freeze the exact green commit used for deployment.
-- [ ] Real SharedNet competition Room joined with the published Sledgewire seat.
-- [ ] Another SharedNet seat completes request → payment → SharedOS → signed reply.
-- [ ] Persistent DB survives restart and exact retry returns cached response with zero re-execution.
-- [ ] Persistent Ed25519 public key published and private key mounted from secret storage.
-- [ ] At least three real MCP implementations tested.
-- [ ] SharedOS event visibility integration confirmed with a real Sledgewire trace if entering the SharedOS track.
-- [ ] 60-minute no-human autonomous rehearsal passes.
-- [ ] Smoke p95 <25s on real targets; all paid calls finish under the event cap.
+- [x] CLI and MCP.
+- [x] One-link /arena.md and machine-readable /arena.json.
+- [x] Free selfcheck and deterministic quote.
+- [x] Paid ladder 3 / 8 / 12 / 20 / 25 / 35.
+- [x] Persistent signing key required in production.
+- [x] DNS validation, IP pinning, redirect refusal and byte/deadline limits.
+- [x] Evidence-bounded repair plus independent inspection.
+- [x] SharedOS current package path, atomic bounded-use store and durable audit/outbox.
+- [x] Direct SharedNet V1 API adapter; token never on argv.
+- [x] Separate build and Arena Room environment variables.
+- [x] Native credit-ledger payment validation and atomic transaction/request binding.
+- [x] Arena cursor/message persistence.
+- [x] CI: tests, selfcheck, network stress, payment/replay stress, economy sensitivity, SharedOS allow/deny/maxUses, static preflight.
 
-## Arena conversion
-- [x] Free selfcheck emits a verifiable receipt.
-- [x] `smoke=3`, `assay=8`, `invoke=12`, `fleet=20`, `seal=25` in one source of truth.
-- [x] No generic numeric trust score.
-- [x] Portable seller-facing Seal packet.
-- [ ] Capture real buyer feedback and tune only if it improves autonomous comprehension.
+## Submission P0
 
-## SharedNet collaboration prize
-- [ ] Build Room ID recorded.
-- [ ] At least three real handoff chains preserved with message IDs.
-- [ ] Red-team agent produces a real failing artifact that builder fixes.
-- [ ] Independent verifier reruns acceptance tests after the patch.
+- [ ] Actual SharedNet development Room used by multiple build agents.
+- [ ] SHAREDNET_BUILD_ROOM_ID recorded.
+- [ ] Real collaboration message IDs preserved.
+- [ ] Participant name and contact final.
+- [ ] Public HTTPS /arena.md product link final.
+- [ ] Submission preflight green.
+- [ ] Submit only once.
+
+## Arena P0
+
+- [ ] Exact green competition commit frozen.
+- [ ] Organizer-provided SHAREDNET_ARENA_ROOM_ID configured separately from build Room.
+- [ ] Competition Instance token mounted from secret storage.
+- [ ] Sledgewire payee address verified against current SharedNet identity.
+- [ ] Native purse and ledger readable.
+- [ ] Persistent SQLite survives process restart.
+- [ ] Another seat completes request -> payment -> SharedOS -> signed reply.
+- [ ] Exact completed retry after restart returns cached delivery with zero re-execution.
+- [ ] At least three real external MCP implementations tested.
+- [ ] SharedOS event visibility confirmed when entering the optional SharedOS track.
+- [ ] Representative agent follows docs/ARENA_AGENT_PROMPT.md.
+- [ ] 60-minute no-human rehearsal passes.
+- [ ] Real Smoke p95 below 25 seconds and all paid calls below hard deadlines.
