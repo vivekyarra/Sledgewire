@@ -1,4 +1,4 @@
-# Sledgewire v0.3.2 stress report
+# Sledgewire v0.3.3 stress report
 
 Date: 2026-09-25
 
@@ -10,18 +10,18 @@ Tested commit: `6bfd2fa6a7990a8d7d3389af1b19119cd8953e0f`
 
 GitHub Actions run: `36154160761`
 
-- Automated tests: **122 / 122 passed**, 0 failed, 0 skipped.
+- Automated tests: **128 / 128 passed**, 0 failed, 0 skipped.
 - Hostile-fixture selfcheck: **VERIFIED**; signed receipt verification true.
 - MCP load harness: **2,000 / 2,000** complete Smoke workflows at concurrency **64**, **0 failures**.
-- MCP load timing on that runner: p50 **62 ms**, p95 **95 ms**, p99 **365 ms**, total **2.284 s**.
-- Arena payment/replay harness: **1,000 claims**, **1,000 cached retries**, **500 wrong-buyer attempts rejected**, **0 duplicate paid executions**, total **146 ms**.
+- MCP load timing on the v0.3.3 branch CI runner: p50 **53 ms**, p95 **89 ms**, p99 **297 ms**, total **2.049 s**.
+- Arena payment/replay harness: **1,000 claims**, **1,000 cached retries**, **500 wrong-buyer attempts rejected**, **0 duplicate paid executions**, total **85 ms**.
 - SharedOS integration: no grant denied; matching grant allowed; exhausted `maxUses` denied; **9 audit events** persisted.
 - Static preflight: **READY**.
 - Production signing policy: missing persistent key fails closed; valid persistent key succeeds.
 
 These latency measurements are local CI harness measurements only. They are not claims about SharedNet, SharedOS Cloud, public-network, or third-party MCP latency.
 
-## Security and organizer-protocol coverage
+## MCP 2026-07-28 compatibility\n\nSledgewire now probes `server/discover` using the current **2026-07-28 stateless MCP era**, sends required per-request `_meta` and `MCP-Protocol-Version`, rejects header/body version mismatches, omits protocol session IDs in the modern era, and falls back to the legacy initialize/initialized handshake for 2025-era servers. The public HTTP server validates `Origin` when present.\n\n## Security and organizer-protocol coverage
 
 The automated suite covers:
 
