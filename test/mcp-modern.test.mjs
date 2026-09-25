@@ -70,3 +70,12 @@ test('legacy initialize still accepts 2025-11-25',async()=>{
   const r=await handleRpc({jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2025-11-25',capabilities:{},clientInfo:{name:'legacy',version:'1'}}});
   assert.equal(r.result.protocolVersion,'2025-11-25');assert.equal(r.result.serverInfo.version,'0.3.6');
 });
+
+test('modern target client mirrors x-mcp-header tool arguments with sentinel encoding',async()=>{
+  const f=await startFixture({mode:'x_mcp_header'});
+  try{
+    const s=new McpSession(f.url,{targetPolicy:tp});const init=await s.initialize();assert.equal(init.era,'modern');
+    await s.listTools();const r=await s.callTool('safe_echo',{text:'hello',region:'東京'});assert.equal(r.content[0].text,'hello');
+    const call=f.seen.find(x=>x.method==='tools/call');assert.ok(call.headers.paramRegion);assert.equal(call.headers.paramRegion.startsWith('=?base64?'),true);
+  }finally{await f.close();}
+});
