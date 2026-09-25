@@ -8,13 +8,16 @@ import {gauntlet} from '../core/gauntlet.mjs';
 import {quote} from '../core/quote.mjs';
 import {selfcheck} from '../core/selfcheck.mjs';
 import {loadSigningMaterial,signReceipt,verifyReceipt} from '../receipts/receipt.mjs';
+import {decodeMcpHeaderValue} from '../mcp/header-codec.mjs';
+import {validateServiceInput} from '../core/service-input.mjs';
+import {traceProof} from '../sharedos/trace-proof.mjs';
 
 export const MODERN_PROTOCOL_VERSION='2026-07-28';
 export const LEGACY_PROTOCOL_VERSION='2025-11-25';
 export const SUPPORTED_PROTOCOL_VERSIONS=[MODERN_PROTOCOL_VERSION,LEGACY_PROTOCOL_VERSION,'2025-06-18'];
 const META_VERSION='io.modelcontextprotocol/protocolVersion';
 const META_SERVER='io.modelcontextprotocol/serverInfo';
-const SERVER_INFO={name:'sledgewire',version:'0.3.5'};
+const SERVER_INFO={name:'sledgewire',version:'0.3.6'};
 
 const signing=loadSigningMaterial();
 export const PUBLIC=signing.publicKeyPem;
@@ -32,12 +35,16 @@ export const toolDefs=[
  {name:'sledgewire.fleet',description:'Paid Arena service: smoke-test up to six candidate MCP services.',inputSchema:{type:'object',additionalProperties:false,required:['targets'],properties:{targets:{type:'array',minItems:1,maxItems:6}}}},
  {name:'sledgewire.seal',description:'Paid Arena service: run the v3 conformance profile and return a portable signed packet.',inputSchema:{type:'object',additionalProperties:false,required:['endpoint'],properties:{endpoint:schemaEndpoint,probe:schemaProbe}}},
  {name:'sledgewire.gauntlet',description:'Paid Arena service: seller-grade dossier with smoke, assay, optional SharedOS-staged invocation, and conformance evidence.',inputSchema:{type:'object',additionalProperties:false,required:['endpoint'],properties:{endpoint:schemaEndpoint,probe:schemaProbe,request:{type:'object'}}}},
+ {name:'sledgewire.trace',description:'Free: retrieve a sanitized SharedOS audit proof for a trace id carried by a paid Sledgewire receipt.',inputSchema:{type:'object',additionalProperties:false,required:['traceId'],properties:{traceId:{type:'string',minLength:36,maxLength:36}}}},
  {name:'sledgewire.verify',description:'Free: verify a Sledgewire Ed25519 receipt.',inputSchema:{type:'object',additionalProperties:false,required:['receipt','publicKeyPem'],properties:{receipt:{type:'object'},publicKeyPem:{type:'string'}}}}
 ];
 
 export async function handleTool(name,args={},internalOpts={}){
   if(name==='sledgewire.verify')return verifyReceipt(args.receipt,args.publicKeyPem);
+  if(name==='sledgewire.trace')return signReceipt({...traceProof(internalOpts.traceStore,args.traceId),issued_at:new Date().toISOString(),receipt_version:'sledgewire.receipt.v3'},signing.privateKeyPem);
   if(internalOpts.publicArena===true&&PAID.has(name)){
+    const validation=validateServiceInput(name,args);
+    if(!validation.ok)return signReceipt({service:name,state:'INCOMPATIBLE',reason:'invalid_input',detail:validation.reason},signing.privateKeyPem);
     const price=catalog.services[name].price;
     return signReceipt({service:name,state:'PAYMENT_REQUIRED',price_credits:price,arena_room_id:internalOpts.arenaRoomId??null,
       quickstart_url:internalOpts.publicBaseUrl?`${String(internalOpts.publicBaseUrl).replace(/\/$/,'')}/arena.md`:null,
@@ -57,7 +64,7 @@ export async function handleTool(name,args={},internalOpts={}){
   else throw new Error('tool_not_found');
   return signReceipt({...payload,issued_at:new Date().toISOString(),receipt_version:'sledgewire.receipt.v3'},signing.privateKeyPem);
 }
-function modernResult(result){return {...result,_meta:{...(result?._meta??{}),[META_SERVER]:SERVER_INFO}};}
+function modernResult(result,{cacheable=false}={}){return {...result,resultType:result?.resultType??'complete',...(cacheable?{ttlMs:result?.ttlMs??0,cacheScope:result?.cacheScope??'private'}:{}),_meta:{...(result?._meta??{}),[META_SERVER]:SERVER_INFO}};}
 function rpcError(id,code,message,data){return {jsonrpc:'2.0',id:id??null,error:{code,message,...(data===undefined?{}:{data})}};}
 function requestVersion(msg){return msg?.params?._meta?.[META_VERSION]??null;}
 function headerValue(headers,name){const v=headers[name]??headers[name.toLowerCase()]??null;return Array.isArray(v)?v[0]:v;}
@@ -74,10 +81,22 @@ export function validateHttpMcp(msg,headers={}){
   const requested=bodyVersion??headerVersion;
   if(requested&&!SUPPORTED_PROTOCOL_VERSIONS.includes(requested))return {ok:false,status:400,body:rpcError(msg?.id,-32022,'UnsupportedProtocolVersion',{requested,supported:SUPPORTED_PROTOCOL_VERSIONS})};
   if(modern){
-    const session=headerValue(headers,'mcp-session-id');if(session)return {ok:false,status:400,body:rpcError(msg?.id,-32020,'HeaderMismatch',{header:'Mcp-Session-Id',reason:'removed_in_2026_07_28'})};
-    const methodHeader=headerValue(headers,'mcp-method');if(methodHeader&&methodHeader!==msg?.method)return {ok:false,status:400,body:rpcError(msg?.id,-32020,'HeaderMismatch',{header:'Mcp-Method',wire:methodHeader,body:msg?.method??null})};
-    const nameHeader=headerValue(headers,'mcp-name');const bodyName=requestPrincipalName(msg);
-    if(nameHeader&&nameHeader!==bodyName)return {ok:false,status:400,body:rpcError(msg?.id,-32020,'HeaderMismatch',{header:'Mcp-Name',wire:nameHeader,body:bodyName})};
+    const session=headerValue(headers,'mcp-session-id');
+    if(session)return {ok:false,status:400,body:rpcError(msg?.id,-32020,'HeaderMismatch',{header:'Mcp-Session-Id',reason:'removed_in_2026_07_28'})};
+
+    const methodHeader=headerValue(headers,'mcp-method');
+    if(!methodHeader)return {ok:false,status:400,body:rpcError(msg?.id,-32020,'HeaderMismatch',{header:'Mcp-Method',reason:'required_in_2026_07_28'})};
+    const decodedMethod=decodeMcpHeaderValue(methodHeader);
+    if(decodedMethod===undefined||decodedMethod!==msg?.method)return {ok:false,status:400,body:rpcError(msg?.id,-32020,'HeaderMismatch',{header:'Mcp-Method',wire:methodHeader,body:msg?.method??null})};
+
+    const nameHeader=headerValue(headers,'mcp-name'),bodyName=requestPrincipalName(msg);
+    if(bodyName!==null&&bodyName!==undefined){
+      if(!nameHeader)return {ok:false,status:400,body:rpcError(msg?.id,-32020,'HeaderMismatch',{header:'Mcp-Name',reason:'required_for_named_request'})};
+      const decodedName=decodeMcpHeaderValue(nameHeader);
+      if(decodedName===undefined||decodedName!==String(bodyName))return {ok:false,status:400,body:rpcError(msg?.id,-32020,'HeaderMismatch',{header:'Mcp-Name',wire:nameHeader,body:bodyName})};
+    }else if(nameHeader){
+      return {ok:false,status:400,body:rpcError(msg?.id,-32020,'HeaderMismatch',{header:'Mcp-Name',reason:'unexpected_for_method'})};
+    }
   }
   return {ok:true,status:200};
 }
@@ -89,7 +108,7 @@ export async function handleRpc(msg,internalOpts={}){
   try{
     if(msg.method==='server/discover'){
       if(!modern)return rpcError(msg.id,-32602,'server/discover requires 2026-07-28 request metadata');
-      return {jsonrpc:'2.0',id:msg.id,result:modernResult({resultType:'complete',supportedVersions:SUPPORTED_PROTOCOL_VERSIONS,capabilities:{tools:{}}})};
+      return {jsonrpc:'2.0',id:msg.id,result:modernResult({supportedVersions:SUPPORTED_PROTOCOL_VERSIONS,capabilities:{tools:{}}},{cacheable:true})};
     }
     if(msg.method==='initialize'){
       if(modern)return rpcError(msg.id,-32601,'Method not found');
@@ -97,7 +116,7 @@ export async function handleRpc(msg,internalOpts={}){
       return {jsonrpc:'2.0',id:msg.id,result:{protocolVersion:selected,capabilities:{tools:{}},serverInfo:SERVER_INFO}};
     }
     if(msg.method==='notifications/initialized')return modern?rpcError(msg.id,-32601,'Method not found'):null;
-    if(msg.method==='tools/list'){const result={tools:toolDefs};return {jsonrpc:'2.0',id:msg.id,result:modern?modernResult(result):result};}
+    if(msg.method==='tools/list'){const result={tools:toolDefs};return {jsonrpc:'2.0',id:msg.id,result:modern?modernResult(result,{cacheable:true}):result};}
     if(msg.method==='tools/call'){
       const result=await handleTool(msg.params?.name,msg.params?.arguments??{},internalOpts);
       const payload={content:[{type:'text',text:JSON.stringify(result)}],structuredContent:result,isError:false};

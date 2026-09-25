@@ -37,3 +37,13 @@ test('smoke blocks destructive target probe without explicit destructive authori
 test('streamable SSE fixture works',async()=>{const f=await startFixture({mode:'sse'});try{const r=await smoke(f.url,{targetPolicy:tp,probe});assert.equal(r.state,'READY');}finally{await f.close();}});
 test('redirect is refused',async()=>{const f=await startFixture({mode:'redirect'});try{const r=await smoke(f.url,{targetPolicy:tp,probe});assert.equal(r.state,'INCOMPATIBLE');assert.match(r.checks.initialize.reason,/redirect_refused/);}finally{await f.close();}});
 test('deadline fails closed',async()=>{const f=await startFixture({mode:'slow'});try{const r=await smoke(f.url,{targetPolicy:tp,probe,timeoutMs:100});assert.equal(r.state,'INCOMPATIBLE');assert.match(r.checks.initialize.reason,/deadline_exceeded/);}finally{await f.close();}});
+
+test('target MCP success with wrong response media type fails closed',async()=>{
+  const f=await startFixture({mode:'wrong_content_type'});try{const r=await smoke(f.url,{targetPolicy:tp,probe});assert.equal(r.state,'INCOMPATIBLE');assert.match(r.checks.initialize.reason,/unexpected_content_type/);}finally{await f.close();}
+});
+test('target MCP request body ceiling refuses oversized calls before sending them',async()=>{
+  const f=await startFixture();try{
+    const {McpSession}=await import('../src/mcp/client.mjs');const s=new McpSession(f.url,{targetPolicy:tp,maxRequestBytes:64_000});await s.initialize();await s.listTools();
+    await assert.rejects(()=>s.callTool('safe_echo',{text:'x'.repeat(100_000)}),/request_too_large/);
+  }finally{await f.close();}
+});

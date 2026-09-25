@@ -8,3 +8,11 @@ test('key ids are stable',()=>{const k=generateSigningKeypair();assert.equal(key
 test('canonical object key order stable',()=>assert.equal(stable({b:1,a:2}),stable({a:2,b:1})));
 test('non finite receipt value rejected',()=>assert.throws(()=>stable({x:Infinity}),/non_finite/));
 test('production without key fails closed',()=>{const old={...process.env};delete process.env.SLEDGEWIRE_PRIVATE_KEY_FILE;delete process.env.SLEDGEWIRE_PRIVATE_KEY_PEM;try{assert.throws(()=>loadSigningMaterial({production:true}),/production_signing_key_required/);}finally{process.env=old;}});
+
+test('canonicalizer rejects malicious depth before stack exhaustion',()=>{
+  let x={leaf:true};for(let i=0;i<200;i++)x={x};
+  assert.throws(()=>stable(x),/canonical_depth_limit/);
+});
+test('canonicalizer rejects cycles deterministically',()=>{
+  const x={};x.self=x;assert.throws(()=>stable(x),/canonical_cycle/);
+});

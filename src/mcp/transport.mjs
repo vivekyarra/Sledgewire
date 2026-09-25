@@ -24,13 +24,15 @@ export class HttpMcpError extends Error{
 export async function postJsonPinned(endpoint,body,opts={}){
   const resolved=opts.resolvedTarget??await resolveTarget(endpoint,opts.targetPolicy);
   const maxBytes=opts.maxBytes??1_000_000;
+  const maxRequestBytes=opts.maxRequestBytes??262_144;
   const timeoutMs=opts.timeoutMs??8_000;
   const payload=Buffer.from(JSON.stringify(body));
+  if(payload.length>maxRequestBytes)throw new Error('request_too_large');
   const lib=resolved.url.protocol==='https:'?https:http;
   const headers={'content-type':'application/json','accept':'application/json, text/event-stream','content-length':String(payload.length),...(opts.headers??{})};
   return await new Promise((resolve,reject)=>{
-    let settled=false;let timer;
-    const done=(fn,v)=>{if(settled)return;settled=true;clearTimeout(timer);fn(v);};
+    let settled=false;let timer;let abortHandler=null;
+    const done=(fn,v)=>{if(settled)return;settled=true;clearTimeout(timer);if(abortHandler&&opts.signal)opts.signal.removeEventListener('abort',abortHandler);fn(v);};
     const request=lib.request({
       protocol:resolved.url.protocol,hostname:resolved.url.hostname,port:resolved.url.port||undefined,
       path:`${resolved.url.pathname}${resolved.url.search}`,method:'POST',headers,
@@ -38,6 +40,9 @@ export async function postJsonPinned(endpoint,body,opts={}){
       lookup:(_hostname,_options,cb)=>cb(null,resolved.address,resolved.family)
     },res=>{
       if(res.statusCode>=300&&res.statusCode<400){res.resume();return done(reject,new Error('redirect_refused'));}
+      const declaredRaw=res.headers['content-length'];
+      const declared=declaredRaw===undefined?null:Number(Array.isArray(declaredRaw)?declaredRaw[0]:declaredRaw);
+      if(declared!==null&&Number.isFinite(declared)&&declared>maxBytes){res.resume();return done(reject,new Error('response_too_large'));}
       const chunks=[];let size=0;
       res.on('data',chunk=>{size+=chunk.length;if(size>maxBytes){request.destroy(new Error('response_too_large'));return;}chunks.push(chunk);});
       res.on('end',()=>{
@@ -47,8 +52,9 @@ export async function postJsonPinned(endpoint,body,opts={}){
         try{
           let obj=null;
           if(text.trim()){
-            const ct=String(res.headers['content-type']??'');
-            if(ct.includes('text/event-stream'))obj=parseSse(text);
+            const media=String(res.headers['content-type']??'').split(';',1)[0].trim().toLowerCase();
+            if(status>=200&&status<300&&media!=='application/json'&&media!=='text/event-stream')throw new Error('unexpected_content_type');
+            if(media==='text/event-stream')obj=parseSse(text);
             else {try{obj=JSON.parse(text);}catch(error){if(status>=200&&status<300)throw error;}}
           }
           if(status<200||status>=300)return done(reject,new HttpMcpError(status,obj,text));
@@ -58,7 +64,7 @@ export async function postJsonPinned(endpoint,body,opts={}){
     });
     request.on('error',e=>done(reject,e));
     timer=setTimeout(()=>request.destroy(new Error('deadline_exceeded')),timeoutMs);
-    if(opts.signal){if(opts.signal.aborted)request.destroy(opts.signal.reason??new Error('aborted'));else opts.signal.addEventListener('abort',()=>request.destroy(opts.signal.reason??new Error('aborted')),{once:true});}
+    if(opts.signal){abortHandler=()=>request.destroy(opts.signal.reason??new Error('aborted'));if(opts.signal.aborted)abortHandler();else opts.signal.addEventListener('abort',abortHandler,{once:true});}
     request.end(payload);
   });
 }

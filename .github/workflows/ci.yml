@@ -18,9 +18,9 @@ jobs:
       - run: npm install --ignore-scripts
       - run: npm test
       - run: npm run selfcheck
-      - run: npm run stress -- 5000 96
-      - run: npm run stress:arena -- 5000
-      - run: npm run stress:dupes -- 500 12
+      - run: npm run stress -- 10000 128
+      - run: npm run stress:arena -- 10000
+      - run: npm run stress:dupes -- 1000 16
       - run: npm run economy
       - run: npm run sharedos:check
       - run: npm run preflight

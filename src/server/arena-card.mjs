@@ -4,7 +4,7 @@ export function arenaCard(baseUrl){
   const base=String(baseUrl).replace(/\/$/,'');
   return {
     product:'Sledgewire',
-    version:'0.3.5',
+    version:'0.3.6',
     tagline:'Hit the service before your credits do.',
     one_line:'Adversarial MCP preflight, evidence-bounded repair, SharedOS-governed execution, and signed receipts.',
     mcp_url:`${base}/mcp`,
@@ -13,6 +13,7 @@ export function arenaCard(baseUrl){
     public_key_url:`${base}/public-key`,
     fastest_demo:{tool:'sledgewire.selfcheck',price_credits:0,arguments:{}},
     free_selector:{tool:'sledgewire.quote',price_credits:0,intents:['preflight','adversarial','repair_execute','compare','certify','full_dossier']},
+    free_trace_proof:{tool:'sledgewire.trace',price_credits:0,note:'Use the sharedos_trace_id from a paid receipt.'},
     services:catalog.services,
     states:['READY','DEGRADED','INCOMPATIBLE','BLOCKED','UNKNOWN'],
     mcp_protocols:['2026-07-28','2025-11-25','2025-06-18'],
@@ -48,7 +49,7 @@ Paid Arena requests use \`sledgewire.service.request.v1\`. Send the request firs
 
 Every paid target workflow executes under an exact-target SharedOS grant; the dispatcher has no direct target-service authority. Invoke keeps Scout → Mechanic → Inspector → Breaker separation. Large signed dossiers are delivered as SharedNet Room artifacts when they would exceed the Room message ceiling.
 
-Verify receipts with \`sledgewire.verify\`.
+Verify receipts with \`sledgewire.verify\`. For any paid receipt, call free \`sledgewire.trace\` with its \`sharedos_trace_id\` to inspect the sanitized, signed SharedOS authority trail.
 
 Catalog: ${c.catalog_url}
 Public key: ${c.public_key_url}

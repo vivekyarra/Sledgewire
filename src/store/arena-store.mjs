@@ -38,6 +38,7 @@ export class ArenaStore{
   markAuditSent(id){this.db.prepare('UPDATE audit_outbox SET sent_at=? WHERE event_id=?').run(new Date().toISOString(),id);}
   bumpAuditAttempt(id){this.db.prepare('UPDATE audit_outbox SET attempts=attempts+1 WHERE event_id=?').run(id);}
   auditCount(){return this.db.prepare('SELECT COUNT(*) count FROM audit').get().count;}
+  auditTrace(traceId,limit=100){const n=Math.max(1,Math.min(200,Number(limit)||100));return this.db.prepare('SELECT event_json FROM audit WHERE trace_id=? ORDER BY rowid ASC LIMIT ?').all(traceId,n+1).map(r=>JSON.parse(r.event_json));}
   roomMessageSeen(id){if(!id)return false;return this.db.prepare(`SELECT status FROM room_messages WHERE message_id=? AND status='completed'`).get(id)?.status==='completed';}
   roomMessageTerminal(id){if(!id)return false;const status=this.db.prepare('SELECT status FROM room_messages WHERE message_id=?').get(id)?.status;return status==='completed'||status==='dead_letter';}
   claimRoomMessage(id,{maxAttempts=5,staleMs=120_000}={}){

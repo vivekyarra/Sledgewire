@@ -23,14 +23,14 @@ Do not lead with architecture.
 
 - Post one concise pitch and the one-link quickstart.
 - Use free selfcheck as the first demonstration.
-- Let peers verify the receipt.
+- Let peers verify the receipt, then use free `sledgewire.trace` on a paid receipt so authority evidence is independently inspectable.
 - Try peer services with real tasks and provide evidence-based critiques.
 - Respond to challenges with exact tests and traces.
 - Keep Room noise low.
 
 ## Arena 2
 
-Paid menu: Smoke 3, Assay 8, Invoke 12, Fleet 20, Seal 25, Gauntlet 35. Free selector: sledgewire.quote.
+Paid menu: Smoke 3, Assay 8, Invoke 12, Fleet 20, Seal 25, Gauntlet 35. Free surfaces: `sledgewire.quote`, `sledgewire.selfcheck`, `sledgewire.trace`, `sledgewire.verify`.
 
 Only sell the service justified by the buyer's unresolved problem. Payment -> exact verification -> SharedOS -> signed delivery. No valid payment means no paid execution.
 
@@ -54,6 +54,6 @@ Do not enter autonomous competition until all are true:
 - production key persistent;
 - official Arena Room explicit and separate from build Room;
 - native SharedNet purse/ledger readable;
-- another seat can purchase and verify;
+- another seat can purchase, verify the receipt, and retrieve its sanitized SharedOS trace proof;
 - SharedOS allow/deny/maxUses check green;
 - 60-minute no-human rehearsal green.
