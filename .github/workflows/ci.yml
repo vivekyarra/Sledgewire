@@ -1,0 +1,33 @@
+name: CI
+on:
+  push:
+    branches: [main, 'build/**', 'release/**']
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - run: npm install --ignore-scripts
+      - run: npm test
+      - run: npm run selfcheck
+      - run: npm run stress -- 1000 48
+      - run: npm run sharedos:check
+      - run: npm run preflight
+      - name: production key fail-closed check
+        run: |
+          if NODE_ENV=production node -e "import('./src/server/protocol.mjs')"; then
+            echo 'production unexpectedly started without signing key' >&2
+            exit 1
+          fi
+      - name: production key success check
+        run: |
+          node scripts/keygen.mjs /tmp/swkeys >/tmp/key.json
+          NODE_ENV=production SLEDGEWIRE_PRIVATE_KEY_FILE=/tmp/swkeys/ed25519-private.pem SLEDGEWIRE_PUBLIC_KEY_FILE=/tmp/swkeys/ed25519-public.pem node -e "import('./src/server/protocol.mjs').then(m=>console.log(m.PUBLIC_KEY_ID))"
