@@ -1,0 +1,11 @@
+node_modules/
+coverage/
+.sledgewire/
+*.db
+*.db-shm
+*.db-wal
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
