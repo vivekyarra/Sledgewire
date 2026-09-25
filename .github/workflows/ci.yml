@@ -18,8 +18,9 @@ jobs:
       - run: npm install --ignore-scripts
       - run: npm test
       - run: npm run selfcheck
-      - run: npm run stress -- 2000 64
-      - run: npm run stress:arena -- 1000
+      - run: npm run stress -- 5000 96
+      - run: npm run stress:arena -- 5000
+      - run: npm run stress:dupes -- 500 12
       - run: npm run economy
       - run: npm run sharedos:check
       - run: npm run preflight
@@ -33,3 +34,11 @@ jobs:
         run: |
           node scripts/keygen.mjs /tmp/swkeys >/tmp/key.json
           NODE_ENV=production SLEDGEWIRE_PRIVATE_KEY_FILE=/tmp/swkeys/ed25519-private.pem SLEDGEWIRE_PUBLIC_KEY_FILE=/tmp/swkeys/ed25519-public.pem node -e "import('./src/server/protocol.mjs').then(m=>console.log(m.PUBLIC_KEY_ID))"
+      - name: production paid bypass is impossible
+        run: |
+          set +e
+          NODE_ENV=production PUBLIC_BASE_URL=https://sledgewire.example SLEDGEWIRE_PUBLIC_PAID_EXECUTION=1 SLEDGEWIRE_PRIVATE_KEY_FILE=/tmp/swkeys/ed25519-private.pem SLEDGEWIRE_PUBLIC_KEY_FILE=/tmp/swkeys/ed25519-public.pem node src/server/http.mjs >/tmp/bypass.out 2>/tmp/bypass.err
+          code=$?
+          set -e
+          test "$code" -ne 0
+          grep -q 'production_paid_execution_bypass_forbidden' /tmp/bypass.err
