@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {SEAT,ADDRESS,ROOM,TXN,INSTANCE_TOKEN,normalizeTransfer,SharedNetApi,parseWatchBatch,senderInstance,payeeBelongsToIdentity,MAX_ARTIFACT_BYTES,MAX_SHAREDNET_JSON_BYTES} from '../src/sharednet/api.mjs';
+import {SEAT,ADDRESS,ROOM,TXN,INSTANCE_TOKEN,normalizeTransfer,SharedNetApi,parseWatchBatch,senderInstance,payeeBelongsToIdentity,MAX_ARTIFACT_BYTES,MAX_SHAREDNET_JSON_BYTES,MAX_SHAREDNET_PAGE_BYTES} from '../src/sharednet/api.mjs';
 import {ArenaStore} from '../src/store/arena-store.mjs';
 import {createArenaHandler} from '../src/sharednet/handler.mjs';
 import {generateSigningKeypair} from '../src/receipts/receipt.mjs';
@@ -91,4 +91,24 @@ test('SharedNet artifact response is validated and relative trusted URLs are nor
   const api=new SharedNetApi({token,fetchImpl:async()=>{n++;return new Response(JSON.stringify(n===1?{artifact:{id:'art_ABCDEFGHIJ'},url:'/api/v1/artifacts/art_ABCDEFGHIJ'}:{}),{status:201});}});
   const ok=await api.uploadArtifact('x',{roomId:'rom_ABCDEFGHIJ'});assert.equal(ok.url,'https://www.sharednet.ai/api/v1/artifacts/art_ABCDEFGHIJ');
   await assert.rejects(()=>api.uploadArtifact('x',{roomId:'rom_ABCDEFGHIJ'}),/artifact_response_invalid/);
+});
+
+test('SharedNet transfer direction string alone cannot prove incoming payment',()=>{
+  const id={principal:{id:'p_ABCDEFGHIJ'},instance:{id:'i_ABCDEFGHIJ'}};
+  const tx=normalizeTransfer({id:'txn_ABCDEFGHIJ',sender_instance_id:'i_ZYXWVUTSRQ',direction:'received',amount:3,room_id:'rom_ABCDEFGHIJ',memo:'m'},id);
+  assert.equal(tx.payee_ok,false);
+});
+test('SharedNet base rejects non-HTTP schemes even for localhost',()=>{
+  const token='sni_'+ 'A'.repeat(43);
+  assert.throws(()=>new SharedNetApi({token,baseUrl:'ftp://localhost'}),/must_be_https/);
+});
+test('SharedNet artifact URL must stay on configured origin',async()=>{
+  const token='sni_'+ 'A'.repeat(43);
+  const api=new SharedNetApi({token,fetchImpl:async()=>new Response(JSON.stringify({artifact:{id:'art_ABCDEFGHIJ'},url:'https://evil.example/file'}),{status:201})});
+  await assert.rejects(()=>api.uploadArtifact('x',{roomId:'rom_ABCDEFGHIJ'}),/artifact_response_invalid/);
+});
+test('SharedNet message page can exceed generic JSON ceiling but remains bounded by page ceiling',async()=>{
+  const token='sni_'+ 'A'.repeat(43),padding='x'.repeat(MAX_SHAREDNET_JSON_BYTES+100_000);
+  const api=new SharedNetApi({token,fetchImpl:async()=>new Response(JSON.stringify({items:[{content:padding}],next_cursor:null,has_more:false}),{status:200})});
+  const r=await api.messages('rom_ABCDEFGHIJ');assert.equal(r.items[0].content.length,padding.length);assert.ok(MAX_SHAREDNET_PAGE_BYTES>MAX_SHAREDNET_JSON_BYTES);
 });

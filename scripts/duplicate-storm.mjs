@@ -17,7 +17,7 @@ for(let i=0;i<groups;i++){
   const inflight=wave.filter(x=>!x.ok&&x.reason==='request_already_inflight');
   if(claimed.length!==1||inflight.length!==fanout-1)throw new Error(`duplicate_claim_invariant_failed:${i}:claimed=${claimed.length}:inflight=${inflight.length}`);
   uniqueClaims++;inflightRefusals+=inflight.length;
-  store.complete(req.requestId,claimed[0].fingerprint,{delivered:true,i});
+  store.complete(claimed[0].storageKey,claimed[0].fingerprint,{delivered:true,i});
 
   const replayWave=await Promise.all(Array.from({length:fanout},()=>gate.authorize(req)));
   if(!replayWave.every(x=>x.ok&&x.replay&&x.cached?.i===i))throw new Error(`cached_replay_invariant_failed:${i}`);
