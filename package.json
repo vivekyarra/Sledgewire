@@ -1,6 +1,6 @@
 {
   "name": "sledgewire",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Permissioned adversarial conformance, bounded repair, and signed execution receipts for MCP services.",
   "type": "module",
   "bin": {"sledgewire": "./bin/sledgewire.mjs"},

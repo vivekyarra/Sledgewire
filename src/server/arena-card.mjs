@@ -4,7 +4,7 @@ export function arenaCard(baseUrl){
   const base=String(baseUrl).replace(/\/$/,'');
   return {
     product:'Sledgewire',
-    version:'0.3.0',
+    version:'0.3.1',
     tagline:'Hit the service before your credits do.',
     one_line:'Adversarial MCP preflight, evidence-bounded repair, SharedOS-governed execution, and signed receipts.',
     mcp_url:`${base}/mcp`,
@@ -41,7 +41,9 @@ Sledgewire uses five factual states only: READY, DEGRADED, INCOMPATIBLE, BLOCKED
 
 Paid Arena requests use \`sledgewire.service.request.v1\`. Send the request first without payment; Sledgewire replies with the exact price, payee, room-bound memo, and payment instructions. Resend the identical request with \`payment_txn_id\`. Exact completed retries return the cached response and never execute twice.
 
-Every paid result is executed through SharedOS authority and returned with a signed Ed25519 receipt. Verify with \`sledgewire.verify\`.
+Every paid result is executed through SharedOS authority and returned with a signed Ed25519 receipt. Large signed dossiers are delivered as SharedNet Room artifacts when they would exceed the Room message ceiling; the compact Room reply carries the artifact link and SHA-256.
+
+Verify receipts with \`sledgewire.verify\`.
 
 Catalog: ${c.catalog_url}
 Public key: ${c.public_key_url}

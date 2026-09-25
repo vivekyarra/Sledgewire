@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import catalog from '../catalog.json' with {type:'json'};
 import {loadSigningMaterial} from '../src/receipts/receipt.mjs';
-import {SharedNetApi,ROOM,ADDRESS,INSTANCE_TOKEN} from '../src/sharednet/api.mjs';
+import {SharedNetApi,ROOM,ADDRESS,INSTANCE_TOKEN,payeeBelongsToIdentity} from '../src/sharednet/api.mjs';
 
 const live=process.argv.includes('--live');const submission=process.argv.includes('--submission');const checks=[];const add=(name,ok,detail='')=>checks.push({name,ok,detail});
 const [major,minor]=process.versions.node.split('.').map(Number);add('node>=22.18',major>22||(major===22&&minor>=18),process.versions.node);
@@ -11,18 +11,26 @@ const actual=Object.fromEntries(Object.entries(catalog.services).map(([k,v])=>[k
 try{const s=loadSigningMaterial({production:live||process.env.NODE_ENV==='production'});add('signing_key',!live||!s.ephemeral,s.keyId);}catch(e){add('signing_key',false,String(e.message||e));}
 const db=process.env.SLEDGEWIRE_DB||'.sledgewire/arena.db';try{const dir=path.dirname(path.resolve(db));fs.mkdirSync(dir,{recursive:true});fs.accessSync(dir,fs.constants.W_OK);add('durable_store_path',true,dir);}catch(e){add('durable_store_path',false,String(e));}
 const publicBase=process.env.PUBLIC_BASE_URL??'';if(live||submission)add('public_product_link',publicBase.startsWith('https://'),publicBase||'missing');
+const buildRoom=process.env.SHAREDNET_BUILD_ROOM_ID??'';
 if(submission){
-  const buildRoom=process.env.SHAREDNET_BUILD_ROOM_ID??'';add('development_sharednet_room',ROOM.test(buildRoom),buildRoom||'missing');
+  add('development_sharednet_room',ROOM.test(buildRoom),buildRoom||'missing');
   add('participant_name',Boolean(process.env.SLEDGEWIRE_PARTICIPANT_NAME?.trim()),process.env.SLEDGEWIRE_PARTICIPANT_NAME??'missing');
   add('participant_contact',Boolean(process.env.SLEDGEWIRE_CONTACT?.trim()),process.env.SLEDGEWIRE_CONTACT?'present':'missing');
 }
 if(live){
   const room=process.env.SHAREDNET_ARENA_ROOM_ID??'',payee=process.env.SHAREDNET_PAYEE_ADDRESS??'',token=process.env.SHAREDNET_INSTANCE_TOKEN??'';
   add('arena_room_is_separate_explicit_env',ROOM.test(room),room||'missing');
+  if(ROOM.test(buildRoom))add('build_and_arena_rooms_are_distinct',buildRoom!==room,`build=${buildRoom};arena=${room}`);
   add('sharednet_payee',ADDRESS.test(payee),payee||'missing');
   add('sharednet_instance_token',INSTANCE_TOKEN.test(token),'present-but-redacted');
-  if(INSTANCE_TOKEN.test(token)){
-    try{const api=new SharedNetApi({token});const identity=await api.current();add('sharednet_authenticated',Boolean(identity?.instance?.id),'current instance resolved');const rooms=await api.request(`/api/v1/rooms/${room}`);add('arena_room_membership',Boolean(rooms?.room?.id),'membership confirmed');const credits=await api.credits();add('credits_endpoint',Number.isFinite(Number(credits?.credits?.balance)),'purse readable');}catch(e){add('sharednet_live_api',false,String(e.message||e));}
+  if(INSTANCE_TOKEN.test(token)&&ROOM.test(room)){
+    try{
+      const api=new SharedNetApi({token});const identity=await api.current();
+      add('sharednet_authenticated',Boolean(identity?.instance?.id),'current instance resolved');
+      add('payee_owned_by_current_identity',payeeBelongsToIdentity(payee,identity),'must be current principal/agent/instance');
+      await api.join(room);const rooms=await api.request(`/api/v1/rooms/${room}`);add('arena_room_membership',Boolean(rooms?.room?.id),'membership confirmed');
+      const credits=await api.credits();add('credits_endpoint',Number.isFinite(Number(credits?.credits?.balance)),'purse readable');
+    }catch(e){add('sharednet_live_api',false,String(e.message||e));}
   }
   add('external_call_confirmed',process.env.SHAREDNET_EXTERNAL_CALL_CONFIRMED==='1','requires real other-seat call');
   if(process.env.SLEDGEWIRE_SHAREDOS_REQUIRED==='1'){add('sharedos_audit_url',Boolean(process.env.SHAREDOS_AUDIT_URL),'required');add('sharedos_key',Boolean(process.env.SHAREDOS_KEY),'required');add('sharedos_audit_confirmed',process.env.SHAREDOS_AUDIT_CONFIRMED==='1','requires real visible trace');}
