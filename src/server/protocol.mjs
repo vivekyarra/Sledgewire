@@ -46,13 +46,10 @@ export async function handleTool(name,args={},internalOpts={}){
 export async function handleRpc(msg,internalOpts={}){
   if(msg?.jsonrpc!=='2.0')return {jsonrpc:'2.0',id:msg?.id??null,error:{code:-32600,message:'Invalid Request'}};
   try{
-    if(msg.method==='initialize')return {jsonrpc:'2.0',id:msg.id,result:{protocolVersion:'2025-06-18',capabilities:{tools:{}},serverInfo:{name:'sledgewire',version:'0.3.0'}}};
+    if(msg.method==='initialize')return {jsonrpc:'2.0',id:msg.id,result:{protocolVersion:'2025-06-18',capabilities:{tools:{}},serverInfo:{name:'sledgewire',version:'0.3.1'}}};
     if(msg.method==='notifications/initialized')return null;
     if(msg.method==='tools/list')return {jsonrpc:'2.0',id:msg.id,result:{tools:toolDefs}};
-    if(msg.method==='tools/call'){
-      const result=await handleTool(msg.params?.name,msg.params?.arguments??{},internalOpts);
-      return {jsonrpc:'2.0',id:msg.id,result:{content:[{type:'text',text:JSON.stringify(result)}],structuredContent:result,isError:false}};
-    }
+    if(msg.method==='tools/call'){const result=await handleTool(msg.params?.name,msg.params?.arguments??{},internalOpts);return {jsonrpc:'2.0',id:msg.id,result:{content:[{type:'text',text:JSON.stringify(result)}],structuredContent:result,isError:false}};}
     return {jsonrpc:'2.0',id:msg.id,error:{code:-32601,message:'Method not found'}};
   }catch(e){return {jsonrpc:'2.0',id:msg.id??null,error:{code:-32000,message:String(e.message||e)}};}
 }

@@ -6,11 +6,15 @@ export const ROOM=new RegExp(`^rom_(?:[0-9A-Za-z]{10}|${CROCKFORD}{26})$`);
 export const TXN=new RegExp(`^txn_(?:[0-9A-Za-z]{10}|${CROCKFORD}{26})$`);
 export const MESSAGE=new RegExp(`^msg_(?:[0-9A-Za-z]{10}|${CROCKFORD}{26})$`);
 export const INSTANCE_TOKEN=/^sni_[A-Za-z0-9_-]{43}$/;
+export const MAX_ARTIFACT_BYTES=4_194_304;
 
 function safeBase(raw){const u=new URL(raw??'https://www.sharednet.ai');if(u.protocol!=='https:'&&u.hostname!=='127.0.0.1'&&u.hostname!=='localhost')throw new Error('sharednet_base_must_be_https');return u.toString().replace(/\/$/,'');}
 function asId(x){return typeof x==='string'?x:null;}
 function transferField(tx,names){for(const n of names)if(tx?.[n]!==undefined&&tx?.[n]!==null)return tx[n];return null;}
 export function idempotencyUuid(seed){const b=createHash('sha256').update(String(seed)).digest().subarray(0,16);b[6]=(b[6]&0x0f)|0x40;b[8]=(b[8]&0x3f)|0x80;const h=b.toString('hex');return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;}
+export function payeeBelongsToIdentity(payee,identity){const ids=[identity?.principal?.id??identity?.principal_id,identity?.agent?.id??identity?.agent_id,identity?.instance?.id??identity?.instance_id].filter(Boolean);return ids.includes(payee);}
+function delay(ms,signal){return new Promise((resolve,reject)=>{const t=setTimeout(resolve,ms);if(signal){const abort=()=>{clearTimeout(t);reject(signal.reason??new Error('aborted'));};if(signal.aborted)return abort();signal.addEventListener('abort',abort,{once:true});}});}
+function retryAfterMs(response,fallback){const raw=response.headers?.get?.('retry-after');const seconds=raw===null?NaN:Number(raw);return Number.isFinite(seconds)?Math.min(5000,Math.max(0,seconds*1000)):fallback;}
 
 export function normalizeTransfer(tx,identity){
   if(!tx||typeof tx!=='object')return null;
@@ -28,23 +32,35 @@ export function normalizeTransfer(tx,identity){
 }
 
 export class SharedNetApi{
-  constructor({token=process.env.SHAREDNET_INSTANCE_TOKEN,baseUrl=process.env.SHAREDNET_BASE_URL??'https://www.sharednet.ai',timeoutMs=10000,fetchImpl=globalThis.fetch}={}){
+  constructor({token=process.env.SHAREDNET_INSTANCE_TOKEN,baseUrl=process.env.SHAREDNET_BASE_URL??'https://www.sharednet.ai',timeoutMs=10000,retryBaseMs=250,fetchImpl=globalThis.fetch}={}){
     if(!token||!INSTANCE_TOKEN.test(token))throw new Error('valid_sharednet_instance_token_required');
-    this.token=token;this.base=safeBase(baseUrl);this.timeoutMs=timeoutMs;this.fetch=fetchImpl;this.identityCache=null;
+    this.token=token;this.base=safeBase(baseUrl);this.timeoutMs=timeoutMs;this.retryBaseMs=retryBaseMs;this.fetch=fetchImpl;this.identityCache=null;
   }
-  async request(path,{method='GET',body=null,idempotencyKey=null,signal=null}={}){
-    const controller=new AbortController();const timer=setTimeout(()=>controller.abort(new Error('sharednet_deadline_exceeded')),this.timeoutMs);
-    const relay=()=>controller.abort(signal.reason??new Error('aborted'));signal?.addEventListener('abort',relay,{once:true});
-    try{
-      const headers={authorization:`Bearer ${this.token}`,accept:'application/json'};if(body!==null)headers['content-type']='application/json';if(idempotencyKey)headers['idempotency-key']=idempotencyKey;
-      const r=await this.fetch(`${this.base}${path}`,{method,headers,body:body===null?undefined:JSON.stringify(body),signal:controller.signal,redirect:'error'});
-      const text=await r.text();let payload=null;try{payload=text?JSON.parse(text):null;}catch{throw new Error('sharednet_invalid_json');}
-      if(!r.ok)throw new Error(`sharednet_http_${r.status}:${payload?.error?.code??'unknown'}`);return payload;
-    }finally{clearTimeout(timer);signal?.removeEventListener('abort',relay);}
+  async request(path,{method='GET',body=null,rawBody=null,contentType=null,extraHeaders=null,idempotencyKey=null,signal=null,timeoutMs=this.timeoutMs,retries=2}={}){
+    if(body!==null&&rawBody!==null)throw new Error('sharednet_body_mode_conflict');
+    for(let attempt=0;;attempt++){
+      const controller=new AbortController();const timer=setTimeout(()=>controller.abort(new Error('sharednet_deadline_exceeded')),timeoutMs);
+      const relay=()=>controller.abort(signal.reason??new Error('aborted'));signal?.addEventListener('abort',relay,{once:true});
+      try{
+        const headers={authorization:`Bearer ${this.token}`,accept:'application/json',...(extraHeaders??{})};
+        let payloadBody;
+        if(body!==null){headers['content-type']='application/json';payloadBody=JSON.stringify(body);}
+        else if(rawBody!==null){headers['content-type']=contentType??'application/octet-stream';payloadBody=rawBody;}
+        if(idempotencyKey)headers['idempotency-key']=idempotencyKey;
+        const response=await this.fetch(`${this.base}${path}`,{method,headers,body:payloadBody,signal:controller.signal,redirect:'error'});
+        const text=await response.text();
+        let payload=null;try{payload=text?JSON.parse(text):null;}catch{if(response.ok)throw new Error('sharednet_invalid_json');}
+        if(!response.ok){
+          if([429,502,503,504].includes(response.status)&&attempt<retries){await delay(retryAfterMs(response,this.retryBaseMs*(2**attempt)),signal);continue;}
+          throw new Error(`sharednet_http_${response.status}:${payload?.error?.code??'unknown'}`);
+        }
+        return payload;
+      }finally{clearTimeout(timer);signal?.removeEventListener('abort',relay);}
+    }
   }
   async current(signal){if(this.identityCache)return this.identityCache;const x=await this.request('/api/v1/instances/current',{signal});this.identityCache=x;return x;}
   async join(roomId,signal){if(!ROOM.test(roomId))throw new Error('invalid_sharednet_room');return this.request(`/api/v1/rooms/${roomId}/join`,{method:'POST',idempotencyKey:idempotencyUuid(`join:${roomId}`),signal});}
-  async heartbeat(signal){return this.request('/api/v1/instances/current/heartbeat',{method:'POST',signal});}
+  async heartbeat(signal){return this.request('/api/v1/instances/current/heartbeat',{method:'POST',signal,retries:1});}
   async credits(signal){return this.request('/api/v1/credits',{signal});}
   async get(txnId,signal){
     if(!TXN.test(txnId))return null;const identity=await this.current(signal);let before=null;
@@ -54,15 +70,20 @@ export class SharedNetApi{
     if(!ROOM.test(roomId))throw new Error('invalid_sharednet_room');const qs=new URLSearchParams({limit:String(limit),order});if(after!==null)qs.set('after',String(after));return this.request(`/api/v1/rooms/${roomId}/messages?${qs}`,{signal});
   }
   async latestSequence(roomId,signal){const x=await this.messages(roomId,{order:'desc',limit:1,signal});return Number(x?.items?.[0]?.sequence??0);}
-  async wait(roomId,after=0,signal){if(!ROOM.test(roomId))throw new Error('invalid_sharednet_room');const qs=new URLSearchParams({after:String(after),timeout:'25',limit:'100'});return this.request(`/api/v1/rooms/${roomId}/wait?${qs}`,{signal});}
+  async wait(roomId,after=0,signal){if(!ROOM.test(roomId))throw new Error('invalid_sharednet_room');const qs=new URLSearchParams({after:String(after),timeout:'25',limit:'100'});return this.request(`/api/v1/rooms/${roomId}/wait?${qs}`,{signal,timeoutMs:30_000,retries:1});}
   async post(roomId,content,{replyTo=null,signal=null,idempotencyKey=crypto.randomUUID()}={}){
     if(!ROOM.test(roomId))throw new Error('invalid_sharednet_room');const body={content:String(content),...(replyTo?{reply_to_message_id:replyTo}:{})};return this.request(`/api/v1/rooms/${roomId}/messages`,{method:'POST',body,idempotencyKey,signal});
+  }
+  async uploadArtifact(content,{filename='sledgewire-delivery.json',roomId=null,signal=null,idempotencyKey=crypto.randomUUID()}={}){
+    const bytes=Buffer.isBuffer(content)?content:Buffer.from(String(content));if(bytes.length>MAX_ARTIFACT_BYTES)throw new Error('sharednet_artifact_too_large_client_side');
+    if(!/^[^/\\\u0000-\u001f\u007f]{1,240}$/.test(filename))throw new Error('invalid_artifact_filename');if(roomId&&!ROOM.test(roomId))throw new Error('invalid_sharednet_room');
+    const extraHeaders={'x-sharednet-filename':filename,...(roomId?{'x-sharednet-room':roomId}:{})};
+    return this.request('/api/v1/artifacts',{method:'POST',rawBody:bytes,contentType:'application/json',extraHeaders,idempotencyKey,signal,timeoutMs:20_000});
   }
   async pay(to,amount,{memo=null,roomId=null,signal=null,idempotencyKey=crypto.randomUUID()}={}){
     if(!ADDRESS.test(to))throw new Error('invalid_sharednet_payee');if(!Number.isInteger(amount)||amount<1)throw new Error('invalid_credit_amount');if(roomId&&!ROOM.test(roomId))throw new Error('invalid_sharednet_room');
     return this.request('/api/v1/credits/transfers',{method:'POST',body:{to,amount,...(memo?{memo}:{}),...(roomId?{room_id:roomId}:{})},idempotencyKey,signal});
   }
 }
-
 export function senderInstance(message){return message?.sender_instance_id??message?.sender?.instance_id??message?.sender?.member_id??null;}
 export function parseWatchBatch(text){const x=JSON.parse(text);const messages=Array.isArray(x)?x:(Array.isArray(x?.messages)?x.messages:(x?.message?[x.message]:[]));if(!messages.length)throw new Error('invalid_sharednet_watch_batch');const roomId=x?.room_id??messages[0]?.room_id;if(!ROOM.test(roomId??''))throw new Error('invalid_sharednet_watch_room');for(const m of messages){if(typeof m?.content!=='string'||(m.room_id&&m.room_id!==roomId)||!SEAT.test(senderInstance(m)??''))throw new Error('invalid_sharednet_watch_message');}return {room_id:roomId,messages};}

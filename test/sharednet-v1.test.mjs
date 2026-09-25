@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {SEAT,ADDRESS,ROOM,TXN,INSTANCE_TOKEN,normalizeTransfer,SharedNetApi,parseWatchBatch,senderInstance} from '../src/sharednet/api.mjs';
+import {SEAT,ADDRESS,ROOM,TXN,INSTANCE_TOKEN,normalizeTransfer,SharedNetApi,parseWatchBatch,senderInstance,payeeBelongsToIdentity,MAX_ARTIFACT_BYTES} from '../src/sharednet/api.mjs';
 import {ArenaStore} from '../src/store/arena-store.mjs';
 import {createArenaHandler} from '../src/sharednet/handler.mjs';
 import {generateSigningKeypair} from '../src/receipts/receipt.mjs';
@@ -50,3 +50,21 @@ test('arena handler returns exact payment requirement before execution',async()=
   assert.equal(r.type,'sledgewire.payment_required.v1');assert.equal(r.price_credits,3);assert.equal(r.room_id,'rom_ABCDEFGHIJ');assert.equal(r.memo,'sledgewire:req-abc:sledgewire.smoke');
 });
 test('arena store remembers processed room messages and cursors',()=>{const s=new ArenaStore(':memory:');assert.equal(s.roomMessageSeen('msg_1'),false);s.markRoomMessage('msg_1');assert.equal(s.roomMessageSeen('msg_1'),true);s.setMeta('cursor','42');assert.equal(s.getMeta('cursor'),'42');});
+
+
+test('payee must belong to current SharedNet identity',()=>{
+  const identity={principal:{id:'p_ABCDEFGHIJ'},agent:{id:'a_ABCDEFGHIJ'},instance:{id:'i_ABCDEFGHIJ'}};
+  assert.equal(payeeBelongsToIdentity('p_ABCDEFGHIJ',identity),true);
+  assert.equal(payeeBelongsToIdentity('a_ABCDEFGHIJ',identity),true);
+  assert.equal(payeeBelongsToIdentity('i_ABCDEFGHIJ',identity),true);
+  assert.equal(payeeBelongsToIdentity('p_ZYXWVUTSRQ',identity),false);
+});
+test('SharedNet API retries a transient 503 then succeeds',async()=>{
+  const token='sni_'+ 'A'.repeat(43);let calls=0;
+  const fetchImpl=async()=>{calls++;if(calls===1)return new Response(JSON.stringify({error:{code:'service_unavailable'}}),{status:503});return new Response(JSON.stringify({credits:{balance:100}}),{status:200});};
+  const api=new SharedNetApi({token,fetchImpl,retryBaseMs:1});const r=await api.credits();assert.equal(r.credits.balance,100);assert.equal(calls,2);
+});
+test('artifact upload rejects content larger than SharedNet ceiling before network',async()=>{
+  const token='sni_'+ 'A'.repeat(43);let calls=0;const api=new SharedNetApi({token,fetchImpl:async()=>{calls++;return new Response('{}',{status:201});}});
+  await assert.rejects(()=>api.uploadArtifact(Buffer.alloc(MAX_ARTIFACT_BYTES+1),{roomId:'rom_ABCDEFGHIJ'}),/artifact_too_large/);assert.equal(calls,0);
+});
