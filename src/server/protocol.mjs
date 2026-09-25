@@ -58,7 +58,7 @@ export async function handleTool(name,args={},internalOpts={}){
   else throw new Error('tool_not_found');
   return signReceipt({...payload,issued_at:new Date().toISOString(),receipt_version:'sledgewire.receipt.v3'},signing.privateKeyPem);
 }
-function modernResult(result){return {...result,_meta:{...(result?._meta??{}),[META_SERVER]:SERVER_INFO}};}
+function modernResult(result,{cacheable=false}={}){return {...result,resultType:result?.resultType??'complete',...(cacheable?{ttlMs:result?.ttlMs??0,cacheScope:result?.cacheScope??'private'}:{}),_meta:{...(result?._meta??{}),[META_SERVER]:SERVER_INFO}};}
 function rpcError(id,code,message,data){return {jsonrpc:'2.0',id:id??null,error:{code,message,...(data===undefined?{}:{data})}};}
 function requestVersion(msg){return msg?.params?._meta?.[META_VERSION]??null;}
 function headerValue(headers,name){const v=headers[name]??headers[name.toLowerCase()]??null;return Array.isArray(v)?v[0]:v;}
@@ -102,7 +102,7 @@ export async function handleRpc(msg,internalOpts={}){
   try{
     if(msg.method==='server/discover'){
       if(!modern)return rpcError(msg.id,-32602,'server/discover requires 2026-07-28 request metadata');
-      return {jsonrpc:'2.0',id:msg.id,result:modernResult({resultType:'complete',supportedVersions:SUPPORTED_PROTOCOL_VERSIONS,capabilities:{tools:{}}})};
+      return {jsonrpc:'2.0',id:msg.id,result:modernResult({supportedVersions:SUPPORTED_PROTOCOL_VERSIONS,capabilities:{tools:{}}},{cacheable:true})};
     }
     if(msg.method==='initialize'){
       if(modern)return rpcError(msg.id,-32601,'Method not found');
@@ -110,7 +110,7 @@ export async function handleRpc(msg,internalOpts={}){
       return {jsonrpc:'2.0',id:msg.id,result:{protocolVersion:selected,capabilities:{tools:{}},serverInfo:SERVER_INFO}};
     }
     if(msg.method==='notifications/initialized')return modern?rpcError(msg.id,-32601,'Method not found'):null;
-    if(msg.method==='tools/list'){const result={tools:toolDefs};return {jsonrpc:'2.0',id:msg.id,result:modern?modernResult(result):result};}
+    if(msg.method==='tools/list'){const result={tools:toolDefs};return {jsonrpc:'2.0',id:msg.id,result:modern?modernResult(result,{cacheable:true}):result};}
     if(msg.method==='tools/call'){
       const result=await handleTool(msg.params?.name,msg.params?.arguments??{},internalOpts);
       const payload={content:[{type:'text',text:JSON.stringify(result)}],structuredContent:result,isError:false};
