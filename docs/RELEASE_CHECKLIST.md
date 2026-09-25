@@ -1,6 +1,6 @@
 # Trial Zero release checklist
 
-## Static code gates — v0.3.6
+## Static code gates — v0.3.7
 
 - [x] CLI and MCP with current 2026-07-28 stateless `server/discover` plus bounded legacy fallback.
 - [x] Official `@modelcontextprotocol/client` v2 Streamable HTTP integration test negotiates 2026-07-28 and calls Sledgewire.
@@ -33,12 +33,15 @@
 - [x] Unused legacy child-process SharedNet adapter removed from production tree.
 - [x] SharedNet secrets excluded from git and Docker context.
 - [x] SQLite close/reopen replay and two-connection one-use tests green.
-- [x] **217 / 217** automated tests green on v0.3.6 evidence commit.
+- [x] **220 / 220** automated tests green on v0.3.7 evidence commit.
 - [x] **10,000 / 10,000** MCP Smoke workflows at concurrency **128**, 0 failures.
 - [x] **10,000** payment claims + 10,000 cached retries + 500 wrong-buyer rejections, 0 duplicate paid executions.
 - [x] Duplicate storm: **33,000 authorization attempts**, 1,000 unique claims, 15,000 in-flight duplicates refused, 16,000 cached replays, 1,000 transaction-reuse attempts refused, **1,000 ledger reads**, 0 duplicate paid executions.
 - [x] SharedOS deny / allow / maxUses / durable-audit check green.
 - [x] Static preflight green; live preflight additionally requires production mode and disabled paid bypass.
+- [x] Production MCP Host/authority guard rejects unlisted Host headers.
+- [x] Two-process Docker Compose topology shares the same persistent SQLite/WAL volume between public MCP and Arena daemon.
+- [x] Buyer-side `npm run arena:rehearse` path is implemented and unit-tested for quote -> native transfer -> signed delivery -> trace proof -> exact cached retry.
 
 ## Submission P0
 
@@ -56,6 +59,7 @@
 - [ ] Organizer Arena Room configured separately from build Room.
 - [ ] Competition seat joined; invite token removed afterward.
 - [ ] Payee verified against current SharedNet identity; purse/ledger readable.
+- [ ] Run `npm run arena:rehearse` with a real second seat; preserve `.sledgewire/live-rehearsal.json` as evidence.
 - [ ] Another seat completes request -> payment -> SharedOS -> signed reply.
 - [ ] Another seat independently calls `sledgewire.trace` on that paid receipt and verifies the returned proof.
 - [ ] Exact completed retry after restart returns cached delivery with zero re-execution.
