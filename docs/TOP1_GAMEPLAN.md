@@ -27,7 +27,7 @@ Strongest short sequence:
 
 The organizer ranks by valid credits earned, so the primary scoreboard metric is gross valid incoming credits, not nominal balance.
 
-Track automatically with `npm run arena:stats`:
+Track automatically with `npm run arena:stats` (gross earned credits are derived from verified payment claims, including a valid payment whose execution later fails):
 
     earned_credits
     unique_buyers
@@ -37,6 +37,7 @@ Track automatically with `npm run arena:stats`:
     smoke-to-premium conversion
     delivery p50 / p95
     invalid payment rejections
+    signed/trace evidence coverage
     duplicate paid executions
 
 Hard reliability targets:
