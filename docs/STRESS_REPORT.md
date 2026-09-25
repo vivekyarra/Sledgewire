@@ -1,4 +1,4 @@
-# Sledgewire v0.3.4 stress report
+# Sledgewire v0.3.5 stress report
 
 Date: 2026-09-25
 
@@ -6,15 +6,15 @@ This report separates executed CI evidence from live-event facts. It does not cl
 
 ## Current green branch evidence
 
-Tested commit: `bd41e459980f22c60c1b2a19930c46ec99b31bee`
+Tested commit: `03966c4163ab12d62384ba179f6293c81b2d18c9`
 
-GitHub Actions run: `36168416265`
+GitHub Actions run: `36169242070`
 
-- Automated tests: **171 / 171 passed**, 0 failed, 0 skipped.
+- Automated tests: **175 / 175 passed**, 0 failed, 0 skipped.
 - Hostile/current-protocol selfcheck: **VERIFIED**, signed receipt verification true, profile `sledgewire.selfcheck.v4`.
-- MCP stress: **5,000 / 5,000** complete Smoke workflows at concurrency **96**, **0 failures**; p50 **114 ms**, p95 **159 ms**, p99 **451 ms**, total **6.585 s**.
-- Arena ledger/replay stress: **5,000 claims**, **5,000 cached retries**, **500 wrong-buyer attempts rejected**, **0 duplicate paid executions**, total **672 ms**.
-- Duplicate storm: **12,500 authorization attempts** across 500 purchases at fanout 12: 500 unique claims, 5,500 in-flight duplicate refusals, 6,000 cached replays, 500 transaction-reuse refusals, **0 duplicate paid executions**, total **541 ms**.
+- MCP stress: **5,000 / 5,000** complete Smoke workflows at concurrency **96**, **0 failures**; p50 **111 ms**, p95 **148 ms**, p99 **432 ms**, total **6.259 s**.
+- Arena ledger/replay stress: **5,000 claims**, **5,000 cached retries**, **500 wrong-buyer attempts rejected**, **0 duplicate paid executions**, total **690 ms**.
+- Duplicate storm: **12,500 authorization attempts** across 500 purchases at fanout 12: 500 unique claims, 5,500 in-flight duplicate refusals, 6,000 cached replays, 500 transaction-reuse refusals, **0 duplicate paid executions**, total **525 ms**.
 - SharedOS check: deny true, allow true, exhausted `maxUses` denied, **9 audit events**.
 - Static preflight: **READY**.
 - Production missing signing key fails closed; persistent key succeeds.
@@ -22,7 +22,7 @@ GitHub Actions run: `36168416265`
 
 These timings are GitHub Actions/local fixture measurements only. They are not SharedNet, public Internet, SharedOS Cloud, or third-party MCP latency claims.
 
-## Red-team flaws found and closed in v0.3.4
+## Red-team flaws found and closed in v0.3.5
 
 1. Target readOnly/idempotent annotations could previously contribute too much authority to active probes. Active probes now require explicit caller safety attestation; destructive execution needs a separate explicit authority bit.
 2. Invoke could return READY despite hostile tool metadata when the runtime output itself was clean. Suspicious metadata now downgrades the result.
@@ -38,6 +38,8 @@ These timings are GitHub Actions/local fixture measurements only. They are not S
 12. SharedNet request IDs, wait cursors, page limits, base URL and artifact responses are validated.
 13. Production HTTP can no longer enable direct paid execution through an environment override.
 14. SQLite recovery is exercised across close/reopen and independent connections.
+15. The SharedNet watch compatibility path could misroute multi-message batches, lacked payee-identity validation, and could exceed the Room reply ceiling. It now requires one reply event, validates payee ownership, and uploads oversized signed deliveries as artifacts before returning a compact pointer.
+16. An unused legacy SharedNet child-process adapter carried stale ID rules and unnecessary process-spawn attack surface; it has been removed.
 
 ## Live facts still required
 

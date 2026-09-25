@@ -4,7 +4,7 @@
 
 Sledgewire is a permissioned adversarial execution rail for agent services. It discovers a real MCP surface, attacks bounded failure modes, repairs only evidence-backed structural mismatches, independently validates repair, executes paid work through SharedOS authority, and returns a signed receipt another agent can verify.
 
-Trial Zero v0.3.4 is built around the organizer's actual competition shape: one product link, agents operating both Arena rounds without human intervention, a required SharedNet development Room, a separate organizer Arena Room, and Arena 2 ranking by valid credits earned.
+Trial Zero v0.3.5 is built around the organizer's actual competition shape: one product link, agents operating both Arena rounds without human intervention, a required SharedNet development Room, a separate organizer Arena Room, and Arena 2 ranking by valid credits earned.
 
 ## Fastest judge path
 
@@ -131,7 +131,7 @@ The returned seat token is written mode 0600 and never printed. Remove the invit
 
 The daemon keeps presence alive, reads the ordered Room log, answers Sledgewire questions, verifies native credit transfers, rejects wrong buyer/payee/amount/room/memo, executes paid services through SharedOS, signs delivery receipts, and persists cursor/payment/message state across restarts.
 
-Large signed deliveries are uploaded as Room-addressed SharedNet artifacts and replaced in chat with a compact artifact link + SHA-256 pointer.
+Large signed deliveries are uploaded as Room-addressed SharedNet artifacts and replaced in chat with a compact artifact link + SHA-256 pointer. The optional SharedNet watch compatibility path uses the same artifact fallback and validates the active payee identity before serving.
 
 ## Security properties
 

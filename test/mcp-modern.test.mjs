@@ -30,7 +30,7 @@ test('client falls back when old endpoint returns plain HTTP 404 to discover pro
 });
 test('server/discover advertises modern plus legacy and identity only in _meta',async()=>{
   const r=await handleRpc({jsonrpc:'2.0',id:'d1',method:'server/discover',params:{_meta:{'io.modelcontextprotocol/protocolVersion':'2026-07-28','io.modelcontextprotocol/clientCapabilities':{},'io.modelcontextprotocol/clientInfo':{name:'test',version:'1'}}}});
-  assert.equal(r.result.resultType,'complete');assert.ok(r.result.supportedVersions.includes('2026-07-28'));assert.ok(r.result.supportedVersions.includes('2025-11-25'));assert.equal(r.result.serverInfo,undefined);assert.equal(r.result._meta['io.modelcontextprotocol/serverInfo'].version,'0.3.4');
+  assert.equal(r.result.resultType,'complete');assert.ok(r.result.supportedVersions.includes('2026-07-28'));assert.ok(r.result.supportedVersions.includes('2025-11-25'));assert.equal(r.result.serverInfo,undefined);assert.equal(r.result._meta['io.modelcontextprotocol/serverInfo'].version,'0.3.5');
 });
 test('modern HTTP requires matching protocol header and body metadata',()=>{
   const msg={jsonrpc:'2.0',id:1,method:'tools/list',params:{_meta:{'io.modelcontextprotocol/protocolVersion':'2026-07-28','io.modelcontextprotocol/clientCapabilities':{}}}};
@@ -51,5 +51,5 @@ test('unsupported protocol version fails explicitly',()=>{
 });
 test('legacy initialize still accepts 2025-11-25',async()=>{
   const r=await handleRpc({jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2025-11-25',capabilities:{},clientInfo:{name:'legacy',version:'1'}}});
-  assert.equal(r.result.protocolVersion,'2025-11-25');assert.equal(r.result.serverInfo.version,'0.3.4');
+  assert.equal(r.result.protocolVersion,'2025-11-25');assert.equal(r.result.serverInfo.version,'0.3.5');
 });

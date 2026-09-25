@@ -15,12 +15,12 @@ const allowedOrigins=new Set([new URL(base).origin,...String(process.env.SLEDGEW
 
 const server=http.createServer(async(req,res)=>{
   res.setHeader('x-content-type-options','nosniff');res.setHeader('referrer-policy','no-referrer');res.setHeader('cache-control','no-store');
-  if(req.method==='GET'&&req.url==='/health')return json(res,200,{ok:true,name:'sledgewire',version:'0.3.4',key_id:PUBLIC_KEY_ID,active_requests:active,paid_execution:publicArena?'sharednet-payment-required':'direct-enabled'});
+  if(req.method==='GET'&&req.url==='/health')return json(res,200,{ok:true,name:'sledgewire',version:'0.3.5',key_id:PUBLIC_KEY_ID,active_requests:active,paid_execution:publicArena?'sharednet-payment-required':'direct-enabled'});
   if(req.method==='GET'&&req.url==='/catalog.json')return json(res,200,catalog);
   if(req.method==='GET'&&req.url==='/arena.json')return json(res,200,arenaCard(base));
   if(req.method==='GET'&&req.url==='/arena.md'){res.statusCode=200;res.setHeader('content-type','text/markdown; charset=utf-8');return res.end(arenaMarkdown(base));}
   if(req.method==='GET'&&req.url==='/public-key'){res.statusCode=200;res.setHeader('content-type','text/plain; charset=utf-8');return res.end(PUBLIC);}
-  if(req.method==='GET'&&req.url==='/.well-known/agent.json'){const card=arenaCard(base);return json(res,200,{name:'Sledgewire',description:card.one_line,version:'0.3.4',mcp_url:card.mcp_url,quickstart_url:card.quickstart_url,catalog_url:card.catalog_url,public_key_url:card.public_key_url,fastest_demo:card.fastest_demo,tools:toolDefs.map(x=>x.name)});}
+  if(req.method==='GET'&&req.url==='/.well-known/agent.json'){const card=arenaCard(base);return json(res,200,{name:'Sledgewire',description:card.one_line,version:'0.3.5',mcp_url:card.mcp_url,quickstart_url:card.quickstart_url,catalog_url:card.catalog_url,public_key_url:card.public_key_url,fastest_demo:card.fastest_demo,tools:toolDefs.map(x=>x.name)});}
   if(req.method!=='POST'||req.url!=='/mcp'){res.statusCode=404;return res.end('not found');}
   const origin=String(req.headers.origin??'');if(origin&&!allowedOrigins.has(origin))return json(res,403,{jsonrpc:'2.0',id:null,error:{code:-32000,message:'Origin not allowed'}});
   if(active>=maxActive)return json(res,503,{error:'server_busy'});

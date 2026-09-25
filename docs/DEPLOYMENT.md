@@ -62,7 +62,7 @@ If the event runtime already uses SharedNet watch:
 
     npx -y sharednet@latest watch --on message --run 'npm run --silent arena:serve' --reply
 
-The direct daemon is preferred because cursor persistence, exact Room selection, payment verification and deterministic delivery idempotency remain inside Sledgewire.
+The direct daemon remains preferred because cursor persistence and poison-message recovery stay inside Sledgewire. Watch compatibility now requires exactly one event per reply invocation, verifies the configured payee against the active SharedNet identity, joins only the configured Arena Room, and uses the same artifact fallback for oversized signed deliveries.
 
 ## SharedOS
 
