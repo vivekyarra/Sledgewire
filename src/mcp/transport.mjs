@@ -14,10 +14,10 @@ function parseSse(text){
   return parsed.at(-1);
 }
 
-class HttpMcpError extends Error{
-  constructor(status,obj){
+export class HttpMcpError extends Error{
+  constructor(status,obj=null,raw=''){
     super(obj?.error?`http_${status}:mcp_error:${obj.error.code}:${obj.error.message}`:`http_${status}`);
-    this.name='HttpMcpError';this.httpStatus=status;this.rpcCode=Number(obj?.error?.code);this.rpcData=obj?.error?.data;
+    this.name='HttpMcpError';this.httpStatus=status;this.rpcCode=Number(obj?.error?.code);this.rpcData=obj?.error?.data;this.raw=String(raw).slice(0,512);
   }
 }
 
@@ -42,15 +42,16 @@ export async function postJsonPinned(endpoint,body,opts={}){
       res.on('data',chunk=>{size+=chunk.length;if(size>maxBytes){request.destroy(new Error('response_too_large'));return;}chunks.push(chunk);});
       res.on('end',()=>{
         if(settled)return;
+        const status=res.statusCode??500;
+        const text=Buffer.concat(chunks).toString('utf8');
         try{
-          const status=res.statusCode??500;
-          const text=Buffer.concat(chunks).toString('utf8');
           let obj=null;
           if(text.trim()){
             const ct=String(res.headers['content-type']??'');
-            obj=ct.includes('text/event-stream')?parseSse(text):JSON.parse(text);
+            if(ct.includes('text/event-stream'))obj=parseSse(text);
+            else {try{obj=JSON.parse(text);}catch(error){if(status>=200&&status<300)throw error;}}
           }
-          if(status<200||status>=300)return done(reject,new HttpMcpError(status,obj));
+          if(status<200||status>=300)return done(reject,new HttpMcpError(status,obj,text));
           done(resolve,{result:obj,headers:res.headers,statusCode:status});
         }catch(e){done(reject,e);}
       });

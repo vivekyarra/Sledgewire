@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {resolveTarget,isBlockedIp} from '../src/security/target-policy.mjs';import {scanUntrusted} from '../src/security/content-scan.mjs';import {startFixture} from '../fixtures/server.mjs';import {McpSession} from '../src/mcp/client.mjs';
-for(const ip of ['127.0.0.1','10.1.2.3','100.64.0.1','169.254.1.1','172.16.0.1','192.168.1.1','192.0.2.2','198.18.0.1','198.51.100.2','203.0.113.4','224.0.0.1','240.0.0.1','::1','fc00::1','fe80::1','2001:db8::1','ff02::1'])test(`blocked ip ${ip}`,()=>assert.equal(isBlockedIp(ip),true));
+for(const ip of ['127.0.0.1','10.1.2.3','100.64.0.1','169.254.1.1','172.16.0.1','192.168.1.1','192.0.2.2','198.18.0.1','198.51.100.2','203.0.113.4','224.0.0.1','240.0.0.1','::1','::ffff:127.0.0.1','64:ff9b::7f00:1','64:ff9b:1::1','100::1','2001::1','2001:2::1','2001:db8::1','2002:7f00:1::','fc00::1','fec0::1','fe80::1','ff02::1'])test(`blocked ip ${ip}`,()=>assert.equal(isBlockedIp(ip),true));
 test('private target blocked',async()=>assert.rejects(()=>resolveTarget('http://127.0.0.1:1',{allowHttp:true}),/blocked|private/));
 test('file scheme blocked',async()=>assert.rejects(()=>resolveTarget('file:///etc/passwd'),/unsupported_target_scheme/));
 test('url credentials blocked',async()=>assert.rejects(()=>resolveTarget('https://u:p@example.com'),/userinfo_not_allowed/));
