@@ -20,7 +20,7 @@ Verify externally:
     GET /public-key
     POST /mcp
 
-Use the deployed /arena.md URL as the submission product link. In production, free quote/selfcheck/verify remain directly callable. Paid MCP calls return a signed PAYMENT_REQUIRED route and do not execute for free. SLEDGEWIRE_PUBLIC_PAID_EXECUTION=1 is for private rehearsal only.
+Use the deployed /arena.md URL as the submission product link. In production, free quote/selfcheck/verify remain directly callable. Paid MCP calls return a signed PAYMENT_REQUIRED route and do not execute for free. `SLEDGEWIRE_PUBLIC_PAID_EXECUTION=1` is permitted only in a non-production private rehearsal; production startup rejects it.
 
 ## SharedNet development Room
 

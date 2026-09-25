@@ -22,7 +22,7 @@ export function createArenaHandler({store,ledger,room,payee,signing,publicBaseUr
     try{
       const result=await runPaidService({service:req.service,input:req.input,store,requestId:req.request_id,fingerprint:auth.fingerprint,buyerSeat});
       const receipt=signReceipt({...result,receipt_version:'sledgewire.receipt.v3',issued_at:new Date().toISOString(),payment:{txn_id:req.payment_txn_id,price_credits:auth.price,room_id:room}},signing.privateKeyPem);
-      const response={type:'sledgewire.service.response.v1',request_id:req.request_id,service:req.service,state:'DELIVERED',trace_id:result.sharedos_trace_id,receipt};
+      const response={type:'sledgewire.service.response.v1',request_id:req.request_id,service:req.service,state:'DELIVERED',outcome_state:result.state??'UNKNOWN',trace_id:result.sharedos_trace_id,receipt};
       store.complete(req.request_id,auth.fingerprint,response);return response;
     }catch(e){store.fail(req.request_id,auth.fingerprint,{message:String(e.message||e)});return failure(req,'execution_failed',{detail:String(e.message||e)});}
   }

@@ -4,7 +4,7 @@
 
 Sledgewire is a permissioned adversarial execution rail for agent services. It discovers a real MCP surface, attacks bounded failure modes, repairs only evidence-backed structural mismatches, independently validates repair, executes paid work through SharedOS authority, and returns a signed receipt another agent can verify.
 
-Trial Zero v0.3.3 is built around the organizer's actual competition shape: one product link, agents operating both Arena rounds without human intervention, a required SharedNet development Room, a separate organizer Arena Room, and Arena 2 ranking by valid credits earned.
+Trial Zero v0.3.4 is built around the organizer's actual competition shape: one product link, agents operating both Arena rounds without human intervention, a required SharedNet development Room, a separate organizer Arena Room, and Arena 2 ranking by valid credits earned.
 
 ## Fastest judge path
 
@@ -17,7 +17,7 @@ Fastest proof is free:
     MCP tool: sledgewire.selfcheck
     arguments: {}
 
-It runs hostile fixtures and returns a signed receipt.
+It runs current-protocol and hostile fixtures and returns a signed receipt.
 
 If the agent does not know which paid service is relevant:
 
@@ -71,7 +71,7 @@ Requires Node 22.18+.
     npm install
     node bin/sledgewire.mjs selfcheck
     node bin/sledgewire.mjs quote preflight https://target.example/mcp
-    node bin/sledgewire.mjs smoke https://target.example/mcp safe_tool
+    node bin/sledgewire.mjs smoke https://target.example/mcp safe_tool --safe
     node bin/sledgewire.mjs assay https://target.example/mcp
     node bin/sledgewire.mjs seal https://target.example/mcp
     node bin/sledgewire.mjs gauntlet https://target.example/mcp
@@ -141,10 +141,15 @@ Large signed deliveries are uploaded as Room-addressed SharedNet artifacts and r
 - Private, loopback, link-local, documentation, benchmark, multicast and reserved ranges blocked.
 - Tool descriptions, schemas and outputs treated as untrusted data.
 - Response bytes, catalog count and deadlines bounded.
-- Destructive/replay probes fail closed unless safety is established.
+- Active probes require explicit caller safety attestation; untrusted target annotations never authorize execution by themselves.
+- Destructive probes/invocations require separate explicit destructive authority.
 - Repair never invents missing semantic values.
 - Payment binds buyer Instance, payee perspective, exact amount, official Arena Room, request and service memo.
 - Exact completed retries are cached; duplicate paid execution is blocked.
+- A crash leaving paid execution outcome uncertain is never blindly retried.
+- Poison Room messages are bounded and dead-lettered instead of permanently blocking the autonomous cursor.
+- SharedNet JSON responses are streamed under a byte ceiling before parsing.
+- Every paid target workflow uses an exact-target SharedOS grant; the dispatcher has no direct target-service authority.
 - SharedOS bounded grants use atomic SQLite usage state and durable audit/outbox storage.
 - SharedNet secrets stay in environment or owner-only files, never argv/messages/receipts/logs.
 - Production requires persistent Ed25519 signing material.
