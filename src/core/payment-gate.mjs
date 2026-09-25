@@ -2,17 +2,34 @@ import {sha256} from '../receipts/receipt.mjs';
 
 export function paymentMemo(requestId,service){return `sledgewire:${requestId}:${service}`;}
 export function requestFingerprint({roomId,buyerSeat,requestId,service,input}){return sha256({roomId,buyerSeat,requestId,service,input});}
-export function requestStorageKey({buyerSeat,requestId}){return `rqk_${sha256({buyerSeat,requestId})}`;}
+export function requestStorageKey({roomId,buyerSeat,requestId}){return `rqk_${sha256({roomId,buyerSeat,requestId})}`;}
 function principalAddress(x){return typeof x==='string'&&(x.startsWith('p_')||x.startsWith('pri_'));}
 
 export class PaymentGate{
-  constructor({ledger,store,prices,payee,uncertainAfterMs=120_000}){this.ledger=ledger;this.store=store;this.prices=prices;this.payee=payee;this.uncertainAfterMs=uncertainAfterMs;}
+  constructor({ledger,store,prices,payee,uncertainAfterMs=120_000,ledgerPositiveTtlMs=30_000,ledgerNegativeTtlMs=500,ledgerCacheMax=2048}){
+    this.ledger=ledger;this.store=store;this.prices=prices;this.payee=payee;this.uncertainAfterMs=uncertainAfterMs;
+    this.ledgerPositiveTtlMs=ledgerPositiveTtlMs;this.ledgerNegativeTtlMs=ledgerNegativeTtlMs;this.ledgerCacheMax=ledgerCacheMax;
+    this.txCache=new Map();this.txInflight=new Map();
+  }
+  async lookupTransaction(txnId,signal){
+    const now=Date.now(),cached=this.txCache.get(txnId);
+    if(cached&&cached.expiresAt>now){this.txCache.delete(txnId);this.txCache.set(txnId,cached);return cached.value;}
+    if(cached)this.txCache.delete(txnId);
+    if(this.txInflight.has(txnId))return this.txInflight.get(txnId);
+    const pending=Promise.resolve().then(()=>this.ledger.get(txnId,signal)).then(value=>{
+      const ttl=value?this.ledgerPositiveTtlMs:this.ledgerNegativeTtlMs;
+      this.txCache.set(txnId,{value,expiresAt:Date.now()+ttl});
+      while(this.txCache.size>this.ledgerCacheMax)this.txCache.delete(this.txCache.keys().next().value);
+      return value;
+    }).finally(()=>this.txInflight.delete(txnId));
+    this.txInflight.set(txnId,pending);return pending;
+  }
   async authorize(req,signal){
     const price=this.prices[req.service];
     if(!Number.isInteger(price)||price<=0)return {ok:false,reason:'unknown_or_free_service'};
     if(!req.txnId)return {ok:false,reason:'payment_required',price,memo:paymentMemo(req.requestId,req.service)};
 
-    const tx=await this.ledger.get(req.txnId,signal);
+    const tx=await this.lookupTransaction(req.txnId,signal);
     if(!tx)return {ok:false,reason:'transaction_not_found'};
     if(tx.id!==undefined&&tx.id!==null&&tx.id!==req.txnId)return {ok:false,reason:'wrong_transaction_id'};
 

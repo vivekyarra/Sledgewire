@@ -30,4 +30,4 @@ for(let i=0;i<groups;i++){
 }
 const result={groups,fanout,authorization_attempts:groups*(fanout*2+1),unique_claims:uniqueClaims,inflight_duplicate_refusals:inflightRefusals,cached_replays:cachedReplays,transaction_reuse_refusals:conflictRefusals,ledger_reads:ledgerReads,duplicate_paid_executions:0,duration_ms:Date.now()-start};
 console.log(JSON.stringify(result,null,2));
-if(uniqueClaims!==groups||inflightRefusals!==groups*(fanout-1)||cachedReplays!==groups*fanout||conflictRefusals!==groups)process.exit(1);
+if(uniqueClaims!==groups||inflightRefusals!==groups*(fanout-1)||cachedReplays!==groups*fanout||conflictRefusals!==groups||ledgerReads!==groups)process.exit(1);

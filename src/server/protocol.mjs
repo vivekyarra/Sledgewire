@@ -9,6 +9,7 @@ import {quote} from '../core/quote.mjs';
 import {selfcheck} from '../core/selfcheck.mjs';
 import {loadSigningMaterial,signReceipt,verifyReceipt} from '../receipts/receipt.mjs';
 import {decodeMcpHeaderValue} from '../mcp/header-codec.mjs';
+import {validateServiceInput} from '../core/service-input.mjs';
 
 export const MODERN_PROTOCOL_VERSION='2026-07-28';
 export const LEGACY_PROTOCOL_VERSION='2025-11-25';
@@ -39,6 +40,8 @@ export const toolDefs=[
 export async function handleTool(name,args={},internalOpts={}){
   if(name==='sledgewire.verify')return verifyReceipt(args.receipt,args.publicKeyPem);
   if(internalOpts.publicArena===true&&PAID.has(name)){
+    const validation=validateServiceInput(name,args);
+    if(!validation.ok)return signReceipt({service:name,state:'INCOMPATIBLE',reason:'invalid_input',detail:validation.reason},signing.privateKeyPem);
     const price=catalog.services[name].price;
     return signReceipt({service:name,state:'PAYMENT_REQUIRED',price_credits:price,arena_room_id:internalOpts.arenaRoomId??null,
       quickstart_url:internalOpts.publicBaseUrl?`${String(internalOpts.publicBaseUrl).replace(/\/$/,'')}/arena.md`:null,

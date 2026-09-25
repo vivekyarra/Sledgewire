@@ -33,3 +33,8 @@ test('production public MCP routes paid calls to SharedNet payment instead of fr
   const r=await handleRpc({jsonrpc:'2.0',id:7,method:'tools/call',params:{name:'sledgewire.smoke',arguments:{endpoint:'https://never-connect.invalid/mcp'}}},{publicArena:true,publicBaseUrl:'https://sledgewire.example',arenaRoomId:room});
   const out=r.result.structuredContent;assert.equal(out.state,'PAYMENT_REQUIRED');assert.equal(out.price_credits,3);assert.equal(out.arena_room_id,room);assert.equal(out.request_template.service,'sledgewire.smoke');assert.ok(out.proof?.signature);
 });
+
+test('production public MCP refuses to route structurally invalid paid input to payment',async()=>{
+  const r=await handleRpc({jsonrpc:'2.0',id:8,method:'tools/call',params:{name:'sledgewire.fleet',arguments:{targets:[]}}},{publicArena:true,publicBaseUrl:'https://sledgewire.example',arenaRoomId:room});
+  const out=r.result.structuredContent;assert.equal(out.state,'INCOMPATIBLE');assert.equal(out.reason,'invalid_input');assert.ok(out.proof?.signature);
+});

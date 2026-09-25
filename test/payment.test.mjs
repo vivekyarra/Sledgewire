@@ -75,3 +75,19 @@ test('bounded grant usage is atomically consumed once',async()=>{
   const s=new ArenaStore(),results=await Promise.all(Array.from({length:8},()=>s.tryConsume('n','g',1)));
   assert.equal(results.filter(Boolean).length,1);
 });
+
+test('buyer request storage key is also scoped by Arena room',()=>{
+  const a=requestStorageKey({...base,roomId:'rom_ABCDEFGHIJ'}),b=requestStorageKey({...base,roomId:'rom_ZYXWVUTSRQ'});
+  assert.notEqual(a,b);
+});
+test('duplicate authorization wave coalesces ledger lookups',async()=>{
+  let reads=0;const s=new ArenaStore(),l={async get(){reads++;await new Promise(r=>setTimeout(r,5));return {id:base.txnId,buyer_instance_id:base.buyerSeat,addressed_to:payee,payee_ok:true,amount:3,room_id:base.roomId,memo:paymentMemo(base.requestId,base.service)};}};
+  const g=new PaymentGate({ledger:l,store:s,prices,payee});
+  const wave=await Promise.all(Array.from({length:25},()=>g.authorize(base)));
+  assert.equal(reads,1);assert.equal(wave.filter(x=>x.ok&&!x.replay).length,1);assert.equal(wave.filter(x=>x.reason==='request_already_inflight').length,24);
+});
+test('short negative ledger cache collapses missing-transaction bursts',async()=>{
+  let reads=0;const g=new PaymentGate({ledger:{async get(){reads++;return null;}},store:new ArenaStore(),prices,payee,ledgerNegativeTtlMs:1000});
+  const wave=await Promise.all(Array.from({length:20},()=>g.authorize(base)));
+  assert.equal(reads,1);assert.ok(wave.every(x=>x.reason==='transaction_not_found'));
+});
