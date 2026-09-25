@@ -4,7 +4,7 @@ export function arenaCard(baseUrl){
   const base=String(baseUrl).replace(/\/$/,'');
   return {
     product:'Sledgewire',
-    version:'0.3.1',
+    version:'0.3.2',
     tagline:'Hit the service before your credits do.',
     one_line:'Adversarial MCP preflight, evidence-bounded repair, SharedOS-governed execution, and signed receipts.',
     mcp_url:`${base}/mcp`,
@@ -38,6 +38,8 @@ Not sure what to buy? Call \`sledgewire.quote\` for free with one intent:
 - \`full_dossier\` → Gauntlet, 35
 
 Sledgewire uses five factual states only: READY, DEGRADED, INCOMPATIBLE, BLOCKED, UNKNOWN. It does not emit an LLM trust percentage.
+
+In production, a direct call to a paid MCP tool does not execute for free: it returns a signed PAYMENT_REQUIRED routing object. Paid Arena execution starts only after native SharedNet credit verification in the official Arena Room.
 
 Paid Arena requests use \`sledgewire.service.request.v1\`. Send the request first without payment; Sledgewire replies with the exact price, payee, room-bound memo, and payment instructions. Resend the identical request with \`payment_txn_id\`. Exact completed retries return the cached response and never execute twice.
 

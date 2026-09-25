@@ -17,7 +17,7 @@ const handle=createArenaHandler({store,ledger:api,room,payee,signing,publicBaseU
 const key=`arena_cursor:${room}`;let stored=store.getMeta(key);let cursor=stored===null?(process.env.SLEDGEWIRE_PROCESS_HISTORY==='1'?0:await api.latestSequence(room)):Number(stored);store.setMeta(key,String(cursor));
 const concurrency=Math.max(1,Math.min(8,Number(process.env.SLEDGEWIRE_ARENA_CONCURRENCY??4)));
 const heartbeat=setInterval(()=>api.heartbeat().catch(e=>console.error(`heartbeat:${e.message}`)),20_000);heartbeat.unref();
-console.error(JSON.stringify({sledgewire:'arena-daemon',version:'0.3.1',room,instance:selfSeat,cursor,concurrency}));
+console.error(JSON.stringify({sledgewire:'arena-daemon',version:'0.3.2',room,instance:selfSeat,cursor,concurrency}));
 let backoff=500;
 for(;;){
   try{
