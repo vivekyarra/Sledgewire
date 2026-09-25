@@ -1,72 +1,98 @@
-# Sledgewire v0.3 stress report
+# Sledgewire v0.3.2 stress report
 
 Date: 2026-09-25
 
-This file distinguishes executed tests from live event facts. Numbers are updated only from real CI or live rehearsals.
+This report separates executed evidence from live-event facts. It does not claim an Arena finishing position.
 
-## Security families covered by automated tests
+## Current green branch evidence
+
+Tested commit: `6bfd2fa6a7990a8d7d3389af1b19119cd8953e0f`
+
+GitHub Actions run: `36154160761`
+
+- Automated tests: **122 / 122 passed**, 0 failed, 0 skipped.
+- Hostile-fixture selfcheck: **VERIFIED**; signed receipt verification true.
+- MCP load harness: **2,000 / 2,000** complete Smoke workflows at concurrency **64**, **0 failures**.
+- MCP load timing on that runner: p50 **62 ms**, p95 **95 ms**, p99 **365 ms**, total **2.284 s**.
+- Arena payment/replay harness: **1,000 claims**, **1,000 cached retries**, **500 wrong-buyer attempts rejected**, **0 duplicate paid executions**, total **146 ms**.
+- SharedOS integration: no grant denied; matching grant allowed; exhausted `maxUses` denied; **9 audit events** persisted.
+- Static preflight: **READY**.
+- Production signing policy: missing persistent key fails closed; valid persistent key succeeds.
+
+These latency measurements are local CI harness measurements only. They are not claims about SharedNet, SharedOS Cloud, public-network, or third-party MCP latency.
+
+## Security and organizer-protocol coverage
+
+The automated suite covers:
 
 - hostile tool output and hostile descriptions;
 - fake-success envelopes;
-- malformed JSON;
-- streamed response byte limits;
-- oversized catalog;
-- timeout;
-- redirect refusal;
-- private/reserved target policy;
+- malformed JSON and Streamable HTTP/SSE behavior;
+- streamed response-byte limits;
+- oversized tool catalog;
+- deadlines and redirect refusal;
+- public/private/reserved target policy;
 - destructive probe refusal;
 - unknown-tool acceptance;
 - schema-forbidden extra-field acceptance;
 - divergent idempotent replay;
-- bounded evidence repair and independent reproduction;
+- evidence-bounded structural repair and independent reproduction;
 - receipt signature, tamper and wrong-key failure;
-- payment buyer/payee/amount/room/memo binding;
-- completed retry caching;
+- payment buyer/payee/amount/Arena-room/memo binding;
+- exact completed retry caching;
 - in-flight duplicate refusal;
 - transaction reuse refusal;
 - failed-request no-silent-reexecution;
-- atomic SharedOS maxUses consumption;
-- SharedNet V1 identifier, message, ledger and caller-perspective normalization;
-- Room cursor/message persistence;
+- atomic SharedOS `maxUses` consumption;
+- current long SharedNet typed IDs plus legacy short IDs;
+- current guest invite join with `rit_` authorization, runtime metadata, and owner-only returned seat token;
+- compatible `sni_` / `rmt_` seat-token handling;
+- current SharedNet wait semantics using only documented `after` + `timeout`;
+- caller-perspective credit-ledger normalization;
+- payee ownership against current Principal/Agent/Instance identity;
+- Room cursor/message persistence and retry ownership;
+- deterministic idempotency keys for replies;
+- public paid-MCP bypass prevention: production direct calls return signed `PAYMENT_REQUIRED` routing rather than executing paid work for free;
+- SharedNet 32 KiB Room-message protection;
+- Room-addressed artifact fallback for large signed deliveries, bounded by the 4 MiB artifact ceiling;
 - free quote routing;
 - public selfcheck;
-- Gauntlet dossier;
-- one-link Arena card.
+- Gauntlet seller dossier;
+- Gauntlet optional invocation through Scout -> Mechanic -> Inspector -> Breaker;
+- one-link Arena quickstart.
 
-## Load gates
+## Organizer/current-protocol defects found and closed
 
-CI runs:
+1. **Development/Arena Room conflation.** Separate `SHAREDNET_BUILD_ROOM_ID` and `SHAREDNET_ARENA_ROOM_ID` configuration now prevents accidental reuse.
+2. **Guest invite mismatch.** Added `npm run arena:join` for the current `rit_` invite flow. It stores the returned seat token owner-only and never prints it.
+3. **Undocumented wait parameter.** Removed `limit` from `/wait`; tests assert the current `after` + `timeout` contract.
+4. **Paid public MCP bypass.** Production public MCP no longer executes paid services directly; it returns a signed payment route into the official Arena.
+5. **Large signed delivery failure.** Oversized responses become SharedNet Room artifacts and the Room receives a compact SHA-256 pointer.
+6. **Autonomous restart ambiguity.** Room messages now use in-flight/completed/failed ownership plus persistent cursor state and retry-safe reply idempotency.
+7. **Wrong payee configuration.** Live preflight requires the configured payee to belong to the authenticated SharedNet identity.
+8. **Gauntlet privilege widening.** Its optional real invocation is routed through the same separated SharedOS Scout/Mechanic/Inspector/Breaker stages as Invoke.
+9. **Credential leakage surface.** `.sharednet/`, `.env*`, signing keys and local DB state are excluded from git and Docker context.
 
-    npm run stress -- 2000 64
-    npm run stress:arena -- 1000
+## Economy sensitivity
 
-The first stresses complete local MCP smoke workflows. The second stresses payment claims, cached retries and wrong-buyer rejection.
+`npm run economy` is deterministic arithmetic, not a forecast, probability, or ranking claim. Seal and Gauntlet are modeled as mutually exclusive seller-premium choices because Gauntlet already contains conformance evidence.
 
-Any local timing is only a local harness measurement, not a claim about public-network, SharedNet or third-party MCP latency.
-
-## SharedOS gate
-
-CI runs npm run sharedos:check and requires:
-
-- no grant -> denied;
-- matching grant -> succeeded;
-- exhausted maxUses -> denied;
-- audit records persisted.
-
-## Economy gate
-
-npm run economy prints deterministic sensitivity scenarios across field sizes. It is not a forecast and does not claim a finishing position. Its purpose is to catch a service ladder whose arithmetic makes substantial gross credits implausible.
+The model exists to reject pricing that mathematically caps revenue too low. Actual Arena 2 placement depends only on valid credits actually earned.
 
 ## Live facts still required
 
-Before Arena-ready status:
+Sledgewire must not be called Arena-ready until all are demonstrated on the real event environment:
 
-1. actual development SharedNet collaboration Room recorded for submission;
-2. public HTTPS one-link reachable by an unrelated agent;
-3. real organizer Arena Room joined;
-4. other-seat request/payment/delivery/receipt verification;
-5. restart survival and cached retry;
-6. three external MCP products tested;
-7. event-visible SharedOS trace if entering that track;
-8. 60-minute autonomous rehearsal;
-9. real endpoint latency measurements.
+1. real SharedNet development Room used by multiple build agents, with submitted Room ID and concrete handoff message IDs;
+2. public HTTPS `/arena.md` reachable and understandable by an unrelated agent;
+3. organizer-provided Arena Room joined with the real competition seat;
+4. native purse and credit ledger readable;
+5. another seat completes request -> payment -> SharedOS -> signed delivery;
+6. exact completed retry after process restart returns cached delivery with zero re-execution;
+7. oversized artifact delivery verified live;
+8. at least three real external MCP implementations tested;
+9. event-visible SharedOS evidence if entering the SharedOS track;
+10. 60-minute no-human autonomous rehearsal;
+11. real endpoint p50/p95 latency measurements.
+
+No repository-only test legitimately replaces those live gates.
