@@ -12,10 +12,12 @@ export const INSTANCE_TOKEN=/^(?:sni|rmt)_[A-Za-z0-9_-]{20,128}$/;
 export const INVITE_TOKEN=/^rit_[A-Za-z0-9_-]{20,128}$/;
 export const MAX_ARTIFACT_BYTES=4_194_304;
 export const MAX_SHAREDNET_JSON_BYTES=1_048_576;
+export const MAX_SHAREDNET_PAGE_BYTES=4_194_304;
 
 function safeBase(raw){
   const u=new URL(raw??'https://www.sharednet.ai');
-  if(u.protocol!=='https:'&&u.hostname!=='127.0.0.1'&&u.hostname!=='localhost')throw new Error('sharednet_base_must_be_https');
+  const local=u.hostname==='127.0.0.1'||u.hostname==='localhost';
+  if(u.protocol!=='https:'&&!(u.protocol==='http:'&&local))throw new Error('sharednet_base_must_be_https');
   if(u.username||u.password||u.search||u.hash)throw new Error('sharednet_base_must_not_include_credentials_query_or_fragment');
   if(u.pathname!=='/'&&u.pathname!=='')throw new Error('sharednet_base_must_be_origin_only');
   return u.origin;
@@ -53,13 +55,12 @@ export function normalizeTransfer(tx,identity){
   const senderPrincipal=asId(transferField(tx,['from_principal_id','sender_principal_id','payer_principal_id','source_principal_id']));
   const recipientPrincipal=asId(transferField(tx,['to_principal_id','recipient_principal_id','payee_principal_id','destination_principal_id']));
   const addressedTo=asId(transferField(tx,['addressed_to','to','recipient_address','payee']));
-  const direction=asId(transferField(tx,['direction','flow']));
   const ourIds=new Set([principalId,instanceId,agentId].filter(Boolean));
-  const incoming=(recipientPrincipal&&principalId&&recipientPrincipal===principalId)||(addressedTo&&ourIds.has(addressedTo))||direction==='received'||direction==='incoming';
+  const incoming=(recipientPrincipal&&principalId&&recipientPrincipal===principalId)||(addressedTo&&ourIds.has(addressedTo));
   return {id:asId(tx.id),buyer_instance_id:buyerInstance,sender_principal_id:senderPrincipal,recipient_principal_id:recipientPrincipal,addressed_to:addressedTo,amount:Number(tx.amount),room_id:asId(tx.room_id),memo:typeof tx.memo==='string'?tx.memo:null,payee_ok:Boolean(incoming),raw_kind:asId(tx.kind??tx.type)};
 }
 
-async function guestJoinRequest({roomId,inviteToken,name,runtimeKind,idempotencyKey,baseUrl,fetchImpl,timeoutMs=10000,signal=null,retries=2,maxResponseBytes=MAX_SHAREDNET_JSON_BYTES}){
+async function guestJoinRequest({roomId,inviteToken,name,runtimeKind,idempotencyKey,baseUrl,fetchImpl,timeoutMs=10000,signal=null,retries=2,maxResponseBytes=MAX_SHAREDNET_PAGE_BYTES}){
   const base=safeBase(baseUrl),body={name,runtime:{kind:runtimeKind}};
   for(let attempt=0;;attempt++){
     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(new Error('sharednet_deadline_exceeded')),timeoutMs),relay=()=>controller.abort(signal.reason??new Error('aborted'));signal?.addEventListener('abort',relay,{once:true});
@@ -110,21 +111,21 @@ export class SharedNetApi{
       }finally{clearTimeout(timer);signal?.removeEventListener('abort',relay);}
     }
   }
-  async current(signal){if(this.identityCache)return this.identityCache;const x=await this.request('/api/v1/instances/current',{signal});this.identityCache=x;return x;}
+  async current(signal,{fresh=false}={}){if(this.identityCache&&!fresh)return this.identityCache;const x=await this.request('/api/v1/instances/current',{signal});this.identityCache=x;return x;}
   async join(roomId,signal){if(!ROOM.test(roomId))throw new Error('invalid_sharednet_room');return this.request(`/api/v1/rooms/${roomId}/join`,{method:'POST',idempotencyKey:idempotencyUuid(`join:${roomId}`),signal});}
   async heartbeat(signal){return this.request('/api/v1/instances/current/heartbeat',{method:'POST',signal,retries:1});}
   async credits(signal){return this.request('/api/v1/credits',{signal});}
   async get(txnId,signal){
-    if(!TXN.test(txnId))return null;const identity=await this.current(signal);let before=null;
+    if(!TXN.test(txnId))return null;const identity=await this.current(signal,{fresh:true});let before=null;
     for(let page=0;page<10;page++){const qs=new URLSearchParams({limit:'100'});if(before)qs.set('before',before);const x=await this.request(`/api/v1/credits/transfers?${qs}`,{signal}),item=(x?.items??[]).find(t=>t?.id===txnId);if(item)return normalizeTransfer(item,identity);if(!x?.has_more||!x?.next_cursor)break;before=x.next_cursor;}return null;
   }
   async messages(roomId,{after=null,before=null,order='asc',limit=100,signal=null}={}){
     if(!ROOM.test(roomId))throw new Error('invalid_sharednet_room');if(after!==null&&(before!==null||order==='desc'))throw new Error('invalid_message_pagination');
     if(!Number.isInteger(limit)||limit<1||limit>100)throw new Error('invalid_sharednet_page_limit');if(!['asc','desc'].includes(order))throw new Error('invalid_sharednet_order');
-    const qs=new URLSearchParams({limit:String(limit),order});if(after!==null)qs.set('after',String(after));if(before!==null)qs.set('before',String(before));return this.request(`/api/v1/rooms/${roomId}/messages?${qs}`,{signal});
+    const qs=new URLSearchParams({limit:String(limit),order});if(after!==null)qs.set('after',String(after));if(before!==null)qs.set('before',String(before));return this.request(`/api/v1/rooms/${roomId}/messages?${qs}`,{signal,maxResponseBytes:MAX_SHAREDNET_PAGE_BYTES});
   }
   async latestSequence(roomId,signal){const x=await this.messages(roomId,{order:'desc',limit:1,signal}),n=validSequence(x?.items?.[0]?.sequence);return n??0;}
-  async wait(roomId,after=0,signal){if(!ROOM.test(roomId))throw new Error('invalid_sharednet_room');if(validSequence(after)===null)throw new Error('invalid_sharednet_wait_cursor');const qs=new URLSearchParams({after:String(after),timeout:'25'});return this.request(`/api/v1/rooms/${roomId}/wait?${qs}`,{signal,timeoutMs:30_000,retries:1});}
+  async wait(roomId,after=0,signal){if(!ROOM.test(roomId))throw new Error('invalid_sharednet_room');if(validSequence(after)===null)throw new Error('invalid_sharednet_wait_cursor');const qs=new URLSearchParams({after:String(after),timeout:'25'});return this.request(`/api/v1/rooms/${roomId}/wait?${qs}`,{signal,timeoutMs:30_000,retries:1,maxResponseBytes:MAX_SHAREDNET_PAGE_BYTES});}
   async post(roomId,content,{replyTo=null,signal=null,idempotencyKey=crypto.randomUUID()}={}){
     if(!ROOM.test(roomId))throw new Error('invalid_sharednet_room');if(replyTo&&!MESSAGE.test(replyTo))throw new Error('invalid_sharednet_reply_message');if(Buffer.byteLength(String(content),'utf8')>32_768)throw new Error('sharednet_message_too_large');
     const body={content:String(content),...(replyTo?{reply_to_message_id:replyTo}:{})};return this.request(`/api/v1/rooms/${roomId}/messages`,{method:'POST',body,idempotencyKey,signal});
@@ -136,7 +137,7 @@ export class SharedNetApi{
     const out=await this.request('/api/v1/artifacts',{method:'POST',rawBody:bytes,contentType:'application/json',extraHeaders,idempotencyKey,signal,timeoutMs:20_000});
     if(!ARTIFACT.test(out?.artifact?.id??'')||typeof out?.url!=='string')throw new Error('sharednet_artifact_response_invalid');
     let artifactUrl;try{artifactUrl=new URL(out.url,this.base);}catch{throw new Error('sharednet_artifact_response_invalid');}
-    if(artifactUrl.protocol!=='https:')throw new Error('sharednet_artifact_response_invalid');
+    if(artifactUrl.protocol!=='https:'||artifactUrl.origin!==this.base)throw new Error('sharednet_artifact_response_invalid');
     return {...out,url:artifactUrl.toString()};
   }
   async pay(to,amount,{memo=null,roomId=null,signal=null,idempotencyKey=crypto.randomUUID()}={}){

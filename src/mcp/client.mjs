@@ -1,5 +1,6 @@
 import {postJsonPinned} from './transport.mjs';
 import {resolveTarget} from '../security/target-policy.mjs';
+import {buildMcpParamHeaders,encodeMcpHeaderValue,scanXMcpHeaderDeclarations} from './header-codec.mjs';
 
 export const MODERN_PROTOCOL_VERSION='2026-07-28';
 export const LEGACY_PROTOCOL_VERSION='2025-11-25';
@@ -13,7 +14,7 @@ class McpRpcError extends Error{
 export class McpSession{
   constructor(endpoint,opts={}){
     this.endpoint=endpoint;this.opts=opts;this.sessionId=null;this.protocolVersion=null;this.era=null;this.resolved=null;
-    this.clientInfo={name:'sledgewire',version:'0.3.5'};this.clientCapabilities={};this.serverInfo=null;
+    this.clientInfo={name:'sledgewire',version:'0.3.6'};this.clientCapabilities={};this.serverInfo=null;this.toolDefinitions=new Map();this.catalogLoaded=false;
   }
   async request(method,params={},extra={}){
     this.resolved??=await resolveTarget(this.endpoint,this.opts.targetPolicy);
@@ -29,13 +30,15 @@ export class McpSession{
         'io.modelcontextprotocol/clientCapabilities':this.clientCapabilities};
     }
     const msg={jsonrpc:'2.0',...(id===undefined?{}:{id}),method,...(bodyParams===undefined?{}:{params:bodyParams})};
-    const headers={...(modern?{
+    const standardHeaders=modern?{
       'mcp-protocol-version':version,'mcp-method':method,
-      ...(method==='tools/call'&&bodyParams?.name?{'mcp-name':String(bodyParams.name)}:{})
+      ...(requestName(method,bodyParams)!==null?{'mcp-name':encodeMcpHeaderValue(String(requestName(method,bodyParams)))}:{})
     }:{
       ...(this.sessionId?{'mcp-session-id':this.sessionId}:{}),
       ...(version?{'mcp-protocol-version':version}:{})
-    }),...(extra.headers??{})};
+    };
+    // Standard MCP headers always win over caller-supplied extras.
+    const headers={...(extra.headers??{}),...standardHeaders};
     const wire=await postJsonPinned(this.endpoint,msg,{...this.opts,...extra,resolvedTarget:this.resolved,headers});
     if(!modern){const returned=wire.headers['mcp-session-id'];if(returned)this.sessionId=Array.isArray(returned)?returned[0]:returned;}
     if(extra.notification)return null;
@@ -70,8 +73,39 @@ export class McpSession{
     await this.request('notifications/initialized',{}, {notification:true}).catch(()=>null);
     return {...result,protocolVersion:this.protocolVersion,serverInfo:this.serverInfo,era:this.era};
   }
-  async listTools(){let tools=[];let cursor;for(let page=0;page<10;page++){const r=await this.request('tools/list',cursor?{cursor}:{});const batch=Array.isArray(r?.tools)?r.tools:[];tools.push(...batch);if(tools.length>512)throw new Error('tool_catalog_too_large');cursor=r?.nextCursor;if(!cursor)break;}return {tools};}
-  async callTool(name,args={},extra={}){const r=await this.request('tools/call',{name,arguments:args},extra);if(r?.isError===true)throw new Error(`target_tool_error:${extractText(r)}`);return r;}
+  async listTools(){
+    let tools=[],cursor;
+    for(let page=0;page<10;page++){
+      const r=await this.request('tools/list',cursor?{cursor}:{});
+      const batch=Array.isArray(r?.tools)?r.tools:[];
+      tools.push(...batch);
+      if(tools.length>512)throw new Error('tool_catalog_too_large');
+      cursor=r?.nextCursor;if(!cursor)break;
+    }
+    this.toolDefinitions=new Map(tools.filter(t=>typeof t?.name==='string').map(t=>[t.name,t]));
+    this.catalogLoaded=true;
+    return {tools};
+  }
+  async callTool(name,args={},extra={}){
+    if(this.era==='modern'&&!this.catalogLoaded)await this.listTools();
+    const headers={...(extra.headers??{})};
+    if(this.era==='modern'){
+      const def=this.toolDefinitions.get(name);
+      if(def){
+        const scan=scanXMcpHeaderDeclarations(def.inputSchema??{});
+        if(!scan.valid)throw new Error(`invalid_x_mcp_header_declaration:${scan.reason}`);
+        Object.assign(headers,buildMcpParamHeaders(scan.declarations,args));
+      }
+    }
+    const r=await this.request('tools/call',{name,arguments:args},{...extra,headers});
+    if(r?.isError===true)throw new Error(`target_tool_error:${extractText(r)}`);
+    return r;
+  }
+}
+function requestName(method,params){
+  if(method==='tools/call'||method==='prompts/get')return params?.name??null;
+  if(method==='resources/read')return params?.uri??null;
+  return null;
 }
 function isLegacyFallbackSignal(error){
   if(error?.legacyOnly===true)return true;

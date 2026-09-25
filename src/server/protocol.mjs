@@ -8,13 +8,14 @@ import {gauntlet} from '../core/gauntlet.mjs';
 import {quote} from '../core/quote.mjs';
 import {selfcheck} from '../core/selfcheck.mjs';
 import {loadSigningMaterial,signReceipt,verifyReceipt} from '../receipts/receipt.mjs';
+import {decodeMcpHeaderValue} from '../mcp/header-codec.mjs';
 
 export const MODERN_PROTOCOL_VERSION='2026-07-28';
 export const LEGACY_PROTOCOL_VERSION='2025-11-25';
 export const SUPPORTED_PROTOCOL_VERSIONS=[MODERN_PROTOCOL_VERSION,LEGACY_PROTOCOL_VERSION,'2025-06-18'];
 const META_VERSION='io.modelcontextprotocol/protocolVersion';
 const META_SERVER='io.modelcontextprotocol/serverInfo';
-const SERVER_INFO={name:'sledgewire',version:'0.3.5'};
+const SERVER_INFO={name:'sledgewire',version:'0.3.6'};
 
 const signing=loadSigningMaterial();
 export const PUBLIC=signing.publicKeyPem;
@@ -74,10 +75,22 @@ export function validateHttpMcp(msg,headers={}){
   const requested=bodyVersion??headerVersion;
   if(requested&&!SUPPORTED_PROTOCOL_VERSIONS.includes(requested))return {ok:false,status:400,body:rpcError(msg?.id,-32022,'UnsupportedProtocolVersion',{requested,supported:SUPPORTED_PROTOCOL_VERSIONS})};
   if(modern){
-    const session=headerValue(headers,'mcp-session-id');if(session)return {ok:false,status:400,body:rpcError(msg?.id,-32020,'HeaderMismatch',{header:'Mcp-Session-Id',reason:'removed_in_2026_07_28'})};
-    const methodHeader=headerValue(headers,'mcp-method');if(methodHeader&&methodHeader!==msg?.method)return {ok:false,status:400,body:rpcError(msg?.id,-32020,'HeaderMismatch',{header:'Mcp-Method',wire:methodHeader,body:msg?.method??null})};
-    const nameHeader=headerValue(headers,'mcp-name');const bodyName=requestPrincipalName(msg);
-    if(nameHeader&&nameHeader!==bodyName)return {ok:false,status:400,body:rpcError(msg?.id,-32020,'HeaderMismatch',{header:'Mcp-Name',wire:nameHeader,body:bodyName})};
+    const session=headerValue(headers,'mcp-session-id');
+    if(session)return {ok:false,status:400,body:rpcError(msg?.id,-32020,'HeaderMismatch',{header:'Mcp-Session-Id',reason:'removed_in_2026_07_28'})};
+
+    const methodHeader=headerValue(headers,'mcp-method');
+    if(!methodHeader)return {ok:false,status:400,body:rpcError(msg?.id,-32020,'HeaderMismatch',{header:'Mcp-Method',reason:'required_in_2026_07_28'})};
+    const decodedMethod=decodeMcpHeaderValue(methodHeader);
+    if(decodedMethod===undefined||decodedMethod!==msg?.method)return {ok:false,status:400,body:rpcError(msg?.id,-32020,'HeaderMismatch',{header:'Mcp-Method',wire:methodHeader,body:msg?.method??null})};
+
+    const nameHeader=headerValue(headers,'mcp-name'),bodyName=requestPrincipalName(msg);
+    if(bodyName!==null&&bodyName!==undefined){
+      if(!nameHeader)return {ok:false,status:400,body:rpcError(msg?.id,-32020,'HeaderMismatch',{header:'Mcp-Name',reason:'required_for_named_request'})};
+      const decodedName=decodeMcpHeaderValue(nameHeader);
+      if(decodedName===undefined||decodedName!==String(bodyName))return {ok:false,status:400,body:rpcError(msg?.id,-32020,'HeaderMismatch',{header:'Mcp-Name',wire:nameHeader,body:bodyName})};
+    }else if(nameHeader){
+      return {ok:false,status:400,body:rpcError(msg?.id,-32020,'HeaderMismatch',{header:'Mcp-Name',reason:'unexpected_for_method'})};
+    }
   }
   return {ok:true,status:200};
 }
