@@ -24,6 +24,12 @@ jobs:
       - run: npm run economy
       - run: npm run sharedos:check
       - run: npm run preflight
+      - name: compose topology parses
+        run: |
+          PUBLIC_BASE_URL=https://sledgewire.example \
+          SHAREDNET_ARENA_ROOM_ID=rom_ABCDEFGHIJ \
+          SHAREDNET_PAYEE_ADDRESS=p_ABCDEFGHIJ \
+          docker compose -f compose.arena.yml config >/dev/null
       - name: production key fail-closed check
         run: |
           if NODE_ENV=production node -e "import('./src/server/protocol.mjs')"; then

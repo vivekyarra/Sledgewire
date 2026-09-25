@@ -1,0 +1,70 @@
+name: sledgewire-arena
+
+x-common: &common
+  build:
+    context: .
+  image: sledgewire:0.3.7
+  restart: unless-stopped
+  init: true
+  read_only: true
+  environment:
+    NODE_ENV: production
+    SLEDGEWIRE_DB: /persistent/sledgewire.db
+    SLEDGEWIRE_PRIVATE_KEY_FILE: /run/secrets/ed25519-private.pem
+    SLEDGEWIRE_PUBLIC_KEY_FILE: /run/secrets/ed25519-public.pem
+    PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?set PUBLIC_BASE_URL}
+    SHAREDNET_ARENA_ROOM_ID: ${SHAREDNET_ARENA_ROOM_ID:?set SHAREDNET_ARENA_ROOM_ID}
+  volumes:
+    - sledgewire-data:/persistent
+    - ./.sledgewire/keys/ed25519-private.pem:/run/secrets/ed25519-private.pem:ro
+    - ./.sledgewire/keys/ed25519-public.pem:/run/secrets/ed25519-public.pem:ro
+  tmpfs:
+    - /tmp:size=64m,mode=1777
+
+services:
+  public:
+    <<: *common
+    command: ["node","src/server/http.mjs"]
+    ports:
+      - "${SLEDGEWIRE_PORT:-8787}:8787"
+    environment:
+      NODE_ENV: production
+      PORT: 8787
+      SLEDGEWIRE_DB: /persistent/sledgewire.db
+      SLEDGEWIRE_PRIVATE_KEY_FILE: /run/secrets/ed25519-private.pem
+      SLEDGEWIRE_PUBLIC_KEY_FILE: /run/secrets/ed25519-public.pem
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?set PUBLIC_BASE_URL}
+      SHAREDNET_ARENA_ROOM_ID: ${SHAREDNET_ARENA_ROOM_ID:?set SHAREDNET_ARENA_ROOM_ID}
+      SLEDGEWIRE_ALLOWED_HOSTS: ${SLEDGEWIRE_ALLOWED_HOSTS:-}
+    healthcheck:
+      test: ["CMD","node","-e","fetch('http://127.0.0.1:8787/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 5s
+
+  arena-daemon:
+    <<: *common
+    command: ["node","src/sharednet/arena-daemon.mjs"]
+    depends_on:
+      public:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      SLEDGEWIRE_DB: /persistent/sledgewire.db
+      SLEDGEWIRE_PRIVATE_KEY_FILE: /run/secrets/ed25519-private.pem
+      SLEDGEWIRE_PUBLIC_KEY_FILE: /run/secrets/ed25519-public.pem
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?set PUBLIC_BASE_URL}
+      SHAREDNET_BASE_URL: ${SHAREDNET_BASE_URL:-https://www.sharednet.ai}
+      SHAREDNET_MEMBER_TOKEN_FILE: /run/secrets/sharednet-seat
+      SHAREDNET_ARENA_ROOM_ID: ${SHAREDNET_ARENA_ROOM_ID:?set SHAREDNET_ARENA_ROOM_ID}
+      SHAREDNET_PAYEE_ADDRESS: ${SHAREDNET_PAYEE_ADDRESS:?set SHAREDNET_PAYEE_ADDRESS}
+      SLEDGEWIRE_ARENA_CONCURRENCY: ${SLEDGEWIRE_ARENA_CONCURRENCY:-4}
+    volumes:
+      - sledgewire-data:/persistent
+      - ./.sledgewire/keys/ed25519-private.pem:/run/secrets/ed25519-private.pem:ro
+      - ./.sledgewire/keys/ed25519-public.pem:/run/secrets/ed25519-public.pem:ro
+      - ./.sharednet/sledgewire-arena-token:/run/secrets/sharednet-seat:ro
+
+volumes:
+  sledgewire-data:

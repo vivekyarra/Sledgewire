@@ -1,5 +1,7 @@
 # Deployment
 
+v0.3.7 adds a two-process Docker Compose topology and a real second-seat Arena rehearsal. The public server and Arena daemon share one local Docker volume so the paid receipt trace is immediately resolvable through the public `sledgewire.trace` tool.
+
 ## Public HTTPS MCP
 
 Generate persistent signing material:
@@ -86,3 +88,42 @@ Before autonomous competition:
     npm run preflight -- --live
 
 Never set SHAREDNET_EXTERNAL_CALL_CONFIRMED or SHAREDOS_AUDIT_CONFIRMED until those live facts have actually happened. Repository trace proofs do not replace any event-required external/visible SharedOS evidence.
+
+
+## Recommended two-process Docker Compose topology
+
+Use the checked-in `compose.arena.yml` so the public MCP process and SharedNet Arena daemon share the same SQLite/WAL volume and signing key:
+
+    npm run keygen -- .sledgewire/keys
+    # Place the already-joined seller seat token at:
+    # .sharednet/sledgewire-arena-token
+    cp deploy/arena.env.example deploy/arena.env
+    # edit deploy/arena.env with the real public URL, Arena Room and payee
+    docker compose --env-file deploy/arena.env -f compose.arena.yml up -d --build
+
+The public process exposes port 8787. Put TLS/reverse-proxying in front of it and make `PUBLIC_BASE_URL` exactly match the external HTTPS origin. The MCP route validates both Origin and Host/authority in production. If a trusted reverse proxy rewrites Host, list only that explicit authority in `SLEDGEWIRE_ALLOWED_HOSTS`.
+
+The Compose file mounts the same named `sledgewire-data` volume into both processes at `/persistent`. Do not replace that with separate ephemeral filesystems.
+
+## Real second-seat no-human rehearsal
+
+The repository now has an actual buyer-side rehearsal. It is not a mock and consumes one real Smoke payment (3 credits); the exact retry reuses the same transaction and must return the cached signed delivery without re-executing.
+
+Prepare a different SharedNet buyer seat token:
+
+    export SHAREDNET_BUYER_TOKEN_FILE=/secure/buyer-seat-token
+    export SHAREDNET_ARENA_ROOM_ID=rom_...
+    export SHAREDNET_PAYEE_ADDRESS=pri_...
+    export PUBLIC_BASE_URL=https://sledgewire.example
+
+Then run:
+
+    npm run arena:rehearse
+
+By default the rehearsal Smoke-tests the public Sledgewire MCP endpoint itself. Override with a different public MCP target:
+
+    export SLEDGEWIRE_REHEARSAL_TARGET=https://another-public-mcp.example/mcp
+
+A successful rehearsal proves, in one automated path: second-seat Room request, exact PAYMENT_REQUIRED quote, native SharedNet transfer, paid Room request, SharedOS-mediated execution, signed delivery verification against the deployed public key, public `sledgewire.trace` lookup, trace proof signature verification, and exact paid retry returning the identical cached receipt.
+
+The redacted evidence packet is written mode 0600 to `.sledgewire/live-rehearsal.json` by default. It never stores the buyer seat token.

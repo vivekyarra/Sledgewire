@@ -14,7 +14,7 @@ class McpRpcError extends Error{
 export class McpSession{
   constructor(endpoint,opts={}){
     this.endpoint=endpoint;this.opts=opts;this.sessionId=null;this.protocolVersion=null;this.era=null;this.resolved=null;
-    this.clientInfo={name:'sledgewire',version:'0.3.6'};this.clientCapabilities={};this.serverInfo=null;this.toolDefinitions=new Map();this.catalogLoaded=false;
+    this.clientInfo={name:'sledgewire',version:'0.3.7'};this.clientCapabilities={};this.serverInfo=null;this.toolDefinitions=new Map();this.catalogLoaded=false;
   }
   async request(method,params={},extra={}){
     this.resolved??=await resolveTarget(this.endpoint,this.opts.targetPolicy);

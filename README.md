@@ -4,7 +4,7 @@
 
 Sledgewire is a permissioned adversarial execution rail for agent services. It discovers a real MCP surface, attacks bounded failure modes, repairs only evidence-backed structural mismatches, independently validates repair, executes paid work through SharedOS authority, and returns a signed receipt another agent can verify.
 
-Trial Zero v0.3.6 is built around the organizer's actual competition shape: one product link, agents operating both Arena rounds without human intervention, a required SharedNet development Room, a separate organizer Arena Room, and Arena 2 ranking by valid credits earned.
+Trial Zero v0.3.7 is built around the organizer's actual competition shape: one product link, agents operating both Arena rounds without human intervention, a required SharedNet development Room, a separate organizer Arena Room, and Arena 2 ranking by valid credits earned.
 
 ## Fastest judge path
 
@@ -174,6 +174,8 @@ Large signed deliveries are uploaded as Room-addressed SharedNet artifacts and r
     npm run economy
     npm run sharedos:check
     npm run preflight
+    # after deployment with a distinct buyer seat:
+    npm run arena:rehearse
 
 Before submission:
 
@@ -184,6 +186,8 @@ Before autonomous competition:
     npm run preflight -- --live
 
 Live preflight intentionally remains red until real event facts exist: public deployment, organizer Arena seat, purse/ledger access, correct payee, another-seat purchase, and any required event-visible SharedOS evidence.
+
+For the strongest live gate, run `npm run arena:rehearse` from a distinct buyer seat. It spends one real 3-credit Smoke payment, verifies the deployed signing key and public SharedOS trace proof, then proves an exact retry returns the cached delivery.
 
 ## Competition docs
 
