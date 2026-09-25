@@ -20,6 +20,7 @@ Start:
 Verify externally:
 
     GET /health
+    GET /ready
     GET /arena.md
     GET /arena.json
     GET /.well-known/agent.json
@@ -127,3 +128,10 @@ By default the rehearsal Smoke-tests the public Sledgewire MCP endpoint itself. 
 A successful rehearsal proves, in one automated path: second-seat Room request, exact PAYMENT_REQUIRED quote, native SharedNet transfer, paid Room request, SharedOS-mediated execution, signed delivery verification against the deployed public key, public `sledgewire.trace` lookup, trace proof signature verification, and exact paid retry returning the identical cached receipt.
 
 The redacted evidence packet is written mode 0600 to `.sledgewire/live-rehearsal.json` by default. It never stores the buyer seat token.
+
+
+## Liveness vs full Arena readiness
+
+`GET /health` is process liveness and remains 200 while the public HTTP process itself is alive. `GET /ready` is stricter: when an Arena Room is configured it requires a fresh heartbeat written by the separate Arena daemon into the shared SQLite database. The daemon updates that heartbeat every 10 seconds; readiness fails closed after 45 seconds.
+
+This catches the dangerous split-brain case where the product link looks healthy but no seller process is actually consuming paid SharedNet requests. `npm run preflight -- --live` now checks the public `/ready` surface and verifies that the deployed Ed25519 public key matches the local production signing key.

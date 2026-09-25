@@ -6,6 +6,7 @@ import {allowedHostSet,hostHeaderAllowed} from './host-guard.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {ArenaStore} from '../store/arena-store.mjs';
+import {readArenaDaemonReadiness} from '../ops/readiness.mjs';
 
 const port=Number(process.env.PORT||8787);
 const base=process.env.PUBLIC_BASE_URL||`http://127.0.0.1:${port}`;
@@ -22,7 +23,14 @@ const allowedHosts=allowedHostSet(base,process.env.SLEDGEWIRE_ALLOWED_HOSTS??'')
 
 const server=http.createServer(async(req,res)=>{
   res.setHeader('x-content-type-options','nosniff');res.setHeader('referrer-policy','no-referrer');res.setHeader('cache-control','no-store');
-  if(req.method==='GET'&&req.url==='/health')return json(res,200,{ok:true,name:'sledgewire',version:'0.3.7',key_id:PUBLIC_KEY_ID,active_requests:active,paid_execution:publicArena?'sharednet-payment-required':'direct-enabled'});
+  if(req.method==='GET'&&req.url==='/health'){
+    const daemon=readArenaDaemonReadiness(traceStore,arenaRoomId);
+    return json(res,200,{ok:true,name:'sledgewire',version:'0.3.7',key_id:PUBLIC_KEY_ID,active_requests:active,paid_execution:publicArena?'sharednet-payment-required':'direct-enabled',arena_daemon:daemon});
+  }
+  if(req.method==='GET'&&req.url==='/ready'){
+    const daemon=readArenaDaemonReadiness(traceStore,arenaRoomId),ready=daemon.ready;
+    return json(res,ready?200:503,{ready,name:'sledgewire',version:'0.3.7',key_id:PUBLIC_KEY_ID,paid_execution:publicArena?'sharednet-payment-required':'direct-enabled',arena_daemon:daemon});
+  }
   if(req.method==='GET'&&req.url==='/catalog.json')return json(res,200,catalog);
   if(req.method==='GET'&&req.url==='/arena.json')return json(res,200,arenaCard(base));
   if(req.method==='GET'&&req.url==='/arena.md'){res.statusCode=200;res.setHeader('content-type','text/markdown; charset=utf-8');return res.end(arenaMarkdown(base));}

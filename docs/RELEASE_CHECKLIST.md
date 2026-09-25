@@ -33,7 +33,7 @@
 - [x] Unused legacy child-process SharedNet adapter removed from production tree.
 - [x] SharedNet secrets excluded from git and Docker context.
 - [x] SQLite close/reopen replay and two-connection one-use tests green.
-- [x] **220 / 220** automated tests green on v0.3.7 evidence commit.
+- [x] **224 / 224** automated tests green on v0.3.7 operational-readiness evidence commit.
 - [x] **10,000 / 10,000** MCP Smoke workflows at concurrency **128**, 0 failures.
 - [x] **10,000** payment claims + 10,000 cached retries + 500 wrong-buyer rejections, 0 duplicate paid executions.
 - [x] Duplicate storm: **33,000 authorization attempts**, 1,000 unique claims, 15,000 in-flight duplicates refused, 16,000 cached replays, 1,000 transaction-reuse attempts refused, **1,000 ledger reads**, 0 duplicate paid executions.
@@ -41,6 +41,7 @@
 - [x] Static preflight green; live preflight additionally requires production mode and disabled paid bypass.
 - [x] Production MCP Host/authority guard rejects unlisted Host headers.
 - [x] Two-process Docker Compose topology shares the same persistent SQLite/WAL volume between public MCP and Arena daemon.
+- [x] Public `/ready` fails closed when the Arena daemon heartbeat is missing, stopped or stale; live preflight checks readiness and deployed signing-key identity.
 - [x] Buyer-side `npm run arena:rehearse` path is implemented and unit-tested for quote -> native transfer -> signed delivery -> trace proof -> exact cached retry.
 
 ## Submission P0

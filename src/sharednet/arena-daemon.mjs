@@ -5,6 +5,7 @@ import {SharedNetApi,ROOM,ADDRESS,SEAT,MESSAGE,payeeBelongsToIdentity} from './a
 import {createArenaHandler} from './handler.mjs';
 import {deliverArenaResponse} from './delivery.mjs';
 import {loadSigningMaterial} from '../receipts/receipt.mjs';
+import {writeArenaDaemonHeartbeat} from '../ops/readiness.mjs';
 
 const room=process.env.SHAREDNET_ARENA_ROOM_ID??'',payee=process.env.SHAREDNET_PAYEE_ADDRESS??'',publicBaseUrl=process.env.PUBLIC_BASE_URL??'';
 if(!ROOM.test(room)||!ADDRESS.test(payee)||!publicBaseUrl.startsWith('https://'))throw new Error('arena_environment_incomplete');
@@ -17,6 +18,11 @@ const handle=createArenaHandler({store,ledger:api,room,payee,signing,publicBaseU
 const key=`arena_cursor:${room}`;let stored=store.getMeta(key),cursor=stored===null?(process.env.SLEDGEWIRE_PROCESS_HISTORY==='1'?0:await api.latestSequence(room)):Number(stored);store.setMeta(key,String(cursor));
 const concurrency=Math.max(1,Math.min(8,Number(process.env.SLEDGEWIRE_ARENA_CONCURRENCY??4))),maxAttempts=Math.max(2,Math.min(10,Number(process.env.SLEDGEWIRE_MESSAGE_MAX_ATTEMPTS??5)));
 const heartbeat=setInterval(()=>api.heartbeat().catch(e=>console.error(`heartbeat:${e.message}`)),20_000);heartbeat.unref();
+const writeLocalHeartbeat=(status='running')=>{try{writeArenaDaemonHeartbeat(store,room,{instanceId:selfSeat,status});}catch(e){console.error(`local-heartbeat:${e.message}`);}};
+writeLocalHeartbeat();
+const localHeartbeat=setInterval(()=>writeLocalHeartbeat(),10_000);localHeartbeat.unref();
+const stop=signal=>{clearInterval(heartbeat);clearInterval(localHeartbeat);writeLocalHeartbeat('stopped');console.error(JSON.stringify({sledgewire:'arena-daemon',event:'stopping',signal}));try{store.db.close();}catch{}process.exit(0);};
+process.once('SIGTERM',()=>stop('SIGTERM'));process.once('SIGINT',()=>stop('SIGINT'));
 console.error(JSON.stringify({sledgewire:'arena-daemon',version:'0.3.7',room,instance:selfSeat,cursor,concurrency,maxAttempts}));
 const sequenceOf=message=>{const n=Number(message?.sequence);return Number.isSafeInteger(n)&&n>=0?n:null;};
 let backoff=500;
