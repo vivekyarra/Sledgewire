@@ -1,8 +1,8 @@
 # Trial Zero release checklist
 
-## Static code gates — v0.3.2
+## Static code gates — v0.3.3
 
-- [x] CLI and MCP.
+- [x] CLI and MCP, including current 2026-07-28 stateless `server/discover` and legacy handshake fallback.
 - [x] One-link `/arena.md` and machine-readable `/arena.json`.
 - [x] Free selfcheck and deterministic quote.
 - [x] Paid ladder 3 / 8 / 12 / 20 / 25 / 35.
@@ -23,7 +23,7 @@
 - [x] Deterministic reply idempotency.
 - [x] Oversized signed delivery artifact fallback.
 - [x] SharedNet secrets excluded from git and Docker context.
-- [x] **122 / 122** automated tests green on the v0.3.2 branch.
+- [x] **128 / 128** automated tests green on the v0.3.3 branch.
 - [x] **2,000 / 2,000** MCP stress workflows at concurrency 64, 0 failures.
 - [x] **1,000** payment claims + 1,000 cached retries + 500 wrong-buyer rejections, 0 duplicate paid executions.
 - [x] SharedOS deny / allow / maxUses / durable-audit check green.

@@ -9,6 +9,13 @@ import {quote} from '../core/quote.mjs';
 import {selfcheck} from '../core/selfcheck.mjs';
 import {loadSigningMaterial,signReceipt,verifyReceipt} from '../receipts/receipt.mjs';
 
+export const MODERN_PROTOCOL_VERSION='2026-07-28';
+export const LEGACY_PROTOCOL_VERSION='2025-11-25';
+export const SUPPORTED_PROTOCOL_VERSIONS=[MODERN_PROTOCOL_VERSION,LEGACY_PROTOCOL_VERSION,'2025-06-18'];
+const META_VERSION='io.modelcontextprotocol/protocolVersion';
+const META_SERVER='io.modelcontextprotocol/serverInfo';
+const SERVER_INFO={name:'sledgewire',version:'0.3.3'};
+
 const signing=loadSigningMaterial();
 export const PUBLIC=signing.publicKeyPem;
 export const PUBLIC_KEY_ID=signing.keyId;
@@ -33,9 +40,7 @@ export async function handleTool(name,args={},internalOpts={}){
   if(internalOpts.publicArena===true&&PAID.has(name)){
     const price=catalog.services[name].price;
     return signReceipt({
-      service:name,
-      state:'PAYMENT_REQUIRED',
-      price_credits:price,
+      service:name,state:'PAYMENT_REQUIRED',price_credits:price,
       arena_room_id:internalOpts.arenaRoomId??null,
       quickstart_url:internalOpts.publicBaseUrl?`${String(internalOpts.publicBaseUrl).replace(/\/$/,'')}/arena.md`:null,
       request_template:{type:'sledgewire.service.request.v1',request_id:'<buyer-unique-id>',service:name,input:args},
@@ -56,14 +61,53 @@ export async function handleTool(name,args={},internalOpts={}){
   return signReceipt({...payload,issued_at:new Date().toISOString(),receipt_version:'sledgewire.receipt.v3'},signing.privateKeyPem);
 }
 
+function modernResult(result){return {...result,_meta:{...(result?._meta??{}),[META_SERVER]:SERVER_INFO}};}
+function rpcError(id,code,message,data){return {jsonrpc:'2.0',id:id??null,error:{code,message,...(data===undefined?{}:{data})}};}
+function requestVersion(msg){return msg?.params?._meta?.[META_VERSION]??null;}
+
+export function validateHttpMcp(msg,headers={}){
+  const bodyVersion=requestVersion(msg);
+  const rawHeader=headers['mcp-protocol-version']??headers['MCP-Protocol-Version']??null;
+  const headerVersion=Array.isArray(rawHeader)?rawHeader[0]:rawHeader;
+  if(bodyVersion===MODERN_PROTOCOL_VERSION||headerVersion===MODERN_PROTOCOL_VERSION){
+    if(bodyVersion!==MODERN_PROTOCOL_VERSION||headerVersion!==MODERN_PROTOCOL_VERSION){
+      return {ok:false,status:400,body:rpcError(msg?.id,-32020,'HeaderMismatch',{header:headerVersion??null,body:bodyVersion??null})};
+    }
+  }
+  const requested=bodyVersion??headerVersion;
+  if(requested&&!SUPPORTED_PROTOCOL_VERSIONS.includes(requested)){
+    return {ok:false,status:400,body:rpcError(msg?.id,-32022,'UnsupportedProtocolVersion',{requested,supported:SUPPORTED_PROTOCOL_VERSIONS})};
+  }
+  return {ok:true,status:200};
+}
+
 export async function handleRpc(msg,internalOpts={}){
-  if(msg?.jsonrpc!=='2.0')return {jsonrpc:'2.0',id:msg?.id??null,error:{code:-32600,message:'Invalid Request'}};
+  if(msg?.jsonrpc!=='2.0')return rpcError(msg?.id,-32600,'Invalid Request');
+  const version=requestVersion(msg);
+  const modern=version===MODERN_PROTOCOL_VERSION;
+  if(version&&!SUPPORTED_PROTOCOL_VERSIONS.includes(version))return rpcError(msg.id,-32022,'UnsupportedProtocolVersion',{requested:version,supported:SUPPORTED_PROTOCOL_VERSIONS});
   try{
-    if(msg.method==='initialize')return {jsonrpc:'2.0',id:msg.id,result:{protocolVersion:'2025-06-18',capabilities:{tools:{}},serverInfo:{name:'sledgewire',version:'0.3.2'}}};
-    if(msg.method==='notifications/initialized')return null;
-    if(msg.method==='tools/list')return {jsonrpc:'2.0',id:msg.id,result:{tools:toolDefs}};
-    if(msg.method==='tools/call'){const result=await handleTool(msg.params?.name,msg.params?.arguments??{},internalOpts);return {jsonrpc:'2.0',id:msg.id,result:{content:[{type:'text',text:JSON.stringify(result)}],structuredContent:result,isError:false}};}
-    return {jsonrpc:'2.0',id:msg.id,error:{code:-32601,message:'Method not found'}};
-  }catch(e){return {jsonrpc:'2.0',id:msg.id??null,error:{code:-32000,message:String(e.message||e)}};}
+    if(msg.method==='server/discover'){
+      if(!modern)return rpcError(msg.id,-32602,'server/discover requires 2026-07-28 request metadata');
+      return {jsonrpc:'2.0',id:msg.id,result:modernResult({resultType:'complete',supportedVersions:SUPPORTED_PROTOCOL_VERSIONS,capabilities:{tools:{}},serverInfo:SERVER_INFO})};
+    }
+    if(msg.method==='initialize'){
+      if(modern)return rpcError(msg.id,-32601,'Method not found');
+      const requested=msg.params?.protocolVersion;
+      const selected=SUPPORTED_PROTOCOL_VERSIONS.includes(requested)&&requested!==MODERN_PROTOCOL_VERSION?requested:LEGACY_PROTOCOL_VERSION;
+      return {jsonrpc:'2.0',id:msg.id,result:{protocolVersion:selected,capabilities:{tools:{}},serverInfo:SERVER_INFO}};
+    }
+    if(msg.method==='notifications/initialized')return modern?rpcError(msg.id,-32601,'Method not found'):null;
+    if(msg.method==='tools/list'){
+      const result={tools:toolDefs};
+      return {jsonrpc:'2.0',id:msg.id,result:modern?modernResult(result):result};
+    }
+    if(msg.method==='tools/call'){
+      const result=await handleTool(msg.params?.name,msg.params?.arguments??{},internalOpts);
+      const payload={content:[{type:'text',text:JSON.stringify(result)}],structuredContent:result,isError:false};
+      return {jsonrpc:'2.0',id:msg.id,result:modern?modernResult(payload):payload};
+    }
+    return rpcError(msg.id,-32601,'Method not found');
+  }catch(e){return rpcError(msg.id,-32000,String(e.message||e));}
 }
 export {catalog};

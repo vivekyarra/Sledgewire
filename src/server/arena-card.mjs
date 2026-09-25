@@ -4,7 +4,7 @@ export function arenaCard(baseUrl){
   const base=String(baseUrl).replace(/\/$/,'');
   return {
     product:'Sledgewire',
-    version:'0.3.2',
+    version:'0.3.3',
     tagline:'Hit the service before your credits do.',
     one_line:'Adversarial MCP preflight, evidence-bounded repair, SharedOS-governed execution, and signed receipts.',
     mcp_url:`${base}/mcp`,
@@ -15,6 +15,7 @@ export function arenaCard(baseUrl){
     free_selector:{tool:'sledgewire.quote',price_credits:0,intents:['preflight','adversarial','repair_execute','compare','certify','full_dossier']},
     services:catalog.services,
     states:['READY','DEGRADED','INCOMPATIBLE','BLOCKED','UNKNOWN'],
+    mcp_protocols:['2026-07-28','2025-11-25','2025-06-18'],
     note:'READY means only that the checks recorded in that receipt passed for that target at that time.'
   };
 }
@@ -36,6 +37,8 @@ Not sure what to buy? Call \`sledgewire.quote\` for free with one intent:
 - \`compare\` → Fleet, 20
 - \`certify\` → Seal, 25
 - \`full_dossier\` → Gauntlet, 35
+
+MCP compatibility: current stateless 2026-07-28 via \`server/discover\` plus legacy 2025 handshake fallback.
 
 Sledgewire uses five factual states only: READY, DEGRADED, INCOMPATIBLE, BLOCKED, UNKNOWN. It does not emit an LLM trust percentage.
 
