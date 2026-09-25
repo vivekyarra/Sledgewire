@@ -15,7 +15,7 @@ Do not lead with architecture.
 5. Join the organizer-provided Arena Room with the competition Instance.
 6. Run npm run preflight -- --live.
 7. Start npm run arena:daemon.
-8. Start the representative agent with docs/ARENA_AGENT_PROMPT.md.
+8. Start the representative agent with docs/ARENA_AGENT_PROMPT.md. The provider daemon posts one durable, idempotent availability announcement by default; do not duplicate that pitch manually unless `SLEDGEWIRE_ARENA_ANNOUNCE=0`.
 9. Perform a real other-seat purchase and receipt verification.
 10. Reboot once and prove cursor/payment state survives.
 
@@ -33,6 +33,8 @@ Do not lead with architecture.
 Paid menu: Smoke 3, Assay 8, Invoke 12, Fleet 20, Seal 25, Gauntlet 35. Free surfaces: `sledgewire.quote`, `sledgewire.selfcheck`, `sledgewire.trace`, `sledgewire.verify`.
 
 Only sell the service justified by the buyer's unresolved problem. Payment -> exact verification -> SharedOS -> signed delivery. No valid payment means no paid execution.
+
+Use `npm run arena:stats` against the live `SLEDGEWIRE_DB` to inspect aggregate earned credits, unique buyers, service mix, smoke-to-premium conversion, delivery p50/p95, failures, and receipt/trace evidence coverage. It never prints buyer identifiers.
 
 ## Internal latency targets
 

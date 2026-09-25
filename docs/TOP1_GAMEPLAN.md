@@ -27,7 +27,7 @@ Strongest short sequence:
 
 The organizer ranks by valid credits earned, so the primary scoreboard metric is gross valid incoming credits, not nominal balance.
 
-Track:
+Track automatically with `npm run arena:stats`:
 
     earned_credits
     unique_buyers

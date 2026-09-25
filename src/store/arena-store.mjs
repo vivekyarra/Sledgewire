@@ -55,6 +55,41 @@ export class ArenaStore{
     if(!id)return {status:'ignored',attempts:0};const row=this.db.prepare('SELECT attempts FROM room_messages WHERE message_id=?').get(id),attempts=row?.attempts??1,status=attempts>=maxAttempts?'dead_letter':'failed';
     this.markRoomMessage(id,status,String(error??'unknown').slice(0,2000));return {status,attempts};
   }
+  arenaStats(){
+    const statusRows=this.db.prepare('SELECT status,COUNT(*) count FROM requests GROUP BY status').all(),status=Object.fromEntries(statusRows.map(r=>[r.status,Number(r.count)]));
+    const rows=this.db.prepare("SELECT service,txn_id,response_json,started_at,completed_at FROM requests WHERE status='completed' ORDER BY rowid ASC").all();
+    const buyers=new Set(),txns=new Set(),serviceMix={},outcomeMix={},latencies=[],smokeBuyers=new Set(),premiumBuyers=new Set();let earned=0,malformed=0,signedDeliveries=0,traceDeliveries=0;
+    for(const row of rows){
+      serviceMix[row.service]=(serviceMix[row.service]??0)+1;if(row.txn_id)txns.add(row.txn_id);
+      const start=Date.parse(row.started_at),end=Date.parse(row.completed_at);if(Number.isFinite(start)&&Number.isFinite(end)&&end>=start)latencies.push(end-start);
+      let response;try{response=JSON.parse(row.response_json);}catch{malformed++;continue;}
+      const receipt=response?.receipt,buyer=receipt?.buyer_seat,price=Number(receipt?.payment?.price_credits),outcome=response?.outcome_state??receipt?.state??'UNKNOWN';
+      outcomeMix[String(outcome)]=(outcomeMix[String(outcome)]??0)+1;
+      if(typeof buyer==='string'&&buyer){buyers.add(buyer);if(row.service==='sledgewire.smoke')smokeBuyers.add(buyer);else premiumBuyers.add(buyer);}
+      if(Number.isInteger(price)&&price>0)earned+=price;
+      if(receipt?.proof?.signature)signedDeliveries++;
+      if(typeof response?.trace_id==='string'&&response.trace_id&&response.trace_id===receipt?.sharedos_trace_id)traceDeliveries++;
+    }
+    latencies.sort((a,b)=>a-b);const percentile=p=>latencies.length?latencies[Math.min(latencies.length-1,Math.max(0,Math.ceil(latencies.length*p)-1))]:null;
+    let converted=0;for(const b of smokeBuyers)if(premiumBuyers.has(b))converted++;
+    return {
+      schema:'sledgewire.arena.stats.v1',
+      earned_credits:earned,
+      unique_buyers:buyers.size,
+      paid_transactions:txns.size,
+      completed_deliveries:rows.length,
+      failed_requests:status.failed??0,
+      inflight_requests:status.inflight??0,
+      credits_per_unique_buyer:buyers.size?Number((earned/buyers.size).toFixed(2)):0,
+      service_mix:serviceMix,
+      outcome_mix:outcomeMix,
+      delivery_ms:{p50:percentile(0.50),p95:percentile(0.95),max:latencies.length?latencies.at(-1):null},
+      smoke_buyers:smokeBuyers.size,
+      smoke_to_premium_buyers:converted,
+      smoke_to_premium_conversion:smokeBuyers.size?Number((converted/smokeBuyers.size).toFixed(4)):0,
+      integrity:{signed_deliveries:signedDeliveries,trace_bound_deliveries:traceDeliveries,malformed_completed_rows:malformed}
+    };
+  }
   getMeta(key){return this.db.prepare('SELECT value FROM metadata WHERE key=?').get(key)?.value??null;}
   setMeta(key,value){this.db.prepare(`INSERT INTO metadata(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`).run(key,String(value));}
 }
