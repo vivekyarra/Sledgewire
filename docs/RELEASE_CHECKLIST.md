@@ -1,6 +1,6 @@
 # Trial Zero release checklist
 
-## Static code gates — v0.3.4
+## Static code gates — v0.3.5
 
 - [x] CLI and MCP with current 2026-07-28 stateless `server/discover` plus bounded legacy fallback.
 - [x] Modern fallback refuses to hide timeouts/internal errors as legacy compatibility.
@@ -22,9 +22,11 @@
 - [x] Native credit-ledger buyer/payee/amount/room/memo binding and one-use transaction/request binding.
 - [x] Exact completed retry caching; stale uncertain paid executions never blindly re-execute.
 - [x] Arena cursor/message persistence, bounded retries, poison-message dead-letter.
+- [x] Watch compatibility validates active payee ownership, requires one reply event, and uses artifact fallback for oversized signed deliveries.
+- [x] Unused legacy child-process SharedNet adapter removed from production tree.
 - [x] Oversized signed delivery artifact fallback with validated artifact response.
 - [x] SharedNet secrets excluded from git and Docker context.
-- [x] **171 / 171** automated tests green on v0.3.4 branch.
+- [x] **175 / 175** automated tests green on v0.3.5 branch.
 - [x] **5,000 / 5,000** MCP stress workflows at concurrency **96**, 0 failures.
 - [x] **5,000** payment claims + 5,000 cached retries + 500 wrong-buyer rejections, 0 duplicate paid executions.
 - [x] Duplicate storm: **12,500 authorization attempts**, 500 unique claims, 5,500 in-flight duplicates refused, 6,000 cached replays, 500 transaction-reuse attempts refused, 0 duplicate paid executions.
