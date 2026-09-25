@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {SEAT,ADDRESS,ROOM,TXN,INSTANCE_TOKEN,normalizeTransfer,SharedNetApi,parseWatchBatch,senderInstance,payeeBelongsToIdentity,MAX_ARTIFACT_BYTES} from '../src/sharednet/api.mjs';
+import {SEAT,ADDRESS,ROOM,TXN,INSTANCE_TOKEN,normalizeTransfer,SharedNetApi,parseWatchBatch,senderInstance,payeeBelongsToIdentity,MAX_ARTIFACT_BYTES,MAX_SHAREDNET_JSON_BYTES} from '../src/sharednet/api.mjs';
 import {ArenaStore} from '../src/store/arena-store.mjs';
 import {createArenaHandler} from '../src/sharednet/handler.mjs';
 import {generateSigningKeypair} from '../src/receipts/receipt.mjs';
@@ -67,4 +67,28 @@ test('SharedNet API retries a transient 503 then succeeds',async()=>{
 test('artifact upload rejects content larger than SharedNet ceiling before network',async()=>{
   const token='sni_'+ 'A'.repeat(43);let calls=0;const api=new SharedNetApi({token,fetchImpl:async()=>{calls++;return new Response('{}',{status:201});}});
   await assert.rejects(()=>api.uploadArtifact(Buffer.alloc(MAX_ARTIFACT_BYTES+1),{roomId:'rom_ABCDEFGHIJ'}),/artifact_too_large/);assert.equal(calls,0);
+});
+
+test('SharedNet API bounds JSON responses before parsing',async()=>{
+  const token='sni_'+ 'A'.repeat(43);
+  const api=new SharedNetApi({token,maxResponseBytes:128,fetchImpl:async()=>new Response(JSON.stringify({padding:'x'.repeat(1000)}),{status:200})});
+  await assert.rejects(()=>api.credits(),/sharednet_response_too_large/);
+});
+test('SharedNet base URL must be an origin and cannot smuggle credentials or a path',()=>{
+  const token='sni_'+ 'A'.repeat(43);
+  assert.throws(()=>new SharedNetApi({token,baseUrl:'https://www.sharednet.ai/api/v1'}),/origin_only/);
+  assert.throws(()=>new SharedNetApi({token,baseUrl:'https://u:p@www.sharednet.ai'}),/credentials/);
+});
+test('SharedNet wait cursor rejects negative and non-integer values before network',async()=>{
+  const token='sni_'+ 'A'.repeat(43);let calls=0;
+  const api=new SharedNetApi({token,fetchImpl:async()=>{calls++;return new Response('{}',{status:200});}});
+  await assert.rejects(()=>api.wait('rom_ABCDEFGHIJ',-1),/invalid_sharednet_wait_cursor/);
+  await assert.rejects(()=>api.wait('rom_ABCDEFGHIJ',1.5),/invalid_sharednet_wait_cursor/);
+  assert.equal(calls,0);
+});
+test('SharedNet artifact response is validated and relative trusted URLs are normalized',async()=>{
+  const token='sni_'+ 'A'.repeat(43);let n=0;
+  const api=new SharedNetApi({token,fetchImpl:async()=>{n++;return new Response(JSON.stringify(n===1?{artifact:{id:'art_ABCDEFGHIJ'},url:'/api/v1/artifacts/art_ABCDEFGHIJ'}:{}),{status:201});}});
+  const ok=await api.uploadArtifact('x',{roomId:'rom_ABCDEFGHIJ'});assert.equal(ok.url,'https://www.sharednet.ai/api/v1/artifacts/art_ABCDEFGHIJ');
+  await assert.rejects(()=>api.uploadArtifact('x',{roomId:'rom_ABCDEFGHIJ'}),/artifact_response_invalid/);
 });

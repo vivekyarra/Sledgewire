@@ -3,16 +3,17 @@ import {resolveTarget} from '../security/target-policy.mjs';
 
 export const MODERN_PROTOCOL_VERSION='2026-07-28';
 export const LEGACY_PROTOCOL_VERSION='2025-11-25';
-const MODERN_ONLY_ERRORS=new Set([-32022,-32021,-32020]);
+const HARD_MODERN_ERRORS=new Set([-32020,-32021]);
+const LEGACY_DISCOVERY_ERRORS=new Set([-32601,-32602]);
 
 class McpRpcError extends Error{
   constructor(error){super(`mcp_error:${error?.code}:${error?.message}`);this.name='McpRpcError';this.rpcCode=Number(error?.code);this.rpcData=error?.data;}
 }
 
-export class McpSession {
+export class McpSession{
   constructor(endpoint,opts={}){
     this.endpoint=endpoint;this.opts=opts;this.sessionId=null;this.protocolVersion=null;this.era=null;this.resolved=null;
-    this.clientInfo={name:'sledgewire',version:'0.3.3'};this.clientCapabilities={};this.serverInfo=null;
+    this.clientInfo={name:'sledgewire',version:'0.3.4'};this.clientCapabilities={};this.serverInfo=null;
   }
   async request(method,params={},extra={}){
     this.resolved??=await resolveTarget(this.endpoint,this.opts.targetPolicy);
@@ -38,8 +39,7 @@ export class McpSession {
     const wire=await postJsonPinned(this.endpoint,msg,{...this.opts,...extra,resolvedTarget:this.resolved,headers});
     if(!modern){const returned=wire.headers['mcp-session-id'];if(returned)this.sessionId=Array.isArray(returned)?returned[0]:returned;}
     if(extra.notification)return null;
-    const obj=wire.result;
-    if(!obj||typeof obj!=='object')throw new Error('invalid_mcp_response');
+    const obj=wire.result;if(!obj||typeof obj!=='object')throw new Error('invalid_mcp_response');
     if(obj.error)throw new McpRpcError(obj.error);
     return obj.result;
   }
@@ -48,13 +48,20 @@ export class McpSession {
     try{
       const discovered=await this.request('server/discover',{}, {modern:true,protocolVersion:MODERN_PROTOCOL_VERSION});
       const supported=Array.isArray(discovered?.supportedVersions)?discovered.supportedVersions:[];
-      if(!supported.includes(MODERN_PROTOCOL_VERSION))throw new Error('modern_version_not_advertised');
+      if(!supported.includes(MODERN_PROTOCOL_VERSION)){
+        if(supported.some(v=>String(v).startsWith('2025-')))throw Object.assign(new Error('legacy_only_discovery'),{legacyOnly:true});
+        throw new Error('modern_version_not_advertised');
+      }
       this.era='modern';this.protocolVersion=MODERN_PROTOCOL_VERSION;this.sessionId=null;
-      this.serverInfo=discovered?.serverInfo??discovered?._meta?.['io.modelcontextprotocol/serverInfo']??null;
+      this.serverInfo=discovered?._meta?.['io.modelcontextprotocol/serverInfo']??null;
       return {protocolVersion:this.protocolVersion,serverInfo:this.serverInfo,capabilities:discovered?.capabilities??{},era:this.era};
     }catch(error){
-      if(Number.isFinite(error?.rpcCode)&&MODERN_ONLY_ERRORS.has(error.rpcCode))throw error;
-      if(!isLegacyFallbackSignal(error))throw error;
+      if(Number.isFinite(error?.rpcCode)&&HARD_MODERN_ERRORS.has(error.rpcCode))throw error;
+      if(Number(error?.rpcCode)===-32022){
+        const supported=Array.isArray(error?.rpcData?.supported)?error.rpcData.supported:[];
+        if(supported.includes(MODERN_PROTOCOL_VERSION))throw new Error('modern_negotiation_inconsistent');
+        if(!supported.some(v=>String(v).startsWith('2025-')))throw error;
+      }else if(!isLegacyFallbackSignal(error))throw error;
     }
     this.era='legacy';this.protocolVersion=LEGACY_PROTOCOL_VERSION;
     const result=await this.request('initialize',{protocolVersion:LEGACY_PROTOCOL_VERSION,capabilities:{},clientInfo:this.clientInfo});
@@ -67,9 +74,10 @@ export class McpSession {
   async callTool(name,args={},extra={}){const r=await this.request('tools/call',{name,arguments:args},extra);if(r?.isError===true)throw new Error(`target_tool_error:${extractText(r)}`);return r;}
 }
 function isLegacyFallbackSignal(error){
-  if(Number.isFinite(error?.rpcCode))return !MODERN_ONLY_ERRORS.has(error.rpcCode);
-  if([400,404,405].includes(Number(error?.httpStatus)))return true;
-  return /deadline_exceeded|modern_version_not_advertised/.test(String(error?.message??error));
+  if(error?.legacyOnly===true)return true;
+  if(Number.isFinite(error?.rpcCode))return LEGACY_DISCOVERY_ERRORS.has(Number(error.rpcCode));
+  if([404,405].includes(Number(error?.httpStatus)))return true;
+  return /modern_version_not_advertised/.test(String(error?.message??error));
 }
 function extractText(r){return Array.isArray(r?.content)?r.content.filter(x=>x?.type==='text').map(x=>x.text).join(' ').slice(0,500):'tool_reported_error';}
 export async function initialize(endpoint,opts={}){const s=new McpSession(endpoint,opts);return s.initialize();}

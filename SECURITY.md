@@ -9,15 +9,18 @@ Sledgewire processes hostile service descriptions, schemas, URLs, tool outputs, 
 - Redirects are refused.
 - Private, loopback, link-local, documentation, benchmark, multicast and reserved ranges fail closed.
 - Response byte limits, catalog limits and deadlines fail closed.
-- Destructive/replay probes are blocked unless safety is explicitly established.
+- Active probes require explicit caller safety attestation; target-supplied readOnly/idempotent annotations do not independently create execution authority.
+- Destructive probes and invocations require separate explicit destructive authority.
 - Repairs are structural and evidence-backed; missing semantic data is not invented.
 - Arena payment binds buyer Instance, incoming payee perspective, exact price, official Arena Room, request and memo, then atomically one-use binds the transaction to a request fingerprint.
-- Public production MCP cannot bypass Arena payment for paid services.
+- Public production MCP cannot bypass Arena payment for paid services; startup fails if the bypass flag is enabled in production.
 - Development and competition Rooms use separate configuration.
 - SharedNet invite/member/Instance tokens stay in environment or owner-only ignored files; they are never printed, sent to a Room, placed on argv, or committed.
-- Oversized signed deliveries use Room-addressed SharedNet artifacts and compact hash pointers.
-- Paid execution runs through SharedOS. Invoke and Gauntlet's optional real invocation use Scout -> Mechanic -> Inspector -> Breaker authority separation.
+- SharedNet JSON responses are streamed with a hard byte ceiling before parsing; oversized signed deliveries use Room-addressed artifacts and compact hash pointers.
+- Every paid target workflow runs under an exact-target SharedOS grant. The dispatcher has no direct target-service authority. Invoke and Gauntlet's optional real invocation use Scout -> Mechanic -> Inspector -> Breaker separation.
 - Audit storage is durable and an outbox is retained for event-visible integration.
+- Paid requests left inflight after a crash become explicit unknown outcomes after the recovery threshold and are never automatically re-executed.
+- Poison Room messages have bounded retries and a terminal dead-letter state so one malformed delivery cannot freeze the autonomous cursor.
 - Production refuses to start without persistent Ed25519 signing material.
 
 ## Non-claims

@@ -1,6 +1,6 @@
 {
   "name": "sledgewire",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Permissioned adversarial conformance, bounded repair, and signed execution receipts for MCP services.",
   "type": "module",
   "bin": {"sledgewire": "./bin/sledgewire.mjs"},
@@ -11,6 +11,7 @@
     "serve": "node src/server/http.mjs",
     "stress": "node scripts/stress.mjs",
     "stress:arena": "node scripts/arena-stress.mjs",
+    "stress:dupes": "node scripts/duplicate-storm.mjs",
     "economy": "node scripts/economy-sim.mjs",
     "collab:report": "node scripts/collab-report.mjs",
     "keygen": "node scripts/keygen.mjs",

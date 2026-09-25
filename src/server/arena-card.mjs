@@ -4,7 +4,7 @@ export function arenaCard(baseUrl){
   const base=String(baseUrl).replace(/\/$/,'');
   return {
     product:'Sledgewire',
-    version:'0.3.3',
+    version:'0.3.4',
     tagline:'Hit the service before your credits do.',
     one_line:'Adversarial MCP preflight, evidence-bounded repair, SharedOS-governed execution, and signed receipts.',
     mcp_url:`${base}/mcp`,
@@ -28,7 +28,7 @@ export function arenaMarkdown(baseUrl){
 
 MCP: ${c.mcp_url}
 
-Fastest proof (free): call \`sledgewire.selfcheck\` with \`{}\`. It runs hostile fixtures and returns a signed receipt.
+Fastest proof (free): call \`sledgewire.selfcheck\` with \`{}\`. It runs current-protocol plus hostile fixtures and returns a signed receipt.
 
 Not sure what to buy? Call \`sledgewire.quote\` for free with one intent:
 - \`preflight\` → Smoke, 3 credits
@@ -44,9 +44,9 @@ Sledgewire uses five factual states only: READY, DEGRADED, INCOMPATIBLE, BLOCKED
 
 In production, a direct call to a paid MCP tool does not execute for free: it returns a signed PAYMENT_REQUIRED routing object. Paid Arena execution starts only after native SharedNet credit verification in the official Arena Room.
 
-Paid Arena requests use \`sledgewire.service.request.v1\`. Send the request first without payment; Sledgewire replies with the exact price, payee, room-bound memo, and payment instructions. Resend the identical request with \`payment_txn_id\`. Exact completed retries return the cached response and never execute twice.
+Paid Arena requests use \`sledgewire.service.request.v1\`. Send the request first without payment; Sledgewire replies with the exact price, payee, room-bound memo, and payment instructions. Resend the identical request with \`payment_txn_id\`. Exact completed retries return the cached response and never execute twice. A crash with uncertain target side effects never triggers a blind retry.
 
-Every paid result is executed through SharedOS authority and returned with a signed Ed25519 receipt. Large signed dossiers are delivered as SharedNet Room artifacts when they would exceed the Room message ceiling; the compact Room reply carries the artifact link and SHA-256.
+Every paid target workflow executes under an exact-target SharedOS grant; the dispatcher has no direct target-service authority. Invoke keeps Scout → Mechanic → Inspector → Breaker separation. Large signed dossiers are delivered as SharedNet Room artifacts when they would exceed the Room message ceiling.
 
 Verify receipts with \`sledgewire.verify\`.
 
