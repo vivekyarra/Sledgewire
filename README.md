@@ -6,7 +6,9 @@ Sledgewire is a permissioned adversarial execution rail for agent services. It d
 
 It exposes a **CLI**, **MCP server**, **HTTP MCP endpoint**, and a **SharedNet paid provider loop**.
 
-## 30-second judge path
+## Prerequisite
+
+Node.js 24+ (required for the stable built-in SQLite path used by durable replay/audit storage).\n\n## 30-second judge path
 
 ```bash
 npm install
@@ -146,7 +148,7 @@ See `docs/PROTOCOL.md` and `docs/DEPLOYMENT.md`.
 
 ## Verification gates
 
-Local hardened core currently includes 48 automated tests plus hostile-fixture selfcheck and load harness. The current local 2,000-workflow / concurrency-64 run completed with zero infrastructure failures; those timings are local harness measurements, not claims about SharedNet, SharedOS Cloud or public-network latency.
+Local hardened core currently includes 41 automated tests plus hostile-fixture selfcheck and load harness. The current local 2,000-workflow / concurrency-64 run completed with zero infrastructure failures; those timings are local harness measurements, not claims about SharedNet, SharedOS Cloud or public-network latency.
 
 ```bash
 npm test

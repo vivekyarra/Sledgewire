@@ -4,7 +4,7 @@ Date: 2026-09-25
 
 ## Executed locally
 
-- `npm test`: **48/48** automated tests passed.
+- `npm test`: **41/41** automated tests passed.
 - `npm run selfcheck`: **VERIFIED** across clean, output-injection, description-injection, fake-success, malformed, oversized and replay-sensitive fixtures.
 - `npm run stress -- 2000 64`: **2,000/2,000** complete smoke workflows succeeded, 0 infrastructure failures. Local harness p50 **44 ms**, p95 **71 ms**, p99 **281 ms**, total **1.646 s**.
 
