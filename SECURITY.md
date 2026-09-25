@@ -21,6 +21,8 @@ Sledgewire processes hostile service descriptions, schemas, URLs, tool outputs, 
 - Audit storage is durable and an outbox is retained for event-visible integration.
 - Paid requests left inflight after a crash become explicit unknown outcomes after the recovery threshold and are never automatically re-executed.
 - Poison Room messages have bounded retries and a terminal dead-letter state so one malformed delivery cannot freeze the autonomous cursor.
+- Watch compatibility accepts one reply event at a time, validates the configured payee against the authenticated SharedNet identity, and uses artifact fallback for oversized signed responses.
+- No production SharedNet path shells out through `npx`; the unused legacy child-process adapter was removed.
 - Production refuses to start without persistent Ed25519 signing material.
 
 ## Non-claims
