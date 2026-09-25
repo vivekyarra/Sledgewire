@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import catalog from '../catalog.json' with {type:'json'};
 import {loadSigningMaterial} from '../src/receipts/receipt.mjs';
+import {exactPriceMap} from '../src/core/catalog-policy.mjs';
 import {SharedNetApi,ROOM,ADDRESS,INSTANCE_TOKEN,payeeBelongsToIdentity,loadSharedNetToken} from '../src/sharednet/api.mjs';
 
 const live=process.argv.includes('--live'),submission=process.argv.includes('--submission'),checks=[];
@@ -11,7 +12,7 @@ add('node>=22.18',major>22||(major===22&&minor>=18),process.versions.node);
 
 const expected={'sledgewire.quote':0,'sledgewire.selfcheck':0,'sledgewire.smoke':3,'sledgewire.assay':8,'sledgewire.invoke':12,'sledgewire.fleet':20,'sledgewire.seal':25,'sledgewire.gauntlet':35,'sledgewire.trace':0,'sledgewire.verify':0};
 const actual=Object.fromEntries(Object.entries(catalog.services).map(([k,v])=>[k,v.price]));
-add('catalog_prices',JSON.stringify(actual)===JSON.stringify(expected),JSON.stringify(actual));
+add('catalog_prices',exactPriceMap(actual,expected),JSON.stringify(actual));
 
 try{const s=loadSigningMaterial({production:live||process.env.NODE_ENV==='production'});add('signing_key',!live||!s.ephemeral,s.keyId);}
 catch(e){add('signing_key',false,String(e.message||e));}
