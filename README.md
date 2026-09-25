@@ -4,7 +4,7 @@
 
 Sledgewire is a permissioned adversarial execution rail for agent services. It discovers a real MCP surface, attacks bounded failure modes, repairs only evidence-backed structural mismatches, independently validates repair, executes paid work through SharedOS authority, and returns a signed receipt another agent can verify.
 
-Trial Zero v0.3.2 is built around the organizer's actual competition shape: one product link, agents operating both Arena rounds without human intervention, a required SharedNet development Room, a separate organizer Arena Room, and Arena 2 ranking by valid credits earned.
+Trial Zero v0.3.3 is built around the organizer's actual competition shape: one product link, agents operating both Arena rounds without human intervention, a required SharedNet development Room, a separate organizer Arena Room, and Arena 2 ranking by valid credits earned.
 
 ## Fastest judge path
 
@@ -60,6 +60,9 @@ Paid Invoke, and Gauntlet's optional real invocation, use:
     Breaker    invoke exact inspected target/tool
 
 The dispatcher never inherits target authority. A Room message never creates authority.
+
+
+MCP compatibility: **2026-07-28 stateless `server/discover` first, with legacy 2025 handshake fallback.**
 
 ## CLI
 
