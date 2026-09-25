@@ -99,6 +99,7 @@ Surfaces:
     GET  /arena.md
     GET  /arena.json
     GET  /health
+    GET  /ready
     GET  /catalog.json
     GET  /.well-known/agent.json
     GET  /public-key
@@ -162,6 +163,7 @@ Large signed deliveries are uploaded as Room-addressed SharedNet artifacts and r
 - SharedNet secrets stay in environment or owner-only files, never argv/messages/receipts/logs.
 - Receipt canonicalization is bounded for depth, nodes, cycles and bytes before signing or verification.
 - Production requires persistent Ed25519 signing material.
+- `/ready` requires a fresh Arena-daemon heartbeat from the same persistent database, so a dead seller process cannot masquerade as a healthy competition service.
 - Paid receipts are independently inspectable through the free, trace-id-scoped `sledgewire.trace` proof surface.
 
 ## Verification
