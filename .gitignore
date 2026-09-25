@@ -1,9 +1,11 @@
 node_modules/
 .sledgewire/
+.sharednet/
 *.db
 *.db-shm
 *.db-wal
 *.pem
 .env
+.env.*
 .DS_Store
 coverage/

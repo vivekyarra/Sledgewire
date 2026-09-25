@@ -6,10 +6,12 @@ const port=Number(process.env.PORT||8787);
 const base=process.env.PUBLIC_BASE_URL||`http://127.0.0.1:${port}`;
 if(process.env.NODE_ENV==='production'&&!base.startsWith('https://'))throw new Error('production_public_base_url_https_required');
 let active=0;const maxActive=Math.max(4,Math.min(256,Number(process.env.SLEDGEWIRE_HTTP_CONCURRENCY??64)));
+const publicArena=process.env.NODE_ENV==='production'&&process.env.SLEDGEWIRE_PUBLIC_PAID_EXECUTION!=='1';
+const arenaRoomId=process.env.SHAREDNET_ARENA_ROOM_ID??null;
 
 const server=http.createServer(async(req,res)=>{
   res.setHeader('x-content-type-options','nosniff');res.setHeader('referrer-policy','no-referrer');res.setHeader('cache-control','no-store');
-  if(req.method==='GET'&&req.url==='/health')return json(res,200,{ok:true,name:'sledgewire',version:'0.3.0',key_id:PUBLIC_KEY_ID,active_requests:active});
+  if(req.method==='GET'&&req.url==='/health')return json(res,200,{ok:true,name:'sledgewire',version:'0.3.0',key_id:PUBLIC_KEY_ID,active_requests:active,paid_execution:publicArena?'sharednet-payment-required':'direct-enabled'});
   if(req.method==='GET'&&req.url==='/catalog.json')return json(res,200,catalog);
   if(req.method==='GET'&&req.url==='/arena.json')return json(res,200,arenaCard(base));
   if(req.method==='GET'&&req.url==='/arena.md'){res.statusCode=200;res.setHeader('content-type','text/markdown; charset=utf-8');return res.end(arenaMarkdown(base));}
@@ -21,7 +23,10 @@ const server=http.createServer(async(req,res)=>{
   active++;
   try{
     let body='';for await(const c of req){body+=c;if(Buffer.byteLength(body)>1_000_000){res.statusCode=413;return res.end();}}
-    let msg;try{msg=JSON.parse(body);}catch{return json(res,400,{error:'invalid_json'});}const out=await handleRpc(msg);if(out===null){res.statusCode=202;return res.end();}return json(res,200,out);
+    let msg;try{msg=JSON.parse(body);}catch{return json(res,400,{error:'invalid_json'});}
+    const out=await handleRpc(msg,{publicArena,publicBaseUrl:base,arenaRoomId});
+    if(out===null){res.statusCode=202;return res.end();}
+    return json(res,200,out);
   }finally{active--;}
 });
 server.listen(port,()=>console.error(`sledgewire http listening on ${port}`));

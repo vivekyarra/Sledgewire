@@ -3,6 +3,7 @@ import path from 'node:path';
 import {ArenaStore} from '../store/arena-store.mjs';
 import {SharedNetApi,ROOM,ADDRESS,SEAT,idempotencyUuid} from './api.mjs';
 import {createArenaHandler} from './handler.mjs';
+import {compactForRoom} from './delivery.mjs';
 import {loadSigningMaterial} from '../receipts/receipt.mjs';
 
 const room=process.env.SHAREDNET_ARENA_ROOM_ID??'',payee=process.env.SHAREDNET_PAYEE_ADDRESS??'',publicBaseUrl=process.env.PUBLIC_BASE_URL??'';
@@ -26,7 +27,10 @@ for(;;){
       if(!store.claimRoomMessage(message.id))return {ok:false,message,reason:'claimed_elsewhere'};
       try{
         const response=await handle(message);
-        if(response)await api.post(room,JSON.stringify(response),{replyTo:message.id??null,idempotencyKey:idempotencyUuid(`sledgewire-reply:${room}:${message.id??message.sequence}`)});
+        if(response){
+          const delivery=await compactForRoom(api,room,message.id,response);
+          await api.post(room,delivery.text,{replyTo:message.id??null,idempotencyKey:idempotencyUuid(`sledgewire-reply:${room}:${message.id??message.sequence}`)});
+        }
         store.markRoomMessage(message.id,'completed');return {ok:true,message};
       }catch(e){store.markRoomMessage(message.id,'failed',String(e.message||e));return {ok:false,message,error:e};}
     });

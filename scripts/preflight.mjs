@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import catalog from '../catalog.json' with {type:'json'};
 import {loadSigningMaterial} from '../src/receipts/receipt.mjs';
-import {SharedNetApi,ROOM,ADDRESS,INSTANCE_TOKEN} from '../src/sharednet/api.mjs';
+import {SharedNetApi,ROOM,ADDRESS,INSTANCE_TOKEN,loadSharedNetToken} from '../src/sharednet/api.mjs';
 
 const live=process.argv.includes('--live');const submission=process.argv.includes('--submission');const checks=[];const add=(name,ok,detail='')=>checks.push({name,ok,detail});
 const [major,minor]=process.versions.node.split('.').map(Number);add('node>=22.18',major>22||(major===22&&minor>=18),process.versions.node);
@@ -17,12 +17,19 @@ if(submission){
   add('participant_contact',Boolean(process.env.SLEDGEWIRE_CONTACT?.trim()),process.env.SLEDGEWIRE_CONTACT?'present':'missing');
 }
 if(live){
-  const room=process.env.SHAREDNET_ARENA_ROOM_ID??'',payee=process.env.SHAREDNET_PAYEE_ADDRESS??'',token=process.env.SHAREDNET_INSTANCE_TOKEN??'';
+  const room=process.env.SHAREDNET_ARENA_ROOM_ID??'',payee=process.env.SHAREDNET_PAYEE_ADDRESS??'',token=loadSharedNetToken();
   add('arena_room_is_separate_explicit_env',ROOM.test(room),room||'missing');
+  add('arena_room_differs_from_build_room',!process.env.SHAREDNET_BUILD_ROOM_ID||process.env.SHAREDNET_BUILD_ROOM_ID!==room,'build and Arena Room must be distinct');
   add('sharednet_payee',ADDRESS.test(payee),payee||'missing');
-  add('sharednet_instance_token',INSTANCE_TOKEN.test(token),'present-but-redacted');
-  if(INSTANCE_TOKEN.test(token)){
-    try{const api=new SharedNetApi({token});const identity=await api.current();add('sharednet_authenticated',Boolean(identity?.instance?.id),'current instance resolved');const rooms=await api.request(`/api/v1/rooms/${room}`);add('arena_room_membership',Boolean(rooms?.room?.id),'membership confirmed');const credits=await api.credits();add('credits_endpoint',Number.isFinite(Number(credits?.credits?.balance)),'purse readable');}catch(e){add('sharednet_live_api',false,String(e.message||e));}
+  add('sharednet_member_or_instance_token',INSTANCE_TOKEN.test(token),'present-but-redacted');
+  if(INSTANCE_TOKEN.test(token)&&ROOM.test(room)){
+    try{
+      const api=new SharedNetApi({token});const identity=await api.current();const ids=[identity?.principal?.id,identity?.agent?.id,identity?.instance?.id].filter(Boolean);
+      add('sharednet_authenticated',Boolean(identity?.instance?.id),'current Instance resolved');
+      add('payee_matches_current_identity',ids.includes(payee),ids.length?'payee must be one of current Principal/Agent/Instance ids':'identity ids missing');
+      const detail=await api.request(`/api/v1/rooms/${room}`);add('arena_room_membership',detail?.room?.id===room,'membership confirmed');
+      const credits=await api.credits();add('credits_endpoint',Number.isFinite(Number(credits?.credits?.balance)),`balance=${credits?.credits?.balance??'unknown'}`);
+    }catch(e){add('sharednet_live_api',false,String(e.message||e));}
   }
   add('external_call_confirmed',process.env.SHAREDNET_EXTERNAL_CALL_CONFIRMED==='1','requires real other-seat call');
   if(process.env.SLEDGEWIRE_SHAREDOS_REQUIRED==='1'){add('sharedos_audit_url',Boolean(process.env.SHAREDOS_AUDIT_URL),'required');add('sharedos_key',Boolean(process.env.SHAREDOS_KEY),'required');add('sharedos_audit_confirmed',process.env.SHAREDOS_AUDIT_CONFIRMED==='1','requires real visible trace');}

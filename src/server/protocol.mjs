@@ -14,21 +14,34 @@ export const PUBLIC=signing.publicKeyPem;
 export const PUBLIC_KEY_ID=signing.keyId;
 const schemaEndpoint={type:'string',minLength:8,maxLength:2048};
 const schemaProbe={type:'object'};
+const PAID=new Set(['sledgewire.smoke','sledgewire.assay','sledgewire.invoke','sledgewire.fleet','sledgewire.seal','sledgewire.gauntlet']);
 
 export const toolDefs=[
  {name:'sledgewire.quote',description:'Free deterministic selector that returns the right Sledgewire service, exact price, and request template.',inputSchema:{type:'object',additionalProperties:false,required:['intent'],properties:{intent:{type:'string',enum:['preflight','adversarial','repair_execute','compare','certify','full_dossier']},endpoint:schemaEndpoint,targets:{type:'array',maxItems:6},tool:{type:'string'}}}},
  {name:'sledgewire.selfcheck',description:'Free hostile-fixture demonstration of Sledgewire fail-closed behavior with a signed receipt.',inputSchema:{type:'object',additionalProperties:false,properties:{}}},
- {name:'sledgewire.smoke',description:'Discover and safely smoke-test a remote MCP endpoint.',inputSchema:{type:'object',additionalProperties:false,required:['endpoint'],properties:{endpoint:schemaEndpoint,probe:schemaProbe}}},
- {name:'sledgewire.assay',description:'Run bounded adversarial MCP protocol checks without claiming semantic truth.',inputSchema:{type:'object',additionalProperties:false,required:['endpoint'],properties:{endpoint:schemaEndpoint,probe:schemaProbe}}},
- {name:'sledgewire.invoke',description:'Perform bounded schema repair, independent validation, then invoke.',inputSchema:{type:'object',additionalProperties:false,required:['endpoint','request'],properties:{endpoint:schemaEndpoint,request:{type:'object'}}}},
- {name:'sledgewire.fleet',description:'Smoke-test up to six candidate MCP services with bounded concurrency.',inputSchema:{type:'object',additionalProperties:false,required:['targets'],properties:{targets:{type:'array',minItems:1,maxItems:6}}}},
- {name:'sledgewire.seal',description:'Run the v3 conformance profile and return a portable signed packet.',inputSchema:{type:'object',additionalProperties:false,required:['endpoint'],properties:{endpoint:schemaEndpoint,probe:schemaProbe}}},
- {name:'sledgewire.gauntlet',description:'Seller-grade full dossier: smoke, assay, optional repaired invocation, and portable conformance evidence.',inputSchema:{type:'object',additionalProperties:false,required:['endpoint'],properties:{endpoint:schemaEndpoint,probe:schemaProbe,request:{type:'object'}}}},
- {name:'sledgewire.verify',description:'Verify a Sledgewire Ed25519 receipt.',inputSchema:{type:'object',additionalProperties:false,required:['receipt','publicKeyPem'],properties:{receipt:{type:'object'},publicKeyPem:{type:'string'}}}}
+ {name:'sledgewire.smoke',description:'Paid Arena service: discover and safely smoke-test a remote MCP endpoint.',inputSchema:{type:'object',additionalProperties:false,required:['endpoint'],properties:{endpoint:schemaEndpoint,probe:schemaProbe}}},
+ {name:'sledgewire.assay',description:'Paid Arena service: run bounded adversarial MCP protocol checks.',inputSchema:{type:'object',additionalProperties:false,required:['endpoint'],properties:{endpoint:schemaEndpoint,probe:schemaProbe}}},
+ {name:'sledgewire.invoke',description:'Paid Arena service: bounded schema repair, independent validation, then invocation.',inputSchema:{type:'object',additionalProperties:false,required:['endpoint','request'],properties:{endpoint:schemaEndpoint,request:{type:'object'}}}},
+ {name:'sledgewire.fleet',description:'Paid Arena service: smoke-test up to six candidate MCP services.',inputSchema:{type:'object',additionalProperties:false,required:['targets'],properties:{targets:{type:'array',minItems:1,maxItems:6}}}},
+ {name:'sledgewire.seal',description:'Paid Arena service: run the v3 conformance profile and return a portable signed packet.',inputSchema:{type:'object',additionalProperties:false,required:['endpoint'],properties:{endpoint:schemaEndpoint,probe:schemaProbe}}},
+ {name:'sledgewire.gauntlet',description:'Paid Arena service: seller-grade full dossier with smoke, assay, optional repaired invocation, and conformance evidence.',inputSchema:{type:'object',additionalProperties:false,required:['endpoint'],properties:{endpoint:schemaEndpoint,probe:schemaProbe,request:{type:'object'}}}},
+ {name:'sledgewire.verify',description:'Free: verify a Sledgewire Ed25519 receipt.',inputSchema:{type:'object',additionalProperties:false,required:['receipt','publicKeyPem'],properties:{receipt:{type:'object'},publicKeyPem:{type:'string'}}}}
 ];
 
 export async function handleTool(name,args={},internalOpts={}){
   if(name==='sledgewire.verify')return verifyReceipt(args.receipt,args.publicKeyPem);
+  if(internalOpts.publicArena===true&&PAID.has(name)){
+    const price=catalog.services[name].price;
+    return signReceipt({
+      service:name,
+      state:'PAYMENT_REQUIRED',
+      price_credits:price,
+      arena_room_id:internalOpts.arenaRoomId??null,
+      quickstart_url:internalOpts.publicBaseUrl?`${String(internalOpts.publicBaseUrl).replace(/\/$/,'')}/arena.md`:null,
+      request_template:{type:'sledgewire.service.request.v1',request_id:'<buyer-unique-id>',service:name,input:args},
+      note:'Paid Arena services execute only after native SharedNet payment verification. Send this request in the official Arena Room first without payment; Sledgewire returns the exact request-bound memo and payee.'
+    },signing.privateKeyPem);
+  }
   const opts={...internalOpts,targetPolicy:internalOpts.targetPolicy??{allowHttp:false,allowPrivate:false}};
   let payload;
   if(name==='sledgewire.quote')payload=quote(args);
@@ -49,10 +62,7 @@ export async function handleRpc(msg,internalOpts={}){
     if(msg.method==='initialize')return {jsonrpc:'2.0',id:msg.id,result:{protocolVersion:'2025-06-18',capabilities:{tools:{}},serverInfo:{name:'sledgewire',version:'0.3.0'}}};
     if(msg.method==='notifications/initialized')return null;
     if(msg.method==='tools/list')return {jsonrpc:'2.0',id:msg.id,result:{tools:toolDefs}};
-    if(msg.method==='tools/call'){
-      const result=await handleTool(msg.params?.name,msg.params?.arguments??{},internalOpts);
-      return {jsonrpc:'2.0',id:msg.id,result:{content:[{type:'text',text:JSON.stringify(result)}],structuredContent:result,isError:false}};
-    }
+    if(msg.method==='tools/call'){const result=await handleTool(msg.params?.name,msg.params?.arguments??{},internalOpts);return {jsonrpc:'2.0',id:msg.id,result:{content:[{type:'text',text:JSON.stringify(result)}],structuredContent:result,isError:false}};}
     return {jsonrpc:'2.0',id:msg.id,error:{code:-32601,message:'Method not found'}};
   }catch(e){return {jsonrpc:'2.0',id:msg.id??null,error:{code:-32000,message:String(e.message||e)}};}
 }
