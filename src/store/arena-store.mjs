@@ -11,6 +11,7 @@ export class ArenaStore{
       CREATE TABLE IF NOT EXISTS audit_outbox(event_id TEXT PRIMARY KEY,event_json TEXT NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,sent_at TEXT);
       CREATE TABLE IF NOT EXISTS room_messages(message_id TEXT PRIMARY KEY,status TEXT NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,error TEXT,processed_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS counters(key TEXT PRIMARY KEY,value INTEGER NOT NULL DEFAULT 0);
     `);
   }
   claim({requestId,txnId,fingerprint,service}){
@@ -55,39 +56,58 @@ export class ArenaStore{
     if(!id)return {status:'ignored',attempts:0};const row=this.db.prepare('SELECT attempts FROM room_messages WHERE message_id=?').get(id),attempts=row?.attempts??1,status=attempts>=maxAttempts?'dead_letter':'failed';
     this.markRoomMessage(id,status,String(error??'unknown').slice(0,2000));return {status,attempts};
   }
-  arenaStats(){
-    const statusRows=this.db.prepare('SELECT status,COUNT(*) count FROM requests GROUP BY status').all(),status=Object.fromEntries(statusRows.map(r=>[r.status,Number(r.count)]));
-    const rows=this.db.prepare("SELECT service,txn_id,response_json,started_at,completed_at FROM requests WHERE status='completed' ORDER BY rowid ASC").all();
-    const buyers=new Set(),txns=new Set(),serviceMix={},outcomeMix={},latencies=[],smokeBuyers=new Set(),premiumBuyers=new Set();let earned=0,malformed=0,signedDeliveries=0,traceDeliveries=0;
+  incrementCounter(key,amount=1){
+    if(typeof key!=='string'||!key||key.length>160||!Number.isSafeInteger(amount))throw new Error('invalid_counter_update');
+    this.db.prepare('INSERT INTO counters(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=value+excluded.value').run(key,amount);
+  }
+  counterMap(prefix=''){
+    const rows=prefix?this.db.prepare('SELECT key,value FROM counters WHERE key LIKE ? ORDER BY key').all(`${prefix}%`):this.db.prepare('SELECT key,value FROM counters ORDER BY key').all();
+    return Object.fromEntries(rows.map(r=>[r.key,Number(r.value)]));
+  }
+  arenaStats({prices={}}={}){
+    const rows=this.db.prepare('SELECT service,txn_id,status,response_json,started_at,completed_at FROM requests ORDER BY rowid ASC').all();
+    const buyers=new Set(),txns=new Set(),serviceMix={},outcomeMix={},latencies=[],smokeBuyers=new Set(),premiumBuyers=new Set();
+    let earned=0,unknownPrice=0,malformed=0,signedDeliveries=0,traceDeliveries=0,completed=0,failed=0,inflight=0;
     for(const row of rows){
-      serviceMix[row.service]=(serviceMix[row.service]??0)+1;if(row.txn_id)txns.add(row.txn_id);
+      if(row.txn_id)txns.add(row.txn_id);
+      const configuredPrice=Number(prices?.[row.service]);
+      let response=null,receipt=null;
+      if(row.response_json){try{response=JSON.parse(row.response_json);receipt=response?.receipt??null;}catch{malformed++;}}
+      const receiptPrice=Number(receipt?.payment?.price_credits),price=Number.isInteger(configuredPrice)&&configuredPrice>0?configuredPrice:(Number.isInteger(receiptPrice)&&receiptPrice>0?receiptPrice:null);
+      if(price===null)unknownPrice++;else earned+=price;
+      if(row.status==='inflight'){inflight++;continue;}
+      if(row.status==='failed'){failed++;continue;}
+      if(row.status!=='completed')continue;
+      completed++;serviceMix[row.service]=(serviceMix[row.service]??0)+1;
       const start=Date.parse(row.started_at),end=Date.parse(row.completed_at);if(Number.isFinite(start)&&Number.isFinite(end)&&end>=start)latencies.push(end-start);
-      let response;try{response=JSON.parse(row.response_json);}catch{malformed++;continue;}
-      const receipt=response?.receipt,buyer=receipt?.buyer_seat,price=Number(receipt?.payment?.price_credits),outcome=response?.outcome_state??receipt?.state??'UNKNOWN';
+      if(!response)continue;
+      const buyer=receipt?.buyer_seat,outcome=response?.outcome_state??receipt?.state??'UNKNOWN';
       outcomeMix[String(outcome)]=(outcomeMix[String(outcome)]??0)+1;
       if(typeof buyer==='string'&&buyer){buyers.add(buyer);if(row.service==='sledgewire.smoke')smokeBuyers.add(buyer);else premiumBuyers.add(buyer);}
-      if(Number.isInteger(price)&&price>0)earned+=price;
       if(receipt?.proof?.signature)signedDeliveries++;
       if(typeof response?.trace_id==='string'&&response.trace_id&&response.trace_id===receipt?.sharedos_trace_id)traceDeliveries++;
     }
     latencies.sort((a,b)=>a-b);const percentile=p=>latencies.length?latencies[Math.min(latencies.length-1,Math.max(0,Math.ceil(latencies.length*p)-1))]:null;
     let converted=0;for(const b of smokeBuyers)if(premiumBuyers.has(b))converted++;
+    const rejects=this.counterMap('arena.reject.'),rejections={};for(const [k,v] of Object.entries(rejects))rejections[k.slice('arena.reject.'.length)]=v;
     return {
       schema:'sledgewire.arena.stats.v1',
       earned_credits:earned,
+      earned_credits_basis:'verified payment claims in local durable store; configured catalog price preferred',
       unique_buyers:buyers.size,
       paid_transactions:txns.size,
-      completed_deliveries:rows.length,
-      failed_requests:status.failed??0,
-      inflight_requests:status.inflight??0,
+      completed_deliveries:completed,
+      failed_requests:failed,
+      inflight_requests:inflight,
       credits_per_unique_buyer:buyers.size?Number((earned/buyers.size).toFixed(2)):0,
       service_mix:serviceMix,
       outcome_mix:outcomeMix,
+      payment_rejections:rejections,
       delivery_ms:{p50:percentile(0.50),p95:percentile(0.95),max:latencies.length?latencies.at(-1):null},
       smoke_buyers:smokeBuyers.size,
       smoke_to_premium_buyers:converted,
       smoke_to_premium_conversion:smokeBuyers.size?Number((converted/smokeBuyers.size).toFixed(4)):0,
-      integrity:{signed_deliveries:signedDeliveries,trace_bound_deliveries:traceDeliveries,malformed_completed_rows:malformed}
+      integrity:{signed_deliveries:signedDeliveries,trace_bound_deliveries:traceDeliveries,malformed_completed_rows:malformed,unknown_price_claims:unknownPrice}
     };
   }
   getMeta(key){return this.db.prepare('SELECT value FROM metadata WHERE key=?').get(key)?.value??null;}
