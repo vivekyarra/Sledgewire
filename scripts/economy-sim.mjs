@@ -21,7 +21,7 @@ for(const [name,r] of Object.entries(scenarios)){
 console.log(JSON.stringify({
   facts:{
     prices,
-    free_entry:['quote','selfcheck','verify'],
+    free_entry:Object.entries(catalog.services).filter(([,v])=>v.price===0).map(([k])=>k.split('.').at(-1)),
     seller_lane:'Seal and Gauntlet conversion shares are mutually exclusive because Gauntlet already includes conformance evidence.',
     note:'Sensitivity arithmetic only. It is not a forecast, probability, or finishing-position claim. Arena rank depends on valid credits actually earned.'
   },

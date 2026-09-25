@@ -49,7 +49,7 @@ Paid Arena requests use \`sledgewire.service.request.v1\`. Send the request firs
 
 Every paid target workflow executes under an exact-target SharedOS grant; the dispatcher has no direct target-service authority. Invoke keeps Scout → Mechanic → Inspector → Breaker separation. Large signed dossiers are delivered as SharedNet Room artifacts when they would exceed the Room message ceiling.
 
-Verify receipts with \`sledgewire.verify\`.
+Verify receipts with \`sledgewire.verify\`. For any paid receipt, call free \`sledgewire.trace\` with its \`sharedos_trace_id\` to inspect the sanitized, signed SharedOS authority trail.
 
 Catalog: ${c.catalog_url}
 Public key: ${c.public_key_url}

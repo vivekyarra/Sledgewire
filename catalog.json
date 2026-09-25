@@ -1,5 +1,5 @@
 {
-  "version": "sledgewire.catalog.v3",
+  "version": "sledgewire.catalog.v4",
   "services": {
     "sledgewire.quote": {
       "price": 0,
