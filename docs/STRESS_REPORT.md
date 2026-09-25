@@ -6,22 +6,26 @@ This report separates executed evidence from live-event facts. It does not claim
 
 ## Current green branch evidence
 
-Tested commit: `6bfd2fa6a7990a8d7d3389af1b19119cd8953e0f`
+Tested commit: `0d2a77e6b80352a28884d7cef4ee9431405e6c96`
 
-GitHub Actions run: `36154160761`
+GitHub Actions run: `36161204939`
 
 - Automated tests: **128 / 128 passed**, 0 failed, 0 skipped.
 - Hostile-fixture selfcheck: **VERIFIED**; signed receipt verification true.
 - MCP load harness: **2,000 / 2,000** complete Smoke workflows at concurrency **64**, **0 failures**.
-- MCP load timing on the v0.3.3 branch CI runner: p50 **53 ms**, p95 **89 ms**, p99 **297 ms**, total **2.049 s**.
-- Arena payment/replay harness: **1,000 claims**, **1,000 cached retries**, **500 wrong-buyer attempts rejected**, **0 duplicate paid executions**, total **85 ms**.
+- MCP load timing on the v0.3.3 branch CI runner: p50 **72 ms**, p95 **117 ms**, p99 **384 ms**, total **2.709 s**.
+- Arena payment/replay harness: **1,000 claims**, **1,000 cached retries**, **500 wrong-buyer attempts rejected**, **0 duplicate paid executions**, total **146 ms**.
 - SharedOS integration: no grant denied; matching grant allowed; exhausted `maxUses` denied; **9 audit events** persisted.
 - Static preflight: **READY**.
 - Production signing policy: missing persistent key fails closed; valid persistent key succeeds.
 
 These latency measurements are local CI harness measurements only. They are not claims about SharedNet, SharedOS Cloud, public-network, or third-party MCP latency.
 
-## MCP 2026-07-28 compatibility\n\nSledgewire now probes `server/discover` using the current **2026-07-28 stateless MCP era**, sends required per-request `_meta` and `MCP-Protocol-Version`, rejects header/body version mismatches, omits protocol session IDs in the modern era, and falls back to the legacy initialize/initialized handshake for 2025-era servers. The public HTTP server validates `Origin` when present.\n\n## Security and organizer-protocol coverage
+## MCP 2026-07-28 compatibility
+
+Sledgewire now probes `server/discover` using the current **2026-07-28 stateless MCP era**, sends required per-request `_meta` and `MCP-Protocol-Version`, rejects header/body version mismatches, omits protocol session IDs in the modern era, and falls back to the legacy initialize/initialized handshake for 2025-era servers. The public HTTP server validates `Origin` when present.
+
+## Security and organizer-protocol coverage
 
 The automated suite covers:
 
