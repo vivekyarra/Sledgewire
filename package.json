@@ -4,7 +4,20 @@
   "description": "Permissioned adversarial conformance, bounded repair, and signed execution receipts for MCP services.",
   "type": "module",
   "bin": {"sledgewire": "./bin/sledgewire.mjs"},
-  "scripts": {"test":"node --test test/*.test.mjs","selfcheck":"node bin/sledgewire.mjs selfcheck","mcp":"node src/server/stdio.mjs","serve":"node src/server/http.mjs","stress":"node scripts/stress.mjs","preflight":"node scripts/preflight.mjs","arena:serve":"node src/sharednet/arena-service.mjs","check":"npm test && npm run selfcheck && npm run stress -- 300 24","sharedos:check":"node scripts/sharedos-check.mjs","audit:flush":"node scripts/audit-flush.mjs","keygen":"node scripts/keygen.mjs"},
+  "scripts": {
+    "test":"node --test test/*.test.mjs",
+    "selfcheck":"node bin/sledgewire.mjs selfcheck",
+    "mcp":"node src/server/stdio.mjs",
+    "serve":"node src/server/http.mjs",
+    "stress":"node scripts/stress.mjs",
+    "preflight":"node scripts/preflight.mjs",
+    "arena:serve":"node src/sharednet/arena-service.mjs",
+    "check":"npm test && npm run selfcheck && npm run rehearsal && npm run stress -- 300 24 && npm run sharedos:check && npm run preflight",
+    "sharedos:check":"node scripts/sharedos-check.mjs",
+    "rehearsal":"node scripts/rehearsal.mjs",
+    "audit:flush":"node scripts/audit-flush.mjs",
+    "keygen":"node scripts/keygen.mjs"
+  },
   "engines": {"node": ">=24"},
   "license": "MIT",
   "dependencies": {"@aicoo/sharedos": "1.0.0-preview"}

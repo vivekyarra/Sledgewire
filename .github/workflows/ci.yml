@@ -16,9 +16,11 @@ jobs:
         with:
           node-version: '24'
       - run: npm install --ignore-scripts
+      - run: npm audit --audit-level=high
       - run: npm test
       - run: npm run selfcheck
-      - run: npm run stress -- 1000 48
+      - run: npm run rehearsal
+      - run: npm run stress -- 2000 64
       - run: npm run sharedos:check
       - run: npm run preflight
       - name: production key fail-closed check
