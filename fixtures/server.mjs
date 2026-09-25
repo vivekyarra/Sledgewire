@@ -13,6 +13,7 @@ export async function startFixture({mode='clean'}={}){
     if(m.method==='server/discover'){
       if(mode==='legacy_plain_404'){res.statusCode=404;res.setHeader('content-type','text/plain');return res.end('not found');}
       if(mode==='legacy_header_reject')return err(-32022,'UnsupportedProtocolVersion',400,{requested:MODERN,supported:['2025-11-25','2025-06-18']});
+      if(mode==='discover_internal_error')return err(-32603,'internal error');
       if(mode!=='modern')return err(-32601,'method not found');
       const version=m.params?._meta?.[META_VERSION];
       if(req.headers['mcp-protocol-version']!==MODERN||version!==MODERN)return err(-32020,'HeaderMismatch',400,{header:req.headers['mcp-protocol-version']??null,body:version??null});

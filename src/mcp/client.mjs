@@ -4,6 +4,7 @@ import {resolveTarget} from '../security/target-policy.mjs';
 export const MODERN_PROTOCOL_VERSION='2026-07-28';
 export const LEGACY_PROTOCOL_VERSION='2025-11-25';
 const HARD_MODERN_ERRORS=new Set([-32020,-32021]);
+const LEGACY_DISCOVERY_ERRORS=new Set([-32601,-32602]);
 
 class McpRpcError extends Error{
   constructor(error){super(`mcp_error:${error?.code}:${error?.message}`);this.name='McpRpcError';this.rpcCode=Number(error?.code);this.rpcData=error?.data;}
@@ -74,8 +75,8 @@ export class McpSession{
 }
 function isLegacyFallbackSignal(error){
   if(error?.legacyOnly===true)return true;
-  if(Number.isFinite(error?.rpcCode))return !HARD_MODERN_ERRORS.has(error.rpcCode);
-  if([400,404,405].includes(Number(error?.httpStatus)))return true;
+  if(Number.isFinite(error?.rpcCode))return LEGACY_DISCOVERY_ERRORS.has(Number(error.rpcCode));
+  if([404,405].includes(Number(error?.httpStatus)))return true;
   return /modern_version_not_advertised/.test(String(error?.message??error));
 }
 function extractText(r){return Array.isArray(r?.content)?r.content.filter(x=>x?.type==='text').map(x=>x.text).join(' ').slice(0,500):'tool_reported_error';}

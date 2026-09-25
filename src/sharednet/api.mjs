@@ -134,8 +134,10 @@ export class SharedNetApi{
     if(!/^[^/\\\u0000-\u001f\u007f]{1,240}$/.test(filename))throw new Error('invalid_artifact_filename');if(roomId&&!ROOM.test(roomId))throw new Error('invalid_sharednet_room');
     const extraHeaders={'x-sharednet-filename':filename,...(roomId?{'x-sharednet-room':roomId}:{})};
     const out=await this.request('/api/v1/artifacts',{method:'POST',rawBody:bytes,contentType:'application/json',extraHeaders,idempotencyKey,signal,timeoutMs:20_000});
-    if(!ARTIFACT.test(out?.artifact?.id??'')||typeof out?.url!=='string'||!out.url.startsWith('https://'))throw new Error('sharednet_artifact_response_invalid');
-    return out;
+    if(!ARTIFACT.test(out?.artifact?.id??'')||typeof out?.url!=='string')throw new Error('sharednet_artifact_response_invalid');
+    let artifactUrl;try{artifactUrl=new URL(out.url,this.base);}catch{throw new Error('sharednet_artifact_response_invalid');}
+    if(artifactUrl.protocol!=='https:')throw new Error('sharednet_artifact_response_invalid');
+    return {...out,url:artifactUrl.toString()};
   }
   async pay(to,amount,{memo=null,roomId=null,signal=null,idempotencyKey=crypto.randomUUID()}={}){
     if(!ADDRESS.test(to))throw new Error('invalid_sharednet_payee');if(!Number.isInteger(amount)||amount<1)throw new Error('invalid_credit_amount');if(roomId&&!ROOM.test(roomId))throw new Error('invalid_sharednet_room');
