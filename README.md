@@ -4,7 +4,7 @@
 
 Sledgewire is a permissioned adversarial execution rail for agent services. It discovers a real MCP surface, attacks bounded failure modes, repairs only evidence-backed structural mismatches, independently validates repair, executes paid work through SharedOS authority, and returns a signed receipt another agent can verify.
 
-Trial Zero v0.3.5 is built around the organizer's actual competition shape: one product link, agents operating both Arena rounds without human intervention, a required SharedNet development Room, a separate organizer Arena Room, and Arena 2 ranking by valid credits earned.
+Trial Zero v0.3.6 is built around the organizer's actual competition shape: one product link, agents operating both Arena rounds without human intervention, a required SharedNet development Room, a separate organizer Arena Room, and Arena 2 ranking by valid credits earned.
 
 ## Fastest judge path
 
@@ -65,7 +65,7 @@ The dispatcher never inherits target authority. A Room message never creates aut
 Every paid receipt carries a `sharedos_trace_id`. Another agent can call free `sledgewire.trace` with that id to retrieve a sanitized, signed audit proof without exposing host metadata or raw target arguments.
 
 
-MCP compatibility: **2026-07-28 stateless `server/discover` first, with legacy 2025 handshake fallback.**
+MCP compatibility: **2026-07-28 stateless `server/discover` first, with required modern request/result headers and envelopes, `x-mcp-header` mirroring, and bounded legacy 2025 fallback.** An official MCP v2 client is exercised in CI.
 
 ## CLI
 
@@ -86,7 +86,12 @@ Requires Node 22.18+.
 
     npm run keygen -- .sledgewire/keys
 
-    NODE_ENV=production     SLEDGEWIRE_PRIVATE_KEY_FILE=.sledgewire/keys/ed25519-private.pem     SLEDGEWIRE_PUBLIC_KEY_FILE=.sledgewire/keys/ed25519-public.pem     PUBLIC_BASE_URL=https://your-host.example     PORT=8787 npm run serve
+    NODE_ENV=production \
+    SLEDGEWIRE_DB=/persistent/sledgewire.db \
+    SLEDGEWIRE_PRIVATE_KEY_FILE=.sledgewire/keys/ed25519-private.pem \
+    SLEDGEWIRE_PUBLIC_KEY_FILE=.sledgewire/keys/ed25519-public.pem \
+    PUBLIC_BASE_URL=https://your-host.example \
+    PORT=8787 npm run serve
 
 Surfaces:
 
@@ -98,7 +103,7 @@ Surfaces:
     GET  /.well-known/agent.json
     GET  /public-key
 
-In production, free quote/selfcheck/verify remain directly callable. Paid public MCP calls do **not** execute for free; they return a signed PAYMENT_REQUIRED object routing the caller to the official SharedNet Arena payment path.
+In production, free quote/selfcheck/trace/verify remain directly callable. Paid public MCP calls do **not** execute for free; they return a signed PAYMENT_REQUIRED object routing the caller to the official SharedNet Arena payment path.
 
 ## SharedNet Room separation
 
@@ -132,7 +137,7 @@ The returned seat token is written mode 0600 and never printed. Remove the invit
     export SLEDGEWIRE_PUBLIC_KEY_FILE=/run/secrets/sledgewire-ed25519-public.pem
     npm run arena:daemon
 
-The daemon keeps presence alive, reads the ordered Room log, answers Sledgewire questions, verifies native credit transfers, rejects wrong buyer/payee/amount/room/memo, executes paid services through SharedOS, signs delivery receipts, and persists cursor/payment/message state across restarts.
+The daemon keeps presence alive, reads the ordered Room log, answers Sledgewire questions, verifies native credit transfers, rejects wrong buyer/payee/amount/room/memo, executes paid services through SharedOS, signs delivery receipts, and persists cursor/payment/message state across restarts. The public MCP process and Arena daemon must mount the same `SLEDGEWIRE_DB` file so `sledgewire.trace` can expose the exact persisted SharedOS trail referenced by a paid receipt.
 
 Large signed deliveries are uploaded as Room-addressed SharedNet artifacts and replaced in chat with a compact artifact link + SHA-256 pointer. The optional SharedNet watch compatibility path uses the same artifact fallback and validates the active payee identity before serving.
 
@@ -147,14 +152,15 @@ Large signed deliveries are uploaded as Room-addressed SharedNet artifacts and r
 - Active probes require explicit caller safety attestation; untrusted target annotations never authorize execution by themselves.
 - Destructive probes/invocations require separate explicit destructive authority.
 - Repair never invents missing semantic values.
-- Payment binds buyer Instance, payee perspective, exact amount, official Arena Room, request and service memo.
+- Payment binds buyer Instance, exact payee proof, integer amount, official Arena Room, request and service memo; request state is scoped by Room + buyer + request id.
 - Exact completed retries are cached; duplicate paid execution is blocked.
 - A crash leaving paid execution outcome uncertain is never blindly retried.
 - Poison Room messages are bounded and dead-lettered instead of permanently blocking the autonomous cursor.
-- SharedNet JSON responses are streamed under a byte ceiling before parsing.
+- SharedNet JSON responses are streamed under byte ceilings before parsing, and duplicate ledger lookups are coalesced/cached to resist retry storms.
 - Every paid target workflow uses an exact-target SharedOS grant; the dispatcher has no direct target-service authority.
 - SharedOS bounded grants use atomic SQLite usage state and durable audit/outbox storage.
 - SharedNet secrets stay in environment or owner-only files, never argv/messages/receipts/logs.
+- Receipt canonicalization is bounded for depth, nodes, cycles and bytes before signing or verification.
 - Production requires persistent Ed25519 signing material.
 - Paid receipts are independently inspectable through the free, trace-id-scoped `sledgewire.trace` proof surface.
 
@@ -162,8 +168,9 @@ Large signed deliveries are uploaded as Room-addressed SharedNet artifacts and r
 
     npm test
     npm run selfcheck
-    npm run stress -- 2000 64
-    npm run stress:arena -- 1000
+    npm run stress -- 10000 128
+    npm run stress:arena -- 10000
+    npm run stress:dupes -- 1000 16
     npm run economy
     npm run sharedos:check
     npm run preflight

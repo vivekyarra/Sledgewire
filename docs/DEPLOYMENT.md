@@ -8,7 +8,12 @@ Generate persistent signing material:
 
 Start:
 
-    NODE_ENV=production     SLEDGEWIRE_PRIVATE_KEY_FILE=/secure/sledgewire-keys/ed25519-private.pem     SLEDGEWIRE_PUBLIC_KEY_FILE=/secure/sledgewire-keys/ed25519-public.pem     PUBLIC_BASE_URL=https://sledgewire.example     PORT=8787 npm run serve
+    NODE_ENV=production \
+    SLEDGEWIRE_DB=/persistent/sledgewire.db \
+    SLEDGEWIRE_PRIVATE_KEY_FILE=/secure/sledgewire-keys/ed25519-private.pem \
+    SLEDGEWIRE_PUBLIC_KEY_FILE=/secure/sledgewire-keys/ed25519-public.pem \
+    PUBLIC_BASE_URL=https://sledgewire.example \
+    PORT=8787 npm run serve
 
 Verify externally:
 
@@ -20,7 +25,7 @@ Verify externally:
     GET /public-key
     POST /mcp
 
-Use the deployed /arena.md URL as the submission product link. In production, free quote/selfcheck/verify remain directly callable. Paid MCP calls return a signed PAYMENT_REQUIRED route and do not execute for free. `SLEDGEWIRE_PUBLIC_PAID_EXECUTION=1` is permitted only in a non-production private rehearsal; production startup rejects it.
+Use the deployed /arena.md URL as the submission product link. In production, free quote/selfcheck/trace/verify remain directly callable. Paid MCP calls return a signed PAYMENT_REQUIRED route and do not execute for free. `SLEDGEWIRE_PUBLIC_PAID_EXECUTION=1` is permitted only in a non-production private rehearsal; production startup rejects it.
 
 ## SharedNet development Room
 
@@ -68,6 +73,8 @@ The direct daemon remains preferred because cursor persistence and poison-messag
 
 Every paid Arena service is mediated by the embedded SharedOS kernel. Invoke, and Gauntlet's optional real invocation, use Scout -> Mechanic -> Inspector -> Breaker authority separation.
 
+The public MCP server and Arena daemon must mount the **same persistent `SLEDGEWIRE_DB`**. Paid receipts include `sharedos_trace_id`; free `sledgewire.trace` resolves that id against the shared durable audit store and returns only a sanitized signed proof. This is independent peer evidence for the embedded SharedOS boundary, not a claim that an external SharedOS Cloud sink has accepted the events.
+
 ## Preflight
 
 Before submission:
@@ -78,4 +85,4 @@ Before autonomous competition:
 
     npm run preflight -- --live
 
-Never set SHAREDNET_EXTERNAL_CALL_CONFIRMED or SHAREDOS_AUDIT_CONFIRMED until those live facts have actually happened.
+Never set SHAREDNET_EXTERNAL_CALL_CONFIRMED or SHAREDOS_AUDIT_CONFIRMED until those live facts have actually happened. Repository trace proofs do not replace any event-required external/visible SharedOS evidence.

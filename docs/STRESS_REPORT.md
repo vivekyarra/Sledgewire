@@ -1,20 +1,20 @@
-# Sledgewire v0.3.5 stress report
+# Sledgewire v0.3.6 stress report
 
 Date: 2026-09-25
 
 This report separates executed CI evidence from live-event facts. It does not claim or predict an Arena finishing position.
 
-## Current green branch evidence
+## Current green code evidence
 
-Tested commit: `03966c4163ab12d62384ba179f6293c81b2d18c9`
+Evidence commit: `8be252ce725226e01e5f018668a2481928c9af50`
 
-GitHub Actions run: `36169242070`
+GitHub Actions run: `36173512273`
 
-- Automated tests: **175 / 175 passed**, 0 failed, 0 skipped.
+- Automated tests: **217 / 217 passed**, 0 failed, 0 skipped.
 - Hostile/current-protocol selfcheck: **VERIFIED**, signed receipt verification true, profile `sledgewire.selfcheck.v4`.
-- MCP stress: **5,000 / 5,000** complete Smoke workflows at concurrency **96**, **0 failures**; p50 **111 ms**, p95 **148 ms**, p99 **432 ms**, total **6.259 s**.
-- Arena ledger/replay stress: **5,000 claims**, **5,000 cached retries**, **500 wrong-buyer attempts rejected**, **0 duplicate paid executions**, total **690 ms**.
-- Duplicate storm: **12,500 authorization attempts** across 500 purchases at fanout 12: 500 unique claims, 5,500 in-flight duplicate refusals, 6,000 cached replays, 500 transaction-reuse refusals, **0 duplicate paid executions**, total **525 ms**.
+- MCP stress: **10,000 / 10,000** complete Smoke workflows at concurrency **128**, **0 failures**; p50 **75 ms**, p95 **104 ms**, p99 **229 ms**, total **6.627 s**.
+- Arena ledger/replay stress: **10,000 claims**, **10,000 cached retries**, **500 wrong-buyer attempts rejected**, **0 duplicate paid executions**, total **1.049 s**.
+- Duplicate storm: **33,000 authorization attempts** across 1,000 purchases at fanout 16: 1,000 unique claims, 15,000 in-flight duplicate refusals, 16,000 cached replays, 1,000 transaction-reuse refusals, only **1,000 ledger reads**, **0 duplicate paid executions**, total **1.136 s**.
 - SharedOS check: deny true, allow true, exhausted `maxUses` denied, **9 audit events**.
 - Static preflight: **READY**.
 - Production missing signing key fails closed; persistent key succeeds.
@@ -22,25 +22,22 @@ GitHub Actions run: `36169242070`
 
 These timings are GitHub Actions/local fixture measurements only. They are not SharedNet, public Internet, SharedOS Cloud, or third-party MCP latency claims.
 
-## Red-team flaws found and closed in v0.3.5
+## Red-team flaws found and closed through v0.3.6
 
-1. Target readOnly/idempotent annotations could previously contribute too much authority to active probes. Active probes now require explicit caller safety attestation; destructive execution needs a separate explicit authority bit.
-2. Invoke could return READY despite hostile tool metadata when the runtime output itself was clean. Suspicious metadata now downgrades the result.
-3. Paid non-Invoke workflows previously ran behind broad dispatcher wrapper grants. Smoke, Assay, Seal, Fleet targets and Gauntlet now receive exact-target SharedOS workflow grants; dispatcher has no direct target-service authority.
-4. A crash after an external side effect but before durable completion created retry ambiguity. Stale inflight paid requests now become `execution_outcome_unknown_no_retry`.
-5. Repeatedly failing Room messages could permanently hold the cursor. Retries are bounded and poison messages become terminal dead letters.
-6. SharedNet response bodies were parsed through unbounded `response.text()`. JSON responses are now streamed under a byte ceiling before parsing.
-7. IPv4-mapped IPv6, NAT64, 6to4 and additional reserved IPv6 paths are blocked.
-8. Modern MCP discovery fallback could hide non-legacy failures. Only explicit legacy evidence triggers fallback; timeouts/internal errors remain failures.
-9. Modern protocol validates version/method/name headers and rejects legacy session headers.
-10. Receipt verification now fails closed on malformed public keys and malformed signature encodings.
-11. Schema validation gained safe support for nullable type unions, standard harmless schema metadata and schema-valued `additionalProperties`.
-12. SharedNet request IDs, wait cursors, page limits, base URL and artifact responses are validated.
-13. Production HTTP can no longer enable direct paid execution through an environment override.
-14. SQLite recovery is exercised across close/reopen and independent connections.
-15. The SharedNet watch compatibility path could misroute multi-message batches, lacked payee-identity validation, and could exceed the Room reply ceiling. It now requires one reply event, validates payee ownership, and uploads oversized signed deliveries as artifacts before returning a compact pointer.
-16. An unused legacy SharedNet child-process adapter carried stale ID rules and unnecessary process-spawn attack surface; it has been removed.
+1. **Cross-buyer request-label collision.** Buyer-controlled `request_id` was previously a global store/grant identity. Durable state is now scoped by Room + buyer + request id, and SharedOS grant ids derive from the full request fingerprint.
+2. **Pay-for-invalid-work trap.** Paid input used to be fully rejected only after payment. Service-specific endpoint/probe/invoke/fleet shapes and resource budgets are now validated before PAYMENT_REQUIRED or ledger lookup.
+3. **Modern MCP wire incompleteness.** Official MCP v2 client testing exposed missing sender-side `resultType` and cache hints. Modern discovery/list/call envelopes and required protocol/method/name headers are now emitted/validated.
+4. **Missing MCP parameter headers.** Reachable primitive `x-mcp-header` declarations are scanned, duplicate/unreachable declarations fail closed, and tool arguments are mirrored through sentinel-safe `Mcp-Param-*` headers.
+5. **HTTP content-type smuggling and body growth.** JSON media type is parsed exactly; target request/response and public request bytes are bounded incrementally.
+6. **Ledger payee ambiguity.** A `direction=received` string is no longer accepted as proof. Exact addressed payee evidence is preferred; principal-perspective fallback is narrowly scoped.
+7. **Request-label isolation omitted Room context.** Storage keys now include Arena Room as well as buyer and request id.
+8. **Ledger retry amplification.** Duplicate payment waves once caused one ledger query per authorization attempt. Per-transaction in-flight coalescing plus bounded positive/negative caching reduced the 33,000-attempt stress run to 1,000 ledger reads.
+9. **Receipt canonicalization exhaustion.** Deep/cyclic payloads could drive recursive signing/verification failure. Canonicalization now has explicit depth, node, cycle and byte ceilings.
+10. **SharedNet URL/proof edge cases.** Non-HTTP localhost base schemes, direction-only payee proof, over-tight Room page limits and off-origin artifact URLs are rejected or corrected.
+11. **External authority evidence gap.** A paid receipt previously carried a trace id without a peer-callable proof surface. Free `sledgewire.trace` now returns a signed, trace-id-scoped, sanitized SharedOS event packet while omitting metadata, authority/owner identities and raw target arguments/outputs.
+12. **Brittle preflight price ordering.** Catalog equality depended on JSON key insertion order. Exact price-map comparison is now order-independent and separately tested.
+13. Earlier hardening remains active: explicit active-probe safety, destructive authorization, exact-target SharedOS grants, unknown-outcome no-retry, poison-message dead-letter, DNS/IP pinning, expanded SSRF blocking, watch-mode single-message delivery, production paid-bypass refusal and restart-safe SQLite replay.
 
 ## Live facts still required
 
-Repository-only tests cannot replace: a genuine development SharedNet collaboration Room, public deployment reachable by unrelated agents, organizer Arena seat/Room, real purse/ledger transaction from another seat, restart/replay on the live environment, real external MCP services, event-visible SharedOS evidence where applicable, and the no-human live rehearsal.
+Repository-only tests cannot replace: a genuine development SharedNet collaboration Room, public deployment reachable by unrelated agents, organizer Arena seat/Room, real purse/ledger transaction from another seat, public and daemon processes sharing the real persistent DB, restart/replay on the live environment, independent `sledgewire.trace` use by another seat, real external MCP services, event-visible SharedOS evidence where applicable, and the 60-minute no-human rehearsal.
