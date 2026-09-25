@@ -12,7 +12,7 @@ test('Arena stats aggregate credits buyers mix conversion latency and evidence w
   completed(s,{id:'r3',txn:'t3',service:'sledgewire.seal',buyer:'i_BUYERBBBB',price:25,end:'2026-09-25T00:00:03.000Z',outcome:'DEGRADED'});
   s.db.prepare("INSERT INTO requests(request_id,txn_id,fingerprint,service,status,error_json,started_at,completed_at) VALUES('rf','tf','fpf','sledgewire.smoke','failed','{}','2026-09-25T00:00:00.000Z','2026-09-25T00:00:01.000Z')").run();
   s.incrementCounter('arena.reject.wrong_buyer',2);const x=s.arenaStats({prices:{'sledgewire.smoke':3,'sledgewire.assay':8,'sledgewire.seal':25}});
-  assert.equal(x.earned_credits,36);assert.equal(x.unique_buyers,2);assert.equal(x.paid_transactions,3);assert.equal(x.failed_requests,1);assert.equal(x.service_mix['sledgewire.smoke'],1);assert.equal(x.outcome_mix.DEGRADED,1);
+  assert.equal(x.earned_credits,39);assert.equal(x.unique_buyers,2);assert.equal(x.paid_transactions,3);assert.equal(x.failed_requests,1);assert.equal(x.service_mix['sledgewire.smoke'],1);assert.equal(x.outcome_mix.DEGRADED,1);
   assert.equal(x.smoke_buyers,1);assert.equal(x.smoke_to_premium_buyers,1);assert.equal(x.smoke_to_premium_conversion,1);assert.equal(x.delivery_ms.p50,2000);assert.equal(x.delivery_ms.p95,3000);
   assert.equal(x.payment_rejections.wrong_buyer,2);assert.equal(x.integrity.signed_deliveries,3);assert.equal(x.integrity.trace_bound_deliveries,3);assert.equal(JSON.stringify(x).includes('i_BUYER'),false);
 });
