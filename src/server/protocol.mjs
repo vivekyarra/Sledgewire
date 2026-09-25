@@ -10,6 +10,7 @@ import {selfcheck} from '../core/selfcheck.mjs';
 import {loadSigningMaterial,signReceipt,verifyReceipt} from '../receipts/receipt.mjs';
 import {decodeMcpHeaderValue} from '../mcp/header-codec.mjs';
 import {validateServiceInput} from '../core/service-input.mjs';
+import {traceProof} from '../sharedos/trace-proof.mjs';
 
 export const MODERN_PROTOCOL_VERSION='2026-07-28';
 export const LEGACY_PROTOCOL_VERSION='2025-11-25';
@@ -34,11 +35,13 @@ export const toolDefs=[
  {name:'sledgewire.fleet',description:'Paid Arena service: smoke-test up to six candidate MCP services.',inputSchema:{type:'object',additionalProperties:false,required:['targets'],properties:{targets:{type:'array',minItems:1,maxItems:6}}}},
  {name:'sledgewire.seal',description:'Paid Arena service: run the v3 conformance profile and return a portable signed packet.',inputSchema:{type:'object',additionalProperties:false,required:['endpoint'],properties:{endpoint:schemaEndpoint,probe:schemaProbe}}},
  {name:'sledgewire.gauntlet',description:'Paid Arena service: seller-grade dossier with smoke, assay, optional SharedOS-staged invocation, and conformance evidence.',inputSchema:{type:'object',additionalProperties:false,required:['endpoint'],properties:{endpoint:schemaEndpoint,probe:schemaProbe,request:{type:'object'}}}},
+ {name:'sledgewire.trace',description:'Free: retrieve a sanitized SharedOS audit proof for a trace id carried by a paid Sledgewire receipt.',inputSchema:{type:'object',additionalProperties:false,required:['traceId'],properties:{traceId:{type:'string',minLength:36,maxLength:36}}}},
  {name:'sledgewire.verify',description:'Free: verify a Sledgewire Ed25519 receipt.',inputSchema:{type:'object',additionalProperties:false,required:['receipt','publicKeyPem'],properties:{receipt:{type:'object'},publicKeyPem:{type:'string'}}}}
 ];
 
 export async function handleTool(name,args={},internalOpts={}){
   if(name==='sledgewire.verify')return verifyReceipt(args.receipt,args.publicKeyPem);
+  if(name==='sledgewire.trace')return signReceipt({...traceProof(internalOpts.traceStore,args.traceId),issued_at:new Date().toISOString(),receipt_version:'sledgewire.receipt.v3'},signing.privateKeyPem);
   if(internalOpts.publicArena===true&&PAID.has(name)){
     const validation=validateServiceInput(name,args);
     if(!validation.ok)return signReceipt({service:name,state:'INCOMPATIBLE',reason:'invalid_input',detail:validation.reason},signing.privateKeyPem);

@@ -19,6 +19,7 @@ Sledgewire processes hostile service descriptions, schemas, URLs, tool outputs, 
 - SharedNet JSON responses are streamed with a hard byte ceiling before parsing; oversized signed deliveries use Room-addressed artifacts and compact hash pointers.
 - Every paid target workflow runs under an exact-target SharedOS grant. The dispatcher has no direct target-service authority. Invoke and Gauntlet's optional real invocation use Scout -> Mechanic -> Inspector -> Breaker separation.
 - Audit storage is durable and an outbox is retained for event-visible integration.
+- Public audit proof is trace-id scoped and sanitized: it omits host metadata, authority/owner addresses, raw tool arguments and outputs; it never lists traces globally.
 - Paid requests left inflight after a crash become explicit unknown outcomes after the recovery threshold and are never automatically re-executed.
 - Poison Room messages have bounded retries and a terminal dead-letter state so one malformed delivery cannot freeze the autonomous cursor.
 - Watch compatibility accepts one reply event at a time, validates the configured payee against the authenticated SharedNet identity, and uses artifact fallback for oversized signed responses.

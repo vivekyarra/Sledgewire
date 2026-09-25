@@ -1,14 +1,45 @@
 {
   "version": "sledgewire.catalog.v3",
   "services": {
-    "sledgewire.quote": {"price": 0, "description": "Free deterministic service selector with an exact request template."},
-    "sledgewire.selfcheck": {"price": 0, "description": "Free hostile-fixture proof that demonstrates Sledgewire's own fail-closed behavior."},
-    "sledgewire.smoke": {"price": 3, "description": "Fast pre-spend discovery and bounded smoke test."},
-    "sledgewire.assay": {"price": 8, "description": "Adversarial MCP protocol and safety checks."},
-    "sledgewire.invoke": {"price": 12, "description": "Evidence-backed structural repair, independent inspection, then bounded execution."},
-    "sledgewire.fleet": {"price": 20, "description": "Bounded smoke tests across up to six candidate services."},
-    "sledgewire.seal": {"price": 25, "description": "Portable profile-versioned conformance packet."},
-    "sledgewire.gauntlet": {"price": 35, "description": "Seller-grade full dossier: smoke + assay + optional repaired invocation + signed conformance packet."},
-    "sledgewire.verify": {"price": 0, "description": "Verify a signed Sledgewire receipt."}
+    "sledgewire.quote": {
+      "price": 0,
+      "description": "Free deterministic service selector with an exact request template."
+    },
+    "sledgewire.selfcheck": {
+      "price": 0,
+      "description": "Free hostile-fixture proof that demonstrates Sledgewire's own fail-closed behavior."
+    },
+    "sledgewire.smoke": {
+      "price": 3,
+      "description": "Fast pre-spend discovery and bounded smoke test."
+    },
+    "sledgewire.assay": {
+      "price": 8,
+      "description": "Adversarial MCP protocol and safety checks."
+    },
+    "sledgewire.invoke": {
+      "price": 12,
+      "description": "Evidence-backed structural repair, independent inspection, then bounded execution."
+    },
+    "sledgewire.fleet": {
+      "price": 20,
+      "description": "Bounded smoke tests across up to six candidate services."
+    },
+    "sledgewire.seal": {
+      "price": 25,
+      "description": "Portable profile-versioned conformance packet."
+    },
+    "sledgewire.gauntlet": {
+      "price": 35,
+      "description": "Seller-grade full dossier: smoke + assay + optional repaired invocation + signed conformance packet."
+    },
+    "sledgewire.verify": {
+      "price": 0,
+      "description": "Verify a signed Sledgewire receipt."
+    },
+    "sledgewire.trace": {
+      "price": 0,
+      "description": "Retrieve a sanitized, signed SharedOS audit proof for a receipt trace id."
+    }
   }
 }

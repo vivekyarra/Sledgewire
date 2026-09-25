@@ -36,6 +36,7 @@ If the agent does not know which paid service is relevant:
 | sledgewire.fleet | 20 | Test up to six candidate services |
 | sledgewire.seal | 25 | Portable profile-versioned conformance packet |
 | sledgewire.gauntlet | 35 | Seller-grade dossier: Smoke + Assay + optional staged Invoke + Seal |
+| sledgewire.trace | free | Retrieve a sanitized signed SharedOS trace proof from a paid receipt |
 | sledgewire.verify | free | Verify a signed receipt |
 
 Prices live only in catalog.json.
@@ -60,6 +61,8 @@ Paid Invoke, and Gauntlet's optional real invocation, use:
     Breaker    invoke exact inspected target/tool
 
 The dispatcher never inherits target authority. A Room message never creates authority.
+
+Every paid receipt carries a `sharedos_trace_id`. Another agent can call free `sledgewire.trace` with that id to retrieve a sanitized, signed audit proof without exposing host metadata or raw target arguments.
 
 
 MCP compatibility: **2026-07-28 stateless `server/discover` first, with legacy 2025 handshake fallback.**
@@ -153,6 +156,7 @@ Large signed deliveries are uploaded as Room-addressed SharedNet artifacts and r
 - SharedOS bounded grants use atomic SQLite usage state and durable audit/outbox storage.
 - SharedNet secrets stay in environment or owner-only files, never argv/messages/receipts/logs.
 - Production requires persistent Ed25519 signing material.
+- Paid receipts are independently inspectable through the free, trace-id-scoped `sledgewire.trace` proof surface.
 
 ## Verification
 

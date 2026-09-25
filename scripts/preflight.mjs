@@ -9,7 +9,7 @@ const add=(name,ok,detail='')=>checks.push({name,ok,detail});
 const [major,minor]=process.versions.node.split('.').map(Number);
 add('node>=22.18',major>22||(major===22&&minor>=18),process.versions.node);
 
-const expected={'sledgewire.quote':0,'sledgewire.selfcheck':0,'sledgewire.smoke':3,'sledgewire.assay':8,'sledgewire.invoke':12,'sledgewire.fleet':20,'sledgewire.seal':25,'sledgewire.gauntlet':35,'sledgewire.verify':0};
+const expected={'sledgewire.quote':0,'sledgewire.selfcheck':0,'sledgewire.smoke':3,'sledgewire.assay':8,'sledgewire.invoke':12,'sledgewire.fleet':20,'sledgewire.seal':25,'sledgewire.gauntlet':35,'sledgewire.trace':0,'sledgewire.verify':0};
 const actual=Object.fromEntries(Object.entries(catalog.services).map(([k,v])=>[k,v.price]));
 add('catalog_prices',JSON.stringify(actual)===JSON.stringify(expected),JSON.stringify(actual));
 

@@ -13,6 +13,7 @@ export function arenaCard(baseUrl){
     public_key_url:`${base}/public-key`,
     fastest_demo:{tool:'sledgewire.selfcheck',price_credits:0,arguments:{}},
     free_selector:{tool:'sledgewire.quote',price_credits:0,intents:['preflight','adversarial','repair_execute','compare','certify','full_dossier']},
+    free_trace_proof:{tool:'sledgewire.trace',price_credits:0,note:'Use the sharedos_trace_id from a paid receipt.'},
     services:catalog.services,
     states:['READY','DEGRADED','INCOMPATIBLE','BLOCKED','UNKNOWN'],
     mcp_protocols:['2026-07-28','2025-11-25','2025-06-18'],

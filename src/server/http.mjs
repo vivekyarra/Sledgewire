@@ -2,6 +2,9 @@ import http from 'node:http';
 import {handleRpc,validateHttpMcp,PUBLIC,PUBLIC_KEY_ID,catalog,toolDefs} from './protocol.mjs';
 import {arenaCard,arenaMarkdown} from './arena-card.mjs';
 import {isJsonContentType} from './http-guards.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
+import {ArenaStore} from '../store/arena-store.mjs';
 
 const port=Number(process.env.PORT||8787);
 const base=process.env.PUBLIC_BASE_URL||`http://127.0.0.1:${port}`;
@@ -12,6 +15,7 @@ if(production&&paidBypass)throw new Error('production_paid_execution_bypass_forb
 let active=0;const maxActive=Math.max(4,Math.min(256,Number(process.env.SLEDGEWIRE_HTTP_CONCURRENCY??64)));
 const publicArena=!paidBypass;
 const arenaRoomId=process.env.SHAREDNET_ARENA_ROOM_ID??null;
+const dbPath=process.env.SLEDGEWIRE_DB??'.sledgewire/arena.db';fs.mkdirSync(path.dirname(path.resolve(dbPath)),{recursive:true});const traceStore=new ArenaStore(dbPath);
 const allowedOrigins=new Set([new URL(base).origin,...String(process.env.SLEDGEWIRE_ALLOWED_ORIGINS??'').split(',').map(x=>x.trim()).filter(Boolean)]);
 
 const server=http.createServer(async(req,res)=>{
@@ -36,7 +40,7 @@ const server=http.createServer(async(req,res)=>{
     }
     let msg;try{msg=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{return json(res,400,{error:'invalid_json'});}
     const validation=validateHttpMcp(msg,req.headers);if(!validation.ok)return json(res,validation.status,validation.body);
-    const out=await handleRpc(msg,{publicArena,publicBaseUrl:base,arenaRoomId});if(out===null){res.statusCode=202;return res.end();}
+    const out=await handleRpc(msg,{publicArena,publicBaseUrl:base,arenaRoomId,traceStore});if(out===null){res.statusCode=202;return res.end();}
     return json(res,200,out);
   }finally{active--;}
 });
