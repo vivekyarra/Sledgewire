@@ -1,0 +1,11 @@
+{
+  "version": "sledgewire.catalog.v2",
+  "services": {
+    "sledgewire.smoke": {"price": 3, "description": "Fast pre-spend discovery and bounded smoke test."},
+    "sledgewire.assay": {"price": 8, "description": "Adversarial MCP protocol and safety checks."},
+    "sledgewire.invoke": {"price": 12, "description": "Evidence-backed structural repair, independent inspection, then bounded execution."},
+    "sledgewire.fleet": {"price": 20, "description": "Bounded smoke tests across up to six candidate services."},
+    "sledgewire.seal": {"price": 25, "description": "Portable profile-versioned conformance packet."},
+    "sledgewire.verify": {"price": 0, "description": "Verify a signed Sledgewire receipt."}
+  }
+}

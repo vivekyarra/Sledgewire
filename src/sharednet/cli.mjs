@@ -1,0 +1,9 @@
+import {spawn} from 'node:child_process';
+export const SEAT=/^i_[0-9A-Za-z]{10}$/;export const ADDRESS=/^(?:p|a|i)_[0-9A-Za-z]{10}$/;export const TXN=/^txn_[0-9A-Za-z]{10}$/;export const ROOM=/^rom_[0-9A-Za-z_-]{6,80}$/;
+function parse(text){const t=text.trim();return t?JSON.parse(t):null;}
+export class SharedNetCli{
+  constructor({seatId,roomId,timeoutMs=12000}){if(!SEAT.test(seatId))throw new Error('invalid_sharednet_seat');if(!ROOM.test(roomId))throw new Error('invalid_sharednet_room');this.seatId=seatId;this.roomId=roomId;this.timeoutMs=timeoutMs;}
+  async run(args,signal){const program=process.platform==='win32'?'npx.cmd':'npx';return await new Promise((resolve,reject)=>{let out='',err='';const child=spawn(program,['-y','sharednet@latest',...args,'--json'],{env:{...process.env,SHAREDNET_SEAT:this.seatId},stdio:['ignore','pipe','pipe'],windowsHide:true});const timer=setTimeout(()=>child.kill(),this.timeoutMs);const abort=()=>child.kill();signal?.addEventListener('abort',abort,{once:true});child.stdout.on('data',c=>out+=c);child.stderr.on('data',c=>err+=c);child.once('error',e=>{clearTimeout(timer);reject(e)});child.once('close',code=>{clearTimeout(timer);signal?.removeEventListener('abort',abort);if(signal?.aborted)return reject(signal.reason??new Error('aborted'));if(code!==0)return reject(new Error(`sharednet_cli_${code}:${err.trim()}`));try{resolve(parse(out));}catch(e){reject(new Error(`sharednet_invalid_json:${e.message}`));}});});}
+  async get(txnId,signal){if(!TXN.test(txnId))return null;const p=await this.run(['ledger','--last','100','--as',this.seatId],signal);return p?.items?.find(x=>x.id===txnId)??null;}
+}
+export function parseWatchBatch(text){const x=JSON.parse(text);if(!x||typeof x!=='object'||!ROOM.test(x.room_id)||!SEAT.test(x.member_id)||!Array.isArray(x.messages))throw new Error('invalid_sharednet_watch_batch');return x;}

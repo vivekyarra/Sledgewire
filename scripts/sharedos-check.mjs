@@ -1,0 +1,10 @@
+import {ArenaStore} from '../src/store/arena-store.mjs';
+import {createKernel,HOST,PURPOSE,ROLES} from '../src/sharedos/host.mjs';
+const store=new ArenaStore(':memory:');const kernel=createKernel(store);const ns='sledgewire';const trace=crypto.randomUUID();
+const ctx={namespaceId:ns,actor:ROLES.mechanic,authority:HOST,owner:HOST,purpose:PURPOSE,traceId:trace,enabledToolNamespaces:[ns],now:new Date().toISOString()};
+const call=()=>({id:crypto.randomUUID(),tool:'sledgewire.stage.mechanic',arguments:{arguments:{n:'7'},schema:{type:'object',required:['n'],additionalProperties:false,properties:{n:{type:'integer'}}},evidence:{}},traceId:trace,requestedAt:new Date().toISOString()});
+const denied=await kernel.invokeTool(ctx,call());if(denied.status!=='denied')throw new Error(`expected deny, got ${denied.status}`);
+store.storeGrant(ns,{id:'check-grant',namespaceId:ns,subject:ROLES.mechanic,issuer:HOST,capabilities:[{resource:{namespace:ns,path:['stage','mechanic'],owner:HOST},actions:['invoke'],scope:'exact'}],constraints:{purposes:[PURPOSE],maxUses:1},issuedAt:new Date().toISOString()});
+const allowed=await kernel.invokeTool({...ctx,now:new Date().toISOString()},call());if(allowed.status!=='succeeded'||allowed.output?.args?.n!==7)throw new Error(`expected succeeded repair, got ${JSON.stringify(allowed)}`);
+const exhausted=await kernel.invokeTool({...ctx,now:new Date().toISOString()},call());if(exhausted.status!=='denied')throw new Error(`expected maxUses deny, got ${exhausted.status}`);
+if(store.auditCount()<3)throw new Error('expected durable audit records');console.log(JSON.stringify({sharedos:'VERIFIED',deny:true,allow:true,maxUses:true,audit_events:store.auditCount()},null,2));

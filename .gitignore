@@ -1,0 +1,9 @@
+node_modules/
+.sledgewire/
+*.db
+*.db-shm
+*.db-wal
+*.pem
+.env
+.DS_Store
+coverage/
