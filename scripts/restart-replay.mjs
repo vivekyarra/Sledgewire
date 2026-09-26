@@ -4,7 +4,6 @@ import {SharedNetApi,INSTANCE_TOKEN,ROOM} from '../src/sharednet/api.mjs';
 import {McpSession} from '../src/mcp/client.mjs';
 import {runRestartReplayProof} from '../src/sharednet/live-rehearsal.mjs';
 import {publicBaseOrigin} from '../src/ops/config.mjs';
-import {publicBaseOrigin} from '../src/ops/config.mjs';
 
 function readSecret(){
   const direct=process.env.SHAREDNET_BUYER_TOKEN?.trim();if(direct)return direct;
