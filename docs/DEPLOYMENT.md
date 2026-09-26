@@ -1,6 +1,6 @@
 # Deployment
 
-v0.3.7 adds a two-process Docker Compose topology and a real second-seat Arena rehearsal. The public server and Arena daemon share one local Docker volume so the paid receipt trace is immediately resolvable through the public `sledgewire.trace` tool.
+v0.3.10 uses a two-process Docker Compose topology plus cryptographically verified second-seat and restart rehearsals. The public server and Arena daemon share one persistent volume so paid outcomes and SharedOS traces survive daemon restarts and remain resolvable through the public `sledgewire.trace` tool.
 
 ## Public HTTPS MCP
 
@@ -127,14 +127,14 @@ By default the rehearsal Smoke-tests the public Sledgewire MCP endpoint itself. 
 
     export SLEDGEWIRE_REHEARSAL_TARGET=https://another-public-mcp.example/mcp
 
-A successful rehearsal proves, in one automated path: second-seat Room request, exact PAYMENT_REQUIRED quote, native SharedNet transfer, paid Room request, SharedOS-mediated execution, signed delivery verification against the deployed public key, public `sledgewire.trace` lookup, trace proof signature verification, and exact paid retry returning the identical cached receipt.
+A successful rehearsal proves, in one automated path: second-seat Room request, buyer-bound signed PAYMENT_REQUIRED quote, native SharedNet transfer, paid Room request, SharedOS-mediated execution, signed delivery verification against the deployed public key, public `sledgewire.trace` lookup, trace proof signature verification, and exact paid retry returning the identical cached receipt. The hardened evidence schema is `sledgewire.live-rehearsal.v3`.
 
 The redacted evidence packet is written mode 0600 to `.sledgewire/live-rehearsal.json` by default. It never stores the buyer seat token.
 
 
 ## Liveness vs full Arena readiness
 
-`GET /health` is process liveness and remains 200 while the public HTTP process itself is alive. `GET /ready` is stricter: when an Arena Room is configured it requires a fresh heartbeat written by the separate Arena daemon into the shared SQLite database. The daemon updates that heartbeat every 10 seconds; readiness fails closed after 45 seconds.
+`GET /health` is process liveness and remains 200 while the public HTTP process itself is alive. `GET /ready` is stricter: when an Arena Room is configured it requires a fresh readiness pulse written by the separate Arena daemon into the shared SQLite database. After startup, that pulse is refreshed only after the daemon successfully heartbeats to SharedNet and confirms access to the configured Arena Room; if those external checks stop succeeding, readiness ages out after 45 seconds.
 
 This catches the dangerous split-brain case where the product link looks healthy but no seller process is actually consuming paid SharedNet requests. The final live preflight additionally negotiates `/mcp`, verifies a signed selfcheck and signed paid routing response, and validates the paid rehearsal/restart evidence against the deployed key and current daemon boot.
 
@@ -151,4 +151,4 @@ Wait until `GET /ready` is green again, then run from the same buyer seat:
 
 This command refuses to run unless the current daemon `boot_id` differs from the one captured by `arena:rehearse`. It makes **no second payment**. It resends the exact original paid request and requires the original signed receipt and SharedOS trace to survive byte-identically across the restart. If the DB volume or signing key was lost, or the provider executes again instead of replaying the cache, the proof fails.
 
-The restart proof is written mode 0600 to `.sledgewire/restart-replay.json`.
+The restart proof is written mode 0600 to `.sledgewire/restart-replay.json` using schema `sledgewire.restart-replay-proof.v2`.
