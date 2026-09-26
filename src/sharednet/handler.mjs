@@ -8,7 +8,7 @@ import {SEAT} from './api.mjs';
 
 const REQUEST_ID=/^[A-Za-z0-9][A-Za-z0-9._-]{2,95}$/;
 
-export function createArenaHandler({store,ledger,room,payee,signing,publicBaseUrl}){
+export function createArenaHandler({store,ledger,room,payee,signing,publicBaseUrl,runService=runPaidService}){
   const prices=Object.fromEntries(Object.entries(catalog.services).map(([k,v])=>[k,v.price])),gate=new PaymentGate({ledger,store,prices,payee});
   async function serve(req,buyerSeat){
     if(typeof req.request_id!=='string'||!REQUEST_ID.test(req.request_id)){store.incrementCounter('arena.reject.invalid_request_id');return failure(req,'invalid_request_id');}
@@ -22,20 +22,23 @@ export function createArenaHandler({store,ledger,room,payee,signing,publicBaseUr
     }
 
     const auth=await gate.authorize({roomId:room,buyerSeat,requestId:req.request_id,service:req.service,input:req.input,txnId:req.payment_txn_id});
-    if(!auth.ok){store.incrementCounter(`arena.reject.${String(auth.reason).replace(/[^a-z0-9_.-]/gi,'_').slice(0,80)}`);return failure(req,auth.reason,auth);}
+    if(!auth.ok){store.incrementCounter(`arena.reject.${String(auth.reason).replace(/[^a-z0-9_.-]/gi,'_').slice(0,80)}`);if(auth.reason==='previous_attempt_failed'&&auth.error?.response)return auth.error.response;return failure(req,auth.reason,auth);}
     if(auth.replay)return auth.cached;
 
     try{
       // SharedOS grant ids are derived from the request fingerprint, not the buyer-supplied
       // request_id, so two different buyers can safely choose the same request label.
-      const result=await runPaidService({service:req.service,input:req.input,store,requestId:auth.fingerprint,fingerprint:auth.fingerprint,buyerSeat});
+      const result=await runService({service:req.service,input:req.input,store,requestId:auth.fingerprint,fingerprint:auth.fingerprint,buyerSeat});
       const receipt=signReceipt({...result,request_id:req.request_id,receipt_version:'sledgewire.receipt.v3',issued_at:new Date().toISOString(),payment:{txn_id:req.payment_txn_id,price_credits:auth.price,room_id:room}},signing.privateKeyPem);
       const response={type:'sledgewire.service.response.v1',request_id:req.request_id,service:req.service,state:'DELIVERED',outcome_state:result.state??'UNKNOWN',trace_id:result.sharedos_trace_id,receipt};
       store.complete(auth.storageKey,auth.fingerprint,response);
       return response;
     }catch(e){
-      store.fail(auth.storageKey,auth.fingerprint,{message:String(e.message||e)});
-      return failure(req,'execution_failed',{detail:String(e.message||e)});
+      const detail=String(e.message||e);
+      const receipt=signReceipt({service:req.service,state:'FAILED',reason:'execution_failed',detail,request_id:req.request_id,request_fingerprint:auth.fingerprint,buyer_seat:buyerSeat,receipt_version:'sledgewire.receipt.v3',issued_at:new Date().toISOString(),payment:{txn_id:req.payment_txn_id,price_credits:auth.price,room_id:room}},signing.privateKeyPem);
+      const response={type:'sledgewire.service.response.v1',request_id:req.request_id,service:req.service,state:'FAILED',reason:'execution_failed',receipt};
+      store.fail(auth.storageKey,auth.fingerprint,{message:detail,response});
+      return response;
     }
   }
 
