@@ -46,6 +46,7 @@
 - [x] Durable `arena:stats` v2 reports verified gross incoming credits, all verified paid buyers, completed-delivery buyers, paid transaction count, paid/delivered service mix, rejection reasons, Smoke-to-premium conversion and latency without emitting buyer identities.
 - [x] Paid claims persist buyer seat before execution; pre-v0.3.9 Arena databases migrate online and exact legacy retries backfill buyer identity without changing replay semantics.
 - [x] Buyer-side `npm run arena:rehearse` path is implemented and unit-tested for quote -> native transfer -> signed delivery -> trace proof -> exact cached retry.
+- [x] Daemon readiness exposes a non-secret per-process `boot_id`; `npm run arena:replay-after-restart` refuses same-boot runs and verifies the original receipt + trace survive a real daemon restart without a second payment.
 
 ## Submission P0
 
@@ -66,7 +67,7 @@
 - [ ] Run `npm run arena:rehearse` with a real second seat; preserve `.sledgewire/live-rehearsal.json` as evidence.
 - [ ] Another seat completes request -> payment -> SharedOS -> signed reply.
 - [ ] Another seat independently calls `sledgewire.trace` on that paid receipt and verifies the returned proof.
-- [ ] Exact completed retry after restart returns cached delivery with zero re-execution.
+- [ ] After a real daemon restart, `npm run arena:replay-after-restart` verifies changed boot id + identical cached delivery + persisted trace with zero second payment.
 - [ ] Oversized artifact delivery verified live.
 - [ ] At least three real external MCP implementations tested.
 - [ ] Event-visible SharedOS evidence confirmed if entering that track.

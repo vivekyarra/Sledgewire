@@ -135,3 +135,18 @@ The redacted evidence packet is written mode 0600 to `.sledgewire/live-rehearsal
 `GET /health` is process liveness and remains 200 while the public HTTP process itself is alive. `GET /ready` is stricter: when an Arena Room is configured it requires a fresh heartbeat written by the separate Arena daemon into the shared SQLite database. The daemon updates that heartbeat every 10 seconds; readiness fails closed after 45 seconds.
 
 This catches the dangerous split-brain case where the product link looks healthy but no seller process is actually consuming paid SharedNet requests. `npm run preflight -- --live` now checks the public `/ready` surface and verifies that the deployed Ed25519 public key matches the local production signing key.
+
+
+## Prove restart-safe replay with zero additional credits
+
+The first live rehearsal now records the seller daemon's random process `boot_id` from `/ready`. After the rehearsal succeeds, restart the **Arena daemon** while preserving the same database and signing-key mounts:
+
+    docker compose --env-file deploy/arena.env -f compose.arena.yml restart arena-daemon
+
+Wait until `GET /ready` is green again, then run from the same buyer seat:
+
+    npm run arena:replay-after-restart
+
+This command refuses to run unless the current daemon `boot_id` differs from the one captured by `arena:rehearse`. It makes **no second payment**. It resends the exact original paid request and requires the original signed receipt and SharedOS trace to survive byte-identically across the restart. If the DB volume or signing key was lost, or the provider executes again instead of replaying the cache, the proof fails.
+
+The restart proof is written mode 0600 to `.sledgewire/restart-replay.json`.

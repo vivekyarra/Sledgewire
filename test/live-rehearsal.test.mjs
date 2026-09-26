@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {generateSigningKeypair,signReceipt} from '../src/receipts/receipt.mjs';
-import {runLiveSmokeRehearsal} from '../src/sharednet/live-rehearsal.mjs';
+import {runLiveSmokeRehearsal,runRestartReplayProof} from '../src/sharednet/live-rehearsal.mjs';
 
 const room='rom_ABCDEFGHIJ',payee='p_ABCDEFGHIJ',buyer='i_ZYXWVUTSRQ',txn='txn_ABCDEFGHIJ';
 function fakeApi(privateKeyPem){
@@ -29,7 +29,24 @@ function fakeApi(privateKeyPem){
 test('live rehearsal core proves quote payment signed delivery trace and exact cached retry',async()=>{
   const kp=generateSigningKeypair(),api=fakeApi(kp.privateKeyPem),traceId='11111111-1111-4111-8111-111111111111';
   const trace=signReceipt({service:'sledgewire.trace',state:'READY',trace_id:traceId,events:[{event:'allow'}]},kp.privateKeyPem);
-  const r=await runLiveSmokeRehearsal({api,roomId:room,payee,publicBaseUrl:'https://sledgewire.example',targetEndpoint:'https://target.example/mcp',publicKeyPem:kp.publicKeyPem,lookupTrace:async id=>{assert.equal(id,traceId);return trace;},requestId:'rehearsal-fixed',timeoutMs:1000});
-  assert.equal(r.verified,true);assert.deepEqual(r.checks,{payment_quote:true,native_transfer:true,signed_delivery:true,sharedos_trace:true,trace_signature:true,exact_cached_retry:true});
+  const r=await runLiveSmokeRehearsal({api,roomId:room,payee,publicBaseUrl:'https://sledgewire.example',targetEndpoint:'https://target.example/mcp',publicKeyPem:kp.publicKeyPem,providerBootId:'123e4567-e89b-42d3-a456-426614174000',lookupTrace:async id=>{assert.equal(id,traceId);return trace;},requestId:'rehearsal-fixed',timeoutMs:1000});
+  assert.equal(r.verified,true);assert.equal(r.provider_boot_id,'123e4567-e89b-42d3-a456-426614174000');assert.deepEqual(r.checks,{payment_quote:true,native_transfer:true,signed_delivery:true,sharedos_trace:true,trace_signature:true,exact_cached_retry:true});
   assert.equal(api.stats().payCalls,1);assert.equal(api.stats().posts,3);
+});
+
+test('restart replay proof requires a changed daemon boot id and returns identical cached receipt without payment',async()=>{
+  const kp=generateSigningKeypair(),api=fakeApi(kp.privateKeyPem),traceId='11111111-1111-4111-8111-111111111111',oldBoot='123e4567-e89b-42d3-a456-426614174000',newBoot='223e4567-e89b-42d3-a456-426614174001';
+  const trace=signReceipt({service:'sledgewire.trace',state:'READY',trace_id:traceId,events:[{event:'allow'}]},kp.privateKeyPem);
+  const first=await runLiveSmokeRehearsal({api,roomId:room,payee,publicBaseUrl:'https://sledgewire.example',targetEndpoint:'https://target.example/mcp',publicKeyPem:kp.publicKeyPem,providerBootId:oldBoot,lookupTrace:async()=>trace,requestId:'rehearsal-fixed',timeoutMs:1000});
+  const before=api.stats();const proof=await runRestartReplayProof({api,roomId:room,publicBaseUrl:'https://sledgewire.example',publicKeyPem:kp.publicKeyPem,previousEvidence:first,currentBootId:newBoot,lookupTrace:async()=>trace,timeoutMs:1000});
+  assert.equal(proof.verified,true);assert.equal(proof.previous_boot_id,oldBoot);assert.equal(proof.current_boot_id,newBoot);assert.deepEqual(proof.checks,{daemon_boot_changed:true,signing_key_persisted:true,cached_delivery_identical:true,shared_db_trace_persisted:true,no_second_payment:true});
+  assert.equal(api.stats().payCalls,before.payCalls);assert.equal(api.stats().posts,before.posts+1);
+});
+test('restart replay proof refuses same daemon boot id before posting a replay',async()=>{
+  const kp=generateSigningKeypair(),api=fakeApi(kp.privateKeyPem),traceId='11111111-1111-4111-8111-111111111111',boot='123e4567-e89b-42d3-a456-426614174000';
+  const trace=signReceipt({service:'sledgewire.trace',state:'READY',trace_id:traceId,events:[{event:'allow'}]},kp.privateKeyPem);
+  const first=await runLiveSmokeRehearsal({api,roomId:room,payee,publicBaseUrl:'https://sledgewire.example',targetEndpoint:'https://target.example/mcp',publicKeyPem:kp.publicKeyPem,providerBootId:boot,lookupTrace:async()=>trace,requestId:'rehearsal-fixed',timeoutMs:1000});
+  const before=api.stats().posts;
+  await assert.rejects(()=>runRestartReplayProof({api,roomId:room,publicBaseUrl:'https://sledgewire.example',publicKeyPem:kp.publicKeyPem,previousEvidence:first,currentBootId:boot,lookupTrace:async()=>trace,timeoutMs:1000}),/provider_not_restarted_since_rehearsal/);
+  assert.equal(api.stats().posts,before);
 });
