@@ -1,0 +1,89 @@
+name: v0.3.10 Soak
+
+on:
+  push:
+    branches:
+      - build/v0.3.10-soak
+
+permissions:
+  contents: read
+
+jobs:
+  soak:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.18.0'
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts
+      - run: npm audit --audit-level=high
+      - name: 10 full regression passes
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 10); do
+            echo "REGRESSION_PASS=$i"
+            npm test >/tmp/test-$i.log
+            tail -n 8 /tmp/test-$i.log
+          done
+      - name: 25 hostile selfchecks
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 25); do
+            npm run --silent selfcheck >/tmp/selfcheck.json
+            node -e "const x=JSON.parse(require('fs').readFileSync('/tmp/selfcheck.json','utf8'));if(x.verified!==true||x.receipt_verified!==true||x.state!=='READY')process.exit(1)"
+          done
+          echo "SELFCHECK_PASSES=25"
+      - name: 100k MCP workflows at concurrency 256
+        run: npm run stress -- 100000 256 | tee /tmp/stress-mcp.json
+      - name: 100k Arena claims and replays
+        run: npm run stress:arena -- 100000 | tee /tmp/stress-arena.json
+      - name: large duplicate storm
+        run: npm run stress:dupes -- 5000 32 | tee /tmp/stress-dupes.json
+      - name: 50 restart-durability passes
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 50); do
+            node --test test/restart-durability.test.mjs >/tmp/restart-$i.log
+          done
+          echo "RESTART_DURABILITY_PASSES=50"
+      - name: SharedOS verification
+        run: npm run sharedos:check
+      - name: production Docker repeated boot and signed MCP check
+        run: |
+          set -euo pipefail
+          node scripts/keygen.mjs /tmp/swkeys >/tmp/key.json
+          sudo chown 1000:1000 /tmp/swkeys /tmp/swkeys/ed25519-private.pem /tmp/swkeys/ed25519-public.pem
+          chmod 700 /tmp/swkeys
+          chmod 600 /tmp/swkeys/ed25519-private.pem
+          chmod 644 /tmp/swkeys/ed25519-public.pem
+          docker build -t sledgewire-soak .
+          for i in $(seq 1 10); do
+            rm -rf /tmp/swdata && mkdir -p /tmp/swdata && sudo chown 1000:1000 /tmp/swdata
+            docker run -d --name sw-soak-$i -p 18787:8787 \
+              -e NODE_ENV=production \
+              -e PUBLIC_BASE_URL=https://sledgewire.example \
+              -e SLEDGEWIRE_DB=/persistent/sledgewire.db \
+              -e SLEDGEWIRE_PRIVATE_KEY_FILE=/keys/ed25519-private.pem \
+              -e SLEDGEWIRE_PUBLIC_KEY_FILE=/keys/ed25519-public.pem \
+              -v /tmp/swkeys:/keys:ro -v /tmp/swdata:/persistent \
+              sledgewire-soak >/dev/null
+            ok=0
+            for n in $(seq 1 20); do
+              if curl -fsS http://127.0.0.1:18787/health >/tmp/health.json; then ok=1; break; fi
+              sleep 0.25
+            done
+            if [ "$ok" -ne 1 ]; then docker logs sw-soak-$i; exit 1; fi
+            curl -fsS http://127.0.0.1:18787/mcp \
+              -H 'Host: sledgewire.example' \
+              -H 'Content-Type: application/json' \
+              -H 'Mcp-Protocol-Version: 2026-07-28' \
+              -H 'Mcp-Method: tools/call' \
+              -H 'Mcp-Name: sledgewire.selfcheck' \
+              --data '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"sledgewire.selfcheck","arguments":{},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}' >/tmp/mcp.json
+            node -e "const x=JSON.parse(require('fs').readFileSync('/tmp/mcp.json','utf8'));if(x.result?.structuredContent?.verified!==true||!x.result?.structuredContent?.proof?.signature)process.exit(1)"
+            docker rm -f sw-soak-$i >/dev/null
+          done
+          echo "PRODUCTION_DOCKER_BOOT_PASSES=10"
