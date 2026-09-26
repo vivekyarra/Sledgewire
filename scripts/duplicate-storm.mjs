@@ -5,7 +5,7 @@ const groups=Math.max(1,Number(process.argv[2]??500)),fanout=Math.max(2,Number(p
 const room='rom_ABCDEFGHIJ',buyer='i_ABCDEFGHIJ',payee='p_ABCDEFGHIJ',service='sledgewire.smoke',price=3;
 const store=new ArenaStore(':memory:');
 let ledgerReads=0;
-const ledger={async get(txnId){ledgerReads++;await Promise.resolve();const i=Number(txnId.split('_').at(-1));const requestId=`storm-${i}`;return {id:txnId,buyer_instance_id:buyer,payee_ok:true,amount:price,room_id:room,memo:paymentMemo(requestId,service)};}};
+const ledger={async get(txnId){ledgerReads++;await Promise.resolve();const i=Number(txnId.split('_').at(-1));const requestId=`storm-${i}`;return {id:txnId,buyer_instance_id:buyer,payee_ok:true,amount:price,room_id:room,memo:paymentMemo({roomId:room,buyerSeat:buyer,requestId,service,input:{endpoint:`https://example.com/${i}`}})};}};
 const gate=new PaymentGate({ledger,store,prices:{[service]:price},payee});
 let uniqueClaims=0,inflightRefusals=0,cachedReplays=0,conflictRefusals=0;
 const start=Date.now();
