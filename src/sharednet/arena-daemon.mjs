@@ -9,6 +9,7 @@ import {writeArenaDaemonHeartbeat} from '../ops/readiness.mjs';
 import catalog from '../../catalog.json' with {type:'json'};
 import {announceArenaOnce} from './announcement.mjs';
 import {boundedInteger,publicBaseOrigin} from '../ops/config.mjs';
+import {VERSION} from '../version.mjs';
 
 const room=process.env.SHAREDNET_ARENA_ROOM_ID??'',payee=process.env.SHAREDNET_PAYEE_ADDRESS??'';
 if(!ROOM.test(room)||!ADDRESS.test(payee))throw new Error('arena_environment_incomplete');
@@ -34,7 +35,7 @@ const statsEvery=boundedInteger(process.env.SLEDGEWIRE_ARENA_STATS_INTERVAL_MS,{
 const statsTimer=setInterval(()=>{try{console.error(JSON.stringify({sledgewire:'arena-stats',...store.arenaStats({prices:arenaPrices})}));}catch(e){console.error(`arena-stats:${e.message}`);}},statsEvery);statsTimer.unref();
 const stop=signal=>{clearInterval(heartbeat);clearInterval(localHeartbeat);clearInterval(statsTimer);writeLocalHeartbeat('stopped');console.error(JSON.stringify({sledgewire:'arena-daemon',event:'stopping',signal}));try{store.db.close();}catch{}process.exit(0);};
 process.once('SIGTERM',()=>stop('SIGTERM'));process.once('SIGINT',()=>stop('SIGINT'));
-console.error(JSON.stringify({sledgewire:'arena-daemon',version:'0.3.9',room,instance:selfSeat,boot_id:daemonBootId,cursor,concurrency,maxAttempts}));
+console.error(JSON.stringify({sledgewire:'arena-daemon',version:VERSION,room,instance:selfSeat,boot_id:daemonBootId,cursor,concurrency,maxAttempts}));
 const sequenceOf=message=>{const n=Number(message?.sequence);return Number.isSafeInteger(n)&&n>=0?n:null;};
 let backoff=500;
 for(;;){
