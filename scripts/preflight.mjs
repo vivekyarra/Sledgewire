@@ -22,11 +22,15 @@ const db=process.env.SLEDGEWIRE_DB||'.sledgewire/arena.db';
 try{const dir=path.dirname(path.resolve(db));fs.mkdirSync(dir,{recursive:true});fs.accessSync(dir,fs.constants.W_OK);add('durable_store_path',true,dir);}
 catch(e){add('durable_store_path',false,String(e));}
 
-const publicBase=process.env.PUBLIC_BASE_URL??'',paidBypass=process.env.SLEDGEWIRE_PUBLIC_PAID_EXECUTION==='1';
+const publicBase=process.env.PUBLIC_BASE_URL??'',productUrl=process.env.SLEDGEWIRE_PRODUCT_URL??(publicBase?`${publicBase.replace(/\/$/,'')}/arena.md`:''),paidBypass=process.env.SLEDGEWIRE_PUBLIC_PAID_EXECUTION==='1';
+function isHttpsUrl(value){try{const u=new URL(value);return u.protocol==='https:'&&Boolean(u.hostname)&&!u.username&&!u.password;}catch{return false;}}
+if(submission){
+  add('public_product_link',isHttpsUrl(productUrl),productUrl||'missing');
+}
 if(live||submission){
-  add('public_product_link',publicBase.startsWith('https://'),publicBase||'missing');
   add('public_paid_bypass_disabled',!paidBypass,paidBypass?'SLEDGEWIRE_PUBLIC_PAID_EXECUTION=1 is forbidden':'disabled');
 }
+if(live)add('public_mcp_base',isHttpsUrl(publicBase),publicBase||'missing');
 if(live)add('node_env_production',process.env.NODE_ENV==='production',process.env.NODE_ENV??'missing');
 
 const buildRoom=process.env.SHAREDNET_BUILD_ROOM_ID??'';
