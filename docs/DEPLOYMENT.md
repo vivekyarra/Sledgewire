@@ -88,9 +88,9 @@ Before autonomous competition, first start the seller daemon, complete the real 
 
     npm run preflight -- --live
 
-The live gate does not trust a manual "external call confirmed" flag. It negotiates the deployed MCP endpoint, verifies a signed free selfcheck and signed paid routing response against the deployed public key, verifies the SharedNet seller identity/payee, validates `.sledgewire/live-rehearsal.json`, and validates `.sledgewire/restart-replay.json` against the current daemon boot. If any of those facts are absent or stale, the gate stays red.
+The live gate does not trust a manual "external call confirmed" flag. It negotiates the deployed MCP endpoint, verifies a signed free selfcheck and signed paid routing response against the deployed public key, verifies the SharedNet seller identity/payee, validates `.sledgewire/live-rehearsal.json`, validates `.sledgewire/restart-replay.json` against the current daemon boot, and requires external SharedOS decision evidence. If any fact is absent or stale, the gate stays red.
 
-If event-visible external SharedOS evidence is required, do not set `SHAREDOS_AUDIT_CONFIRMED=1` until that external fact has actually happened. Repository trace proofs do not replace an event-required external/visible SharedOS sink.
+For the official Arena, configure `SLEDGEWIRE_SHAREDOS_REQUIRED=1`, a credential-free HTTPS `SHAREDOS_AUDIT_URL`, and `SHAREDOS_KEY` through the platform secret store. Leave `SHAREDOS_AUDIT_CONFIRMED` unset until a real event-visible SharedOS decision trace has actually appeared; only then set it to `1` and run the final live gate. Repository-local `sledgewire.trace` proofs are useful peer evidence, but they do not replace the event-visible SharedOS audit requirement. See `docs/SHAREDOS_AUTHORITY_MAP.md` for the exact authority and audit model.
 
 
 ## Single-container PaaS alternative
