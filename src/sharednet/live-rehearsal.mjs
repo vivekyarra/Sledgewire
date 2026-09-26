@@ -2,6 +2,7 @@ import {idempotencyUuid,MESSAGE,SEAT,TXN,payeeBelongsToIdentity} from './api.mjs
 import {paymentMemo} from '../core/payment-gate.mjs';
 import {verifyReceipt} from '../receipts/receipt.mjs';
 import {publicBaseOrigin} from '../ops/config.mjs';
+import {publicBaseOrigin} from '../ops/config.mjs';
 
 function sequenceOf(x){const n=Number(x?.sequence);return Number.isSafeInteger(n)&&n>=0?n:null;}
 function parseJsonMessage(message){if(typeof message?.content!=='string')return null;try{return JSON.parse(message.content);}catch{return null;}}
