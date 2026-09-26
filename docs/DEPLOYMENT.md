@@ -93,6 +93,16 @@ The live gate does not trust a manual "external call confirmed" flag. It negotia
 If event-visible external SharedOS evidence is required, do not set `SHAREDOS_AUDIT_CONFIRMED=1` until that external fact has actually happened. Repository trace proofs do not replace an event-required external/visible SharedOS sink.
 
 
+## Single-container PaaS alternative
+
+If the platform cannot share one local persistent volume between separate services, use:
+
+    npm run arena:all
+
+This supervises the public server and Arena daemon inside one container, sharing one SQLite database. It is intentionally fail-fast: losing either required process terminates the complete service. For Railway-specific volume, root-mount, healthcheck and secret-variable setup, see `docs/RAILWAY_DEPLOYMENT.md`.
+
+This mode reduces container-level isolation compared with the two-process Compose topology below. Prefer Compose on a normal Docker host; use `arena:all` when a one-service persistent-volume platform is the practical deployment target.
+
 ## Recommended two-process Docker Compose topology
 
 Use the checked-in `compose.arena.yml` so the public MCP process and SharedNet Arena daemon share the same SQLite/WAL volume and signing key:

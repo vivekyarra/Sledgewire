@@ -126,6 +126,14 @@ Current SharedNet supports an invite-only guest flow with no account/API key req
 
 The returned seat token is written mode 0600 and never printed. Remove the invite token from the environment afterward.
 
+## Single-container PaaS mode
+
+For platforms where a persistent volume belongs to one service, run the public server and Arena daemon under the fail-fast supervisor:
+
+    npm run arena:all
+
+Both child processes still use the same durable database; if either child dies, the whole service exits so the platform can restart a complete seller. See `docs/RAILWAY_DEPLOYMENT.md` for the Railway path. The two-container Compose topology remains the stronger isolation model when a normal Docker host is available.
+
 ## Run the autonomous provider
 
     export NODE_ENV=production
@@ -202,6 +210,7 @@ Live preflight intentionally remains red until real event facts exist. It now pr
 - docs/TOP1_GAMEPLAN.md
 - docs/ARENA_RUNBOOK.md
 - docs/DEPLOYMENT.md
+- docs/RAILWAY_DEPLOYMENT.md
 - docs/PROTOCOL.md
 - docs/RELEASE_CHECKLIST.md
 - docs/SHAREDNET_COLLAB.md
