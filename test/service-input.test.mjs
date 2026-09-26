@@ -10,6 +10,10 @@ test('valid paid smoke input passes structural prepayment validation',()=>{
 });
 for(const endpoint of ['http://example.com/mcp','https://127.0.0.1/mcp','https://169.254.169.254/latest','https://user:pass@example.com/mcp','https://example.com/mcp#fragment'])
   test(`unsafe endpoint rejected before payment: ${endpoint}`,()=>assert.equal(validateServiceInput('sledgewire.smoke',{endpoint}).ok,false));
+test('unknown-tool protocol mutation authority must be an explicit boolean',()=>{
+  assert.equal(validateServiceInput('sledgewire.assay',{endpoint:'https://example.com/mcp',probe:{authorizeUnknownToolProbe:true}}).ok,true);
+  assert.equal(validateServiceInput('sledgewire.assay',{endpoint:'https://example.com/mcp',probe:{authorizeUnknownToolProbe:'yes'}}).reason,'probe_unknown_tool_authority');
+});
 test('fleet over six targets is rejected',()=>{
   const targets=Array.from({length:7},(_,i)=>({endpoint:`https://example.com/${i}`}));
   assert.equal(validateServiceInput('sledgewire.fleet',{targets}).reason,'fleet_targets_1_to_6');
