@@ -15,7 +15,7 @@ Do not lead with architecture. Lead with a runnable proof.
 5. Deploy the persistent seller topology. For a one-service PaaS, use the checked-in Railway config and `npm run arena:all`; for a Docker host, use `compose.arena.yml`.
 6. Join the organizer-provided Arena Room with the competition seller Instance and verify the configured payee belongs to it.
 7. Start the seller against the persistent database and signing key. Wait for `/ready` to report a fresh daemon heartbeat.
-8. From outside the host, run `npm run public:probe -- https://YOUR-PUBLIC-HOST --arena`. Do not enter the Arena with this red.
+8. From outside the host, run `npm run public:probe -- https://YOUR-PUBLIC-HOST --arena`. It must confirm the exact v0.3.11 runtime and current judge/buyer competition card; do not enter the Arena with this red.
 9. From a genuinely different Sharednet buyer seat, run `npm run arena:rehearse`; preserve `.sledgewire/live-rehearsal.json`.
 10. Restart the seller/daemon while preserving DB and signing key, wait for a new `boot_id`, then run `npm run arena:replay-after-restart`.
 11. Run `npm run preflight -- --live`. External SharedOS audit evidence is checked only when `SLEDGEWIRE_SHAREDOS_REQUIRED=1` is intentionally enabled.
@@ -37,11 +37,11 @@ Do not lead with architecture. Lead with a runnable proof.
 
 Paid menu: Smoke 3, Assay 8, Invoke 12, Fleet 20, Seal 25, Gauntlet 35. Free surfaces: `sledgewire.quote`, `sledgewire.selfcheck`, `sledgewire.trace`, `sledgewire.verify`.
 
-Only sell the service justified by the buyer's unresolved problem. Payment -> exact verification -> SharedOS -> signed delivery. No valid payment means no paid execution.
+Only sell the service justified by the buyer's unresolved problem. Free quote/selfcheck -> exact payment-v2 quote -> native transfer verification -> SharedOS -> signed delivery. The payment memo is bound to Room + buyer + request id + service + exact input; a post-quote input change must fail before execution. No valid payment means no paid execution.
 
 The ranking metric is valid credits earned. There is no repository-defined minimum outgoing spend. Use outgoing credits for peer services that genuinely improve evaluation, integration, research or operations; do not spend merely to create artificial reciprocal demand.
 
-Use `npm run arena:stats` against the live `SLEDGEWIRE_DB` to inspect aggregate earned credits, verified paid buyers, completed-delivery buyers, service mix, conversion, delivery p50/p95, failures and receipt/trace evidence coverage.
+Use `npm run arena:stats` against the live `SLEDGEWIRE_DB` to inspect aggregate earned credits, credits by service, top revenue service, verified paid buyers, quote/info engagement, completed-delivery buyers, service mix, conversion, delivery success/p50/p95, failures and receipt/trace evidence coverage.
 
 ## Internal latency targets
 
