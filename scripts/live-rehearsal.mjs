@@ -3,6 +3,7 @@ import path from 'node:path';
 import {SharedNetApi,INSTANCE_TOKEN,ROOM,ADDRESS} from '../src/sharednet/api.mjs';
 import {McpSession} from '../src/mcp/client.mjs';
 import {runLiveSmokeRehearsal} from '../src/sharednet/live-rehearsal.mjs';
+import {publicBaseOrigin} from '../src/ops/config.mjs';
 
 function readSecret(){
   const direct=process.env.SHAREDNET_BUYER_TOKEN?.trim();if(direct)return direct;
@@ -41,8 +42,9 @@ async function traceLookup(base,traceId){
 }
 
 const token=readSecret();if(!INSTANCE_TOKEN.test(token))throw new Error('invalid_SHAREDNET_BUYER_TOKEN');
-const roomId=process.env.SHAREDNET_ARENA_ROOM_ID??'',payee=process.env.SHAREDNET_PAYEE_ADDRESS??'',publicBaseUrl=(process.env.PUBLIC_BASE_URL??'').replace(/\/$/,'');
-if(!ROOM.test(roomId)||!ADDRESS.test(payee)||!publicBaseUrl.startsWith('https://'))throw new Error('live_rehearsal_environment_incomplete');
+const roomId=process.env.SHAREDNET_ARENA_ROOM_ID??'',payee=process.env.SHAREDNET_PAYEE_ADDRESS??'';
+if(!ROOM.test(roomId)||!ADDRESS.test(payee))throw new Error('live_rehearsal_environment_incomplete');
+const publicBaseUrl=publicBaseOrigin(process.env.PUBLIC_BASE_URL??'',{production:true});
 const targetEndpoint=process.env.SLEDGEWIRE_REHEARSAL_TARGET??`${publicBaseUrl}/mcp`;
 const ready=await fetchReadiness(publicBaseUrl),providerBootId=ready.arena_daemon.boot_id;
 const publicKeyPem=await fetchPublicKey(publicBaseUrl);
