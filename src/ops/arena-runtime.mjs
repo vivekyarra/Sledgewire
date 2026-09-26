@@ -32,6 +32,8 @@ export function prepareSingleContainerRuntime({
   processOps=process
 }={}){
   const childEnv={...env};
+  if(!childEnv.PUBLIC_BASE_URL&&childEnv.RAILWAY_PUBLIC_DOMAIN)childEnv.PUBLIC_BASE_URL=`https://${String(childEnv.RAILWAY_PUBLIC_DOMAIN).trim()}`;
+  if(!childEnv.SLEDGEWIRE_DB&&childEnv.RAILWAY_VOLUME_MOUNT_PATH)childEnv.SLEDGEWIRE_DB=pathImpl.join(String(childEnv.RAILWAY_VOLUME_MOUNT_PATH), 'sledgewire.db');
   hydrateFileSecret(childEnv,{valueKey:'SLEDGEWIRE_PRIVATE_KEY_PEM',fileKey:'SLEDGEWIRE_PRIVATE_KEY_FILE'}, {fsImpl});
   hydrateFileSecret(childEnv,{valueKey:'SLEDGEWIRE_PUBLIC_KEY_PEM',fileKey:'SLEDGEWIRE_PUBLIC_KEY_FILE'}, {fsImpl});
   hydrateFileSecret(childEnv,{valueKey:'SHAREDNET_MEMBER_TOKEN',fileKey:'SHAREDNET_MEMBER_TOKEN_FILE',maxBytes:16*1024,trim:true}, {fsImpl});
