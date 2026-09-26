@@ -39,11 +39,12 @@ function endpoint(value){
 }
 function probe(value){
   if(value===undefined)return {ok:true};
-  if(!plainObject(value)||!onlyKeys(value,new Set(['name','arguments','safe','authorizeDestructive'])))return {ok:false,reason:'probe_shape'};
+  if(!plainObject(value)||!onlyKeys(value,new Set(['name','arguments','safe','authorizeDestructive','authorizeUnknownToolProbe'])))return {ok:false,reason:'probe_shape'};
   if(value.name!==undefined&&(typeof value.name!=='string'||value.name.length<1||value.name.length>256))return {ok:false,reason:'probe_name'};
   if(value.arguments!==undefined&&!plainObject(value.arguments))return {ok:false,reason:'probe_arguments'};
   if(value.safe!==undefined&&typeof value.safe!=='boolean')return {ok:false,reason:'probe_safe'};
   if(value.authorizeDestructive!==undefined&&typeof value.authorizeDestructive!=='boolean')return {ok:false,reason:'probe_destructive_authority'};
+  if(value.authorizeUnknownToolProbe!==undefined&&typeof value.authorizeUnknownToolProbe!=='boolean')return {ok:false,reason:'probe_unknown_tool_authority'};
   return {ok:true};
 }
 function invokeRequest(value){

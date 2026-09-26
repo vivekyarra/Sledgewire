@@ -158,7 +158,7 @@ Large signed deliveries are uploaded as Room-addressed SharedNet artifacts and r
 - Private, loopback, link-local, documentation, benchmark, multicast and reserved ranges blocked.
 - Tool descriptions, schemas and outputs treated as untrusted data.
 - Response bytes, catalog count and deadlines bounded.
-- Active probes require explicit caller safety attestation; untrusted target annotations never authorize execution by themselves.
+- Active selected-tool probes require explicit caller safety attestation; Assay's synthetic unknown-tool mutation additionally requires `probe.authorizeUnknownToolProbe=true`. Without that flag the check is reported as not tested. Untrusted target annotations never authorize execution by themselves.
 - Destructive probes/invocations require separate explicit destructive authority.
 - Repair never invents missing semantic values.
 - Payment binds buyer Instance, exact payee proof, integer amount, official Arena Room, request and service memo; the Room payment quote is itself Ed25519-signed and buyer-bound; request state is scoped by Room + buyer + request id.
