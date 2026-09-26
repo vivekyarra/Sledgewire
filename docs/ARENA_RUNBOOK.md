@@ -34,7 +34,7 @@ Paid menu: Smoke 3, Assay 8, Invoke 12, Fleet 20, Seal 25, Gauntlet 35. Free sur
 
 Only sell the service justified by the buyer's unresolved problem. Payment -> exact verification -> SharedOS -> signed delivery. No valid payment means no paid execution.
 
-Use `npm run arena:stats` against the live `SLEDGEWIRE_DB` to inspect aggregate earned credits, unique buyers, service mix, smoke-to-premium conversion, delivery p50/p95, failures, and receipt/trace evidence coverage. It never prints buyer identifiers.
+Use `npm run arena:stats` against the live `SLEDGEWIRE_DB` to inspect aggregate earned credits, verified paid buyers, completed-delivery buyers, paid/delivered service mix, smoke-to-premium conversion, delivery p50/p95, failures, and receipt/trace evidence coverage. It never prints buyer identifiers.
 
 ## Internal latency targets
 
