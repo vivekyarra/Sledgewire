@@ -11,13 +11,13 @@ test('Arena stats aggregate credits buyers mix conversion latency and evidence w
   completed(s,{id:'r2',txn:'t2',service:'sledgewire.assay',buyer:'i_BUYERAAAA',price:8,end:'2026-09-25T00:00:02.000Z'});
   completed(s,{id:'r3',txn:'t3',service:'sledgewire.seal',buyer:'i_BUYERBBBB',price:25,end:'2026-09-25T00:00:03.000Z',outcome:'DEGRADED'});
   s.db.prepare("INSERT INTO requests(request_id,txn_id,fingerprint,service,buyer_seat,status,error_json,started_at,completed_at) VALUES('rf','tf','fpf','sledgewire.smoke','i_BUYERCCCC','failed','{}','2026-09-25T00:00:00.000Z','2026-09-25T00:00:01.000Z')").run();
-  s.incrementCounter('arena.reject.wrong_buyer',2);const x=s.arenaStats({prices:{'sledgewire.smoke':3,'sledgewire.assay':8,'sledgewire.seal':25}});
+  s.incrementCounter('arena.reject.wrong_buyer',2);s.incrementCounter('arena.info.demo',3);s.incrementCounter('arena.quote.natural',2);s.incrementCounter('arena.payment_quote.issued',4);const x=s.arenaStats({prices:{'sledgewire.smoke':3,'sledgewire.assay':8,'sledgewire.seal':25}});
   assert.equal(x.schema,'sledgewire.arena.stats.v2');assert.equal(x.earned_credits,39);assert.equal(x.unique_buyers,3);assert.equal(x.unique_completed_buyers,2);assert.equal(x.paid_transactions,4);assert.equal(x.failed_requests,1);assert.equal(x.paid_service_mix['sledgewire.smoke'],2);assert.equal(x.service_mix['sledgewire.smoke'],1);assert.equal(x.outcome_mix.DEGRADED,1);
   assert.equal(x.smoke_buyers,2);assert.equal(x.smoke_to_premium_buyers,1);assert.equal(x.smoke_to_premium_conversion,0.5);assert.equal(x.delivery_ms.p50,2000);assert.equal(x.delivery_ms.p95,3000);
-  assert.equal(x.credits_per_unique_buyer,13);assert.equal(x.payment_rejections.wrong_buyer,2);assert.equal(x.integrity.signed_deliveries,3);assert.equal(x.integrity.trace_bound_deliveries,3);assert.equal(JSON.stringify(x).includes('i_BUYER'),false);
+  assert.equal(x.credits_per_unique_buyer,13);assert.deepEqual(x.credits_by_service,{'sledgewire.smoke':6,'sledgewire.assay':8,'sledgewire.seal':25});assert.equal(x.top_revenue_service,'sledgewire.seal');assert.equal(x.delivery_success_rate,0.75);assert.equal(x.engagement['info.demo'],3);assert.equal(x.engagement['quote.natural'],2);assert.equal(x.engagement['payment_quote.issued'],4);assert.equal(x.payment_rejections.wrong_buyer,2);assert.equal(x.integrity.signed_deliveries,3);assert.equal(x.integrity.trace_bound_deliveries,3);assert.equal(JSON.stringify(x).includes('i_BUYER'),false);
 });
 test('Arena stats are safe and zero-valued on an empty store',()=>{
-  const x=new ArenaStore(':memory:').arenaStats({prices:{}});assert.equal(x.earned_credits,0);assert.equal(x.unique_buyers,0);assert.equal(x.delivery_ms.p95,null);assert.equal(x.smoke_to_premium_conversion,0);
+  const x=new ArenaStore(':memory:').arenaStats({prices:{}});assert.equal(x.earned_credits,0);assert.equal(x.unique_buyers,0);assert.equal(x.delivery_ms.p95,null);assert.equal(x.smoke_to_premium_conversion,0);assert.equal(x.delivery_success_rate,null);assert.equal(x.top_revenue_service,null);assert.deepEqual(x.credits_by_service,{});
 });
 
 test('Arena gross earned credits include verified paid claims that later fail execution',()=>{
