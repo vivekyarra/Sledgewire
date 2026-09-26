@@ -1,10 +1,10 @@
 # Trial Zero release checklist
 
-## Static code gates — v0.3.9
+## Static code gates — v0.3.10
 
 - [x] CLI and MCP with current 2026-07-28 stateless `server/discover` plus bounded legacy fallback.
 - [x] Official `@modelcontextprotocol/client` v2 Streamable HTTP integration test negotiates 2026-07-28 and calls Sledgewire.
-- [x] Modern requests enforce protocol/method/name/session rules; Unicode-safe sentinel headers and reachable `x-mcp-header` mirroring are covered.
+- [x] Modern requests enforce required per-request `clientCapabilities` plus protocol/method/name/session rules; malformed 2026-07-28 envelopes fail with HTTP 400 / JSON-RPC `-32602`. Unicode-safe sentinel headers and reachable `x-mcp-header` mirroring are covered.
 - [x] Modern responses emit required `resultType`; cacheable discovery/catalog responses emit `ttlMs` and `cacheScope`.
 - [x] Modern downgrade refuses to hide timeout/internal errors as legacy compatibility.
 - [x] Exact JSON media-type checks, target request ceilings, response content-length/stream ceilings and deadlines fail closed.
@@ -24,7 +24,7 @@
 - [x] Native SharedNet credit verification binds buyer, exact/fallback-safe payee evidence, integer amount, Arena Room, memo and one-use transaction.
 - [x] Request storage/grant identity is scoped by Room + buyer + request fingerprint, preventing cross-buyer request-label collisions.
 - [x] Concurrent duplicate ledger checks are coalesced; positive/negative lookups are bounded in-memory cached.
-- [x] Exact completed retries are cached; stale uncertain paid executions never blindly re-execute.
+- [x] Exact completed retries are cached from the previously verified durable payment binding without requiring the transfer to remain in remote ledger history; legacy unattributed rows re-verify before buyer backfill; stale uncertain paid executions never blindly re-execute.
 - [x] Separate development and Arena Rooms.
 - [x] Arena cursor/message persistence, bounded retries, poison-message dead-letter.
 - [x] Watch compatibility validates active payee ownership, requires one reply event, and uses artifact fallback for oversized signed deliveries.
@@ -33,20 +33,25 @@
 - [x] Unused legacy child-process SharedNet adapter removed from production tree.
 - [x] SharedNet secrets excluded from git and Docker context.
 - [x] SQLite close/reopen replay and two-connection one-use tests green.
-- [x] **233 / 233** automated tests green on v0.3.9 buyer-metrics durability evidence commit.
+- [x] **248 / 248** automated tests green on v0.3.10 evidence commit `9c15ae5bafa5d54efaa590d3607a2a1b45f17691` (Actions run `36239219171`).
 - [x] **10,000 / 10,000** MCP Smoke workflows at concurrency **128**, 0 failures.
 - [x] **10,000** payment claims + 10,000 cached retries + 500 wrong-buyer rejections, 0 duplicate paid executions.
 - [x] Duplicate storm: **33,000 authorization attempts**, 1,000 unique claims, 15,000 in-flight duplicates refused, 16,000 cached replays, 1,000 transaction-reuse attempts refused, **1,000 ledger reads**, 0 duplicate paid executions.
 - [x] SharedOS deny / allow / maxUses / durable-audit check green.
-- [x] Static preflight green; live preflight additionally requires production mode and disabled paid bypass.
+- [x] Static preflight green; hardened live preflight additionally requires production mode, disabled paid bypass, public modern MCP negotiation, signed selfcheck/payment route, authenticated seller identity/payee, cryptographically validated second-seat rehearsal evidence, and restart-replay evidence matching the current daemon boot.
 - [x] Production MCP Host/authority guard rejects unlisted Host headers.
 - [x] Two-process Docker Compose topology shares the same persistent SQLite/WAL volume between public MCP and Arena daemon.
-- [x] Public `/ready` fails closed when the Arena daemon heartbeat is missing, stopped or stale; live preflight checks readiness and deployed signing-key identity.
+- [x] Public `/ready` fails closed when the Arena daemon readiness pulse is missing, stopped or stale; after startup the pulse refreshes only after successful SharedNet presence plus configured Arena Room access; live preflight checks readiness and deployed signing-key identity.
 - [x] Provider daemon posts one durable idempotent `sledgewire.available.v1` discovery message and will not repost it after restart.
 - [x] Durable `arena:stats` v2 reports verified gross incoming credits, all verified paid buyers, completed-delivery buyers, paid transaction count, paid/delivered service mix, rejection reasons, Smoke-to-premium conversion and latency without emitting buyer identities.
 - [x] Paid claims persist buyer seat before execution; pre-v0.3.9 Arena databases migrate online and exact legacy retries backfill buyer identity without changing replay semantics.
-- [x] Buyer-side `npm run arena:rehearse` path is implemented and unit-tested for quote -> native transfer -> signed delivery -> trace proof -> exact cached retry.
+- [x] Buyer-side `npm run arena:rehearse` path verifies a buyer-bound **signed** payment quote -> native transfer -> signed delivery -> trace proof -> exact cached retry.
 - [x] Daemon readiness exposes a non-secret per-process `boot_id`; `npm run arena:replay-after-restart` refuses same-boot runs and verifies the original receipt + trace survive a real daemon restart without a second payment.
+- [x] `package-lock.json` pins the full npm graph; CI/Docker use `npm ci`; CI rejects high-severity production dependency advisories.
+- [x] CI builds and boots the real non-root production Docker image, verifies `/health`, and performs a signed modern MCP selfcheck.
+- [x] Production/runtime origin and numeric configuration fail closed on credentialed/pathful public bases, NaN/fractional/out-of-range concurrency/timer/cursor settings, and malformed persisted cursors.
+- [x] Room `PAYMENT_REQUIRED` responses are Ed25519-signed and buyer-bound.
+- [x] Paid execution failures are signed, durably cached and replayed exactly without duplicate execution or another ledger read.
 
 ## Submission P0
 
@@ -74,3 +79,4 @@
 - [ ] Representative agent follows `docs/ARENA_AGENT_PROMPT.md`.
 - [ ] 60-minute no-human rehearsal passes.
 - [ ] Real Smoke p95 below 25 seconds and all paid calls below hard deadlines.
+- [ ] Final `npm run preflight -- --live` is green against the exact deployment and current daemon boot.

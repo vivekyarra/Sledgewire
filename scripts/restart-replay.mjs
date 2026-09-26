@@ -3,6 +3,7 @@ import path from 'node:path';
 import {SharedNetApi,INSTANCE_TOKEN,ROOM} from '../src/sharednet/api.mjs';
 import {McpSession} from '../src/mcp/client.mjs';
 import {runRestartReplayProof} from '../src/sharednet/live-rehearsal.mjs';
+import {publicBaseOrigin} from '../src/ops/config.mjs';
 
 function readSecret(){
   const direct=process.env.SHAREDNET_BUYER_TOKEN?.trim();if(direct)return direct;
@@ -33,8 +34,8 @@ async function traceLookup(base,traceId){
 
 const evidencePath=process.env.SLEDGEWIRE_REHEARSAL_EVIDENCE??'.sledgewire/live-rehearsal.json';
 const previous=JSON.parse(fs.readFileSync(evidencePath,'utf8'));
-const publicBaseUrl=String(process.env.PUBLIC_BASE_URL??previous.public_base_url??'').replace(/\/$/,'');
-if(!publicBaseUrl.startsWith('https://')||publicBaseUrl!==previous.public_base_url)throw new Error('restart_proof_public_base_environment_mismatch');
+const publicBaseUrl=publicBaseOrigin(String(process.env.PUBLIC_BASE_URL??previous.public_base_url??''),{production:true});
+if(publicBaseUrl!==previous.public_base_url)throw new Error('restart_proof_public_base_environment_mismatch');
 const roomId=process.env.SHAREDNET_ARENA_ROOM_ID??previous.room_id??'';if(!ROOM.test(roomId)||roomId!==previous.room_id)throw new Error('restart_proof_room_environment_mismatch');
 const token=readSecret();if(!INSTANCE_TOKEN.test(token))throw new Error('invalid_SHAREDNET_BUYER_TOKEN');
 const readiness=await fetchReadiness(publicBaseUrl),currentBootId=readiness.arena_daemon.boot_id;

@@ -24,6 +24,17 @@ export class ArenaStore{
     // accepted only after the column is visible on this connection.
     ensureColumn(this.db,'requests','buyer_seat','buyer_seat TEXT');
   }
+  inspectClaim({requestId,txnId,fingerprint,service,buyerSeat=null}){
+    const byReq=this.db.prepare('SELECT * FROM requests WHERE request_id=?').get(requestId),byTxn=this.db.prepare('SELECT * FROM requests WHERE txn_id=?').get(txnId),existing=byReq??byTxn;
+    if(!existing)return {status:'missing'};
+    const sameCore=existing.request_id===requestId&&existing.txn_id===txnId&&existing.fingerprint===fingerprint&&existing.service===service;
+    if(existing.buyer_seat!==null&&buyerSeat!==null&&existing.buyer_seat!==buyerSeat&&byTxn?.txn_id===txnId)return {status:'wrong_buyer'};
+    if(sameCore&&existing.buyer_seat===null)return {status:'unattributed'};
+    if(!sameCore||buyerSeat===null||existing.buyer_seat!==buyerSeat)return {status:'conflict'};
+    if(existing.status==='completed')return {status:'replay',response:JSON.parse(existing.response_json)};
+    if(existing.status==='failed')return {status:'failed',error:existing.error_json?JSON.parse(existing.error_json):null};
+    return {status:'inflight',startedAt:existing.started_at,ageMs:Math.max(0,Date.now()-Date.parse(existing.started_at))};
+  }
   claim({requestId,txnId,fingerprint,service,buyerSeat=null}){
     this.db.exec('BEGIN IMMEDIATE');try{
       const byReq=this.db.prepare('SELECT * FROM requests WHERE request_id=?').get(requestId),byTxn=this.db.prepare('SELECT * FROM requests WHERE txn_id=?').get(txnId),existing=byReq??byTxn;

@@ -18,3 +18,10 @@ test('Arena availability announcement is durable one-shot across daemon restarts
 test('Arena announcement can be explicitly disabled',async()=>{
   const store=new ArenaStore(':memory:');const r=await announceArenaOnce({api:{async post(){throw new Error('should_not_post');}},store,room,publicBaseUrl:'https://sledgewire.example',enabled:false});assert.equal(r.status,'disabled');
 });
+
+
+test('Arena announcement rejects non-origin and credentialed public URLs',()=>{
+  for(const bad of ['http://sledgewire.example','https://user:pass@sledgewire.example','https://sledgewire.example/path','https://sledgewire.example/?q=1']){
+    assert.throws(()=>arenaAnnouncement(bad));
+  }
+});

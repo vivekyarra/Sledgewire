@@ -5,9 +5,11 @@ import {SharedNetApi,ROOM,ADDRESS,payeeBelongsToIdentity} from './api.mjs';
 import {createArenaHandler} from './handler.mjs';
 import {prepareWatchReply} from './watch-reply.mjs';
 import {loadSigningMaterial} from '../receipts/receipt.mjs';
+import {publicBaseOrigin} from '../ops/config.mjs';
 
-const room=process.env.SHAREDNET_ARENA_ROOM_ID??'',payee=process.env.SHAREDNET_PAYEE_ADDRESS??'',publicBaseUrl=process.env.PUBLIC_BASE_URL??'';
-if(!ROOM.test(room)||!ADDRESS.test(payee)||!publicBaseUrl.startsWith('https://'))throw new Error('arena_environment_incomplete');
+const room=process.env.SHAREDNET_ARENA_ROOM_ID??'',payee=process.env.SHAREDNET_PAYEE_ADDRESS??'';
+if(!ROOM.test(room)||!ADDRESS.test(payee))throw new Error('arena_environment_incomplete');
+const publicBaseUrl=publicBaseOrigin(process.env.PUBLIC_BASE_URL??'',{production:true});
 const dbPath=process.env.SLEDGEWIRE_DB??'.sledgewire/arena.db';fs.mkdirSync(path.dirname(path.resolve(dbPath)),{recursive:true});
 const store=new ArenaStore(dbPath),ledger=new SharedNetApi(),signing=loadSigningMaterial({production:true}),identity=await ledger.current();
 if(!payeeBelongsToIdentity(payee,identity))throw new Error('configured_payee_not_owned_by_current_sharednet_identity');

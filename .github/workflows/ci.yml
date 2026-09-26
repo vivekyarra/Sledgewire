@@ -11,11 +11,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 18
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22.18.0'
-      - run: npm install --ignore-scripts
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts
+      - run: npm audit --audit-level=high
+      - name: syntax check all modules
+        run: find bin fixtures scripts src test -type f -name '*.mjs' -print0 | xargs -0 -n1 node --check
       - run: npm test
       - run: npm run selfcheck
       - run: npm run stress -- 10000 128
@@ -40,11 +44,47 @@ jobs:
         run: |
           node scripts/keygen.mjs /tmp/swkeys >/tmp/key.json
           NODE_ENV=production SLEDGEWIRE_PRIVATE_KEY_FILE=/tmp/swkeys/ed25519-private.pem SLEDGEWIRE_PUBLIC_KEY_FILE=/tmp/swkeys/ed25519-public.pem node -e "import('./src/server/protocol.mjs').then(m=>console.log(m.PUBLIC_KEY_ID))"
+      - name: production image builds and serves modern MCP
+        run: |
+          docker build -t sledgewire-ci .
+          mkdir -p /tmp/swdata
+          chmod 777 /tmp/swdata
+          # Official node images run the app as uid/gid 1000. File-backed Docker
+          # secrets are bind mounts, so preserve 0600 while making ownership explicit.
+          sudo chown 1000:1000 /tmp/swkeys /tmp/swkeys/ed25519-private.pem /tmp/swkeys/ed25519-public.pem
+          docker run -d --name sledgewire-ci-run -p 18787:8787 \
+            -e NODE_ENV=production \
+            -e PUBLIC_BASE_URL=https://sledgewire.example \
+            -e SLEDGEWIRE_DB=/persistent/sledgewire.db \
+            -e SLEDGEWIRE_PRIVATE_KEY_FILE=/keys/ed25519-private.pem \
+            -e SLEDGEWIRE_PUBLIC_KEY_FILE=/keys/ed25519-public.pem \
+            -v /tmp/swkeys:/keys:ro -v /tmp/swdata:/persistent \
+            sledgewire-ci
+          trap 'docker rm -f sledgewire-ci-run >/dev/null 2>&1 || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18787/health >/tmp/health.json; then break; fi
+            if [ "$(docker inspect -f '{{.State.Running}}' sledgewire-ci-run 2>/dev/null || true)" != "true" ]; then
+              docker logs sledgewire-ci-run >&2 || true
+              exit 1
+            fi
+            sleep 1
+          done
+          test -s /tmp/health.json || { docker logs sledgewire-ci-run >&2 || true; exit 1; }
+          node -e "const x=JSON.parse(require('fs').readFileSync('/tmp/health.json','utf8')); if(x.ok!==true||x.version!=='0.3.10') process.exit(1)"
+          curl -fsS http://127.0.0.1:18787/mcp \
+            -H 'Host: sledgewire.example' \
+            -H 'Content-Type: application/json' \
+            -H 'Mcp-Protocol-Version: 2026-07-28' \
+            -H 'Mcp-Method: tools/call' \
+            -H 'Mcp-Name: sledgewire.selfcheck' \
+            --data '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"sledgewire.selfcheck","arguments":{},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}' >/tmp/mcp.json
+          node -e "const x=JSON.parse(require('fs').readFileSync('/tmp/mcp.json','utf8')); if(x.result?.structuredContent?.verified!==true||x.result?.structuredContent?.proof?.signature==null) process.exit(1)"
       - name: production paid bypass is impossible
         run: |
+          sudo chown "$(id -u):$(id -g)" /tmp/swkeys /tmp/swkeys/ed25519-private.pem /tmp/swkeys/ed25519-public.pem
           set +e
           NODE_ENV=production PUBLIC_BASE_URL=https://sledgewire.example SLEDGEWIRE_PUBLIC_PAID_EXECUTION=1 SLEDGEWIRE_PRIVATE_KEY_FILE=/tmp/swkeys/ed25519-private.pem SLEDGEWIRE_PUBLIC_KEY_FILE=/tmp/swkeys/ed25519-public.pem node src/server/http.mjs >/tmp/bypass.out 2>/tmp/bypass.err
           code=$?
           set -e
           test "$code" -ne 0
-          grep -q 'production_paid_execution_bypass_forbidden' /tmp/bypass.err
+          grep -q 'production_paid_execution_bypass_forbidden' /tmp/bypass.err || { cat /tmp/bypass.err >&2; exit 1; }

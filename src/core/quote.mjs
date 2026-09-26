@@ -1,4 +1,5 @@
 import catalog from '../../catalog.json' with {type:'json'};
+import {validateServiceInput} from './service-input.mjs';
 
 const ROUTES={
   preflight:'sledgewire.smoke',
@@ -18,11 +19,18 @@ export function quote({intent='preflight',endpoint=null,targets=null,tool=null}=
   else if(service==='sledgewire.invoke')input={endpoint,request:{name:tool??'<tool>',arguments:{},evidence:{}}};
   else if(service==='sledgewire.gauntlet')input={endpoint,probe:tool?{name:tool,arguments:{},safe:false}:undefined};
   else input={endpoint,...(tool?{probe:{name:tool,arguments:{},safe:false}}:{})};
+  const missing_fields=[];
+  if(service==='sledgewire.fleet'){if(!Array.isArray(targets)||targets.length<1)missing_fields.push('targets');}
+  else{if(typeof endpoint!=='string'||!endpoint)missing_fields.push('endpoint');if(service==='sledgewire.invoke'&&(typeof tool!=='string'||!tool))missing_fields.push('tool');}
+  const validation=missing_fields.length?{ok:false,reason:'missing_required_quote_context'}:validateServiceInput(service,input);
   return {
     service:'sledgewire.quote',
     intent,
     recommended_service:service,
     price_credits:price,
+    request_ready:validation.ok,
+    missing_fields,
+    input_validation:validation,
     reason:{
       preflight:'Lowest-cost check before trusting or paying a service.',
       adversarial:'Use when protocol, replay, malformed-input, or hostile-output behavior matters.',

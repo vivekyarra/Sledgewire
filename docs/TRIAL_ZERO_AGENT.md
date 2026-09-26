@@ -9,7 +9,7 @@ Requires Node.js 22.18 or newer and Git.
 ```sh
 git clone https://github.com/vivekyarra/Sledgewire.git
 cd Sledgewire
-npm install
+npm ci --ignore-scripts
 node bin/sledgewire.mjs selfcheck
 ```
 

@@ -41,6 +41,18 @@ test('completed exact retry returns cached response',async()=>{
   s.complete(a.storageKey,a.fingerprint,{delivered:true});
   const b=await g.authorize(base);assert.equal(b.replay,true);assert.deepEqual(b.cached,{delivered:true});
 });
+test('completed exact retry survives gate restart even when transaction ages out of ledger history',async()=>{
+  let reads=0;const s=new ArenaStore(),firstLedger={async get(){reads++;return ledger().get();}},g1=new PaymentGate({ledger:firstLedger,store:s,prices,payee});
+  const a=await g1.authorize(base);s.complete(a.storageKey,a.fingerprint,{delivered:true,receipt:'stable'});
+  const g2=new PaymentGate({ledger:{async get(){reads++;return null;}},store:s,prices,payee});
+  const b=await g2.authorize(base);assert.equal(b.ok,true);assert.equal(b.replay,true);assert.deepEqual(b.cached,{delivered:true,receipt:'stable'});assert.equal(reads,1);
+});
+test('legacy unattributed completed row still requires ledger verification before replay and buyer backfill',async()=>{
+  const s=new ArenaStore(),storageKey=requestStorageKey(base),fp=requestFingerprint(base);
+  s.db.prepare("INSERT INTO requests(request_id,txn_id,fingerprint,service,buyer_seat,status,response_json,started_at,completed_at) VALUES(?,?,?,?,NULL,'completed',?,?,?)").run(storageKey,base.txnId,fp,base.service,JSON.stringify({delivered:true}),'2026-09-25T00:00:00.000Z','2026-09-25T00:00:01.000Z');
+  let reads=0;const g=new PaymentGate({ledger:{async get(){reads++;return ledger().get();}},store:s,prices,payee});
+  const r=await g.authorize(base);assert.equal(r.replay,true);assert.equal(reads,1);assert.equal(s.db.prepare('SELECT buyer_seat FROM requests WHERE request_id=?').get(storageKey).buyer_seat,base.buyerSeat);
+});
 test('fresh inflight exact retry does not reexecute',async()=>{
   const s=new ArenaStore(),g=new PaymentGate({ledger:ledger(),store:s,prices,payee,uncertainAfterMs:60_000});
   await g.authorize(base);const b=await g.authorize(base);assert.equal(b.reason,'request_already_inflight');
@@ -50,9 +62,9 @@ test('stale inflight paid request becomes explicit unknown outcome and is never 
   s.db.prepare('UPDATE requests SET started_at=? WHERE request_id=?').run(new Date(Date.now()-60_000).toISOString(),a.storageKey);
   const b=await g.authorize(base);assert.equal(b.ok,false);assert.equal(b.reason,'execution_outcome_unknown_no_retry');assert.equal(requestFingerprint(base),a.fingerprint);
 });
-test('same txn cannot buy different request',async()=>{
-  const s=new ArenaStore(),g=new PaymentGate({ledger:ledger(),store:s,prices,payee});
-  await g.authorize(base);const other={...base,requestId:'req-2'},r=await g.authorize(other);assert.equal(r.reason,'wrong_memo');
+test('same txn cannot buy different request and is rejected from durable binding without another ledger read',async()=>{
+  let reads=0;const s=new ArenaStore(),l={async get(){reads++;return ledger().get();}},g=new PaymentGate({ledger:l,store:s,prices,payee});
+  await g.authorize(base);const other={...base,requestId:'req-2'},r=await g.authorize(other);assert.equal(r.reason,'transaction_or_request_reused');assert.equal(reads,1);
 });
 test('same external request id is isolated by buyer seat',async()=>{
   const s=new ArenaStore(),txs={
@@ -64,6 +76,11 @@ test('same external request id is isolated by buyer seat',async()=>{
   const a=await g.authorize({...base,buyerSeat:'i_BUYERAAAA',requestId:'same-id',txnId:'txn_BUYERAAAA'});
   const b=await g.authorize({...base,buyerSeat:'i_BUYERBBBB',requestId:'same-id',txnId:'txn_BUYERBBBB'});
   assert.equal(a.ok,true);assert.equal(b.ok,true);assert.notEqual(a.storageKey,b.storageKey);assert.notEqual(a.fingerprint,b.fingerprint);
+});
+test('durable transaction binding rejects a different buyer without re-reading the ledger',async()=>{
+  const s=new ArenaStore(),g1=new PaymentGate({ledger:ledger(),store:s,prices,payee}),a=await g1.authorize(base);s.complete(a.storageKey,a.fingerprint,{delivered:true});
+  let reads=0;const g2=new PaymentGate({ledger:{async get(){reads++;throw new Error('ledger_should_not_be_called');}},store:s,prices,payee});
+  const r=await g2.authorize({...base,buyerSeat:'i_ZYXWVUTSRQ'});assert.equal(r.reason,'wrong_buyer');assert.equal(reads,0);
 });
 test('fingerprint deterministic',()=>assert.equal(requestFingerprint(base),requestFingerprint(base)));
 test('failed request never silently reexecutes',async()=>{
