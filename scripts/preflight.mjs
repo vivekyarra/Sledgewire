@@ -25,7 +25,7 @@ try{const dir=path.dirname(path.resolve(db));fs.mkdirSync(dir,{recursive:true});
 catch(e){add('durable_store_path',false,String(e));}
 
 const publicBase=process.env.PUBLIC_BASE_URL??'',productUrl=process.env.SLEDGEWIRE_PRODUCT_URL??(publicBase?`${publicBase.replace(/\/$/,'')}/arena.md`:''),paidBypass=process.env.SLEDGEWIRE_PUBLIC_PAID_EXECUTION==='1';
-function isHttpsUrl(value){try{const u=new URL(value);return u.protocol==='https:'&&Boolean(u.hostname)&&!u.username&&!u.password;}catch{return false;}}
+function isHttpsUrl(value){try{const u=new URL(value);return u.protocol==='https:'&&Boolean(u.hostname)&&!u.username&&!u.password&&!u.search&&!u.hash&&(u.pathname===''||u.pathname==='/');}catch{return false;}}
 if(submission){
   add('public_product_link',isHttpsUrl(productUrl),productUrl||'missing');
 }
