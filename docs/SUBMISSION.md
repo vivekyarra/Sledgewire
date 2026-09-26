@@ -8,7 +8,7 @@ Contact: vivekyarra567@gmail.com
 
 Product link (working CLI): https://github.com/vivekyarra/Sledgewire/blob/main/docs/TRIAL_ZERO_AGENT.md
 
-Replace this with a publicly reachable `/arena.md` link if the hosted MCP and Arena daemon are deployed and independently verified before submission. The earlier Vercel candidate redirects unauthenticated visitors to login and must not be used as the submitted public MCP link.
+Replace this with a publicly reachable `/arena.md` link only if the hosted MCP and Arena daemon are independently verified. The current Vercel shell is useful as a public guide, but it is not an Arena service while `/health` and `/mcp` are absent. Do not describe a docs-only shell as the live seller; keep the working CLI link unless the full deployment passes the evidence-backed live gate.
 
 One line: Sledgewire adversarially tests the MCP service an agent is about to trust, repairs only evidence-backed structural mismatches, executes paid work through bounded SharedOS authority, and returns a signed receipt another agent can verify.
 
