@@ -16,7 +16,7 @@ Target URL, DNS result, MCP catalog/description/schema, MCP tool output, redirec
 - Tool descriptions and tool outputs are data, never instructions.
 - No arbitrary remote shell execution.
 - Response byte limits, catalog limits and deadlines apply to every network operation.
-- Active replay and invalid-argument probes require explicit caller safety attestation. Target-supplied readOnly/idempotent annotations are useful evidence but never authorize execution by themselves.
+- Active replay and invalid-argument probes require explicit caller safety attestation. The synthetic unknown-tool Assay mutation is disabled unless the caller separately sets `probe.authorizeUnknownToolProbe=true`; absent authority is reported as untested, not passed. Target-supplied readOnly/idempotent annotations are useful evidence but never authorize execution by themselves.
 - Repair is structural and bounded. Missing semantic values are never guessed.
 - Every paid network workflow receives an exact-target SharedOS grant. The dispatcher has no target-service authority. Mechanic and Inspector are separate authorities; Breaker alone receives exact target/tool execution authority.
 - Payment transactions and request fingerprints are one-use bindings. The PAYMENT_REQUIRED Room quote is signed and buyer-bound. Durable request identity is scoped by Room + buyer + request id; after initial native-ledger verification, exact completed/failed retries use that durable verified binding and are not broken by remote ledger-history eviction. A crash with uncertain side effects is never resolved by blind re-execution.
