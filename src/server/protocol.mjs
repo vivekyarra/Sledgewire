@@ -11,6 +11,7 @@ import {loadSigningMaterial,signReceipt,verifyReceipt} from '../receipts/receipt
 import {decodeMcpHeaderValue} from '../mcp/header-codec.mjs';
 import {validateServiceInput} from '../core/service-input.mjs';
 import {traceProof} from '../sharedos/trace-proof.mjs';
+import {VERSION} from '../version.mjs';
 
 export const MODERN_PROTOCOL_VERSION='2026-07-28';
 export const LEGACY_PROTOCOL_VERSION='2025-11-25';
@@ -18,7 +19,7 @@ export const SUPPORTED_PROTOCOL_VERSIONS=[MODERN_PROTOCOL_VERSION,LEGACY_PROTOCO
 const META_VERSION='io.modelcontextprotocol/protocolVersion';
 const META_CLIENT_CAPABILITIES='io.modelcontextprotocol/clientCapabilities';
 const META_SERVER='io.modelcontextprotocol/serverInfo';
-const SERVER_INFO={name:'sledgewire',version:'0.3.9'};
+const SERVER_INFO={name:'sledgewire',version:VERSION};
 
 const signing=loadSigningMaterial();
 export const PUBLIC=signing.publicKeyPem;
