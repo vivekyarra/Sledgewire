@@ -5,7 +5,7 @@ import {invoke} from '../core/invoke.mjs';
 import {seal} from '../core/seal.mjs';
 import {fleet} from '../core/fleet.mjs';
 import {gauntlet} from '../core/gauntlet.mjs';
-import {quote} from '../core/quote.mjs';
+import {quote,QUOTE_INTENT_ALIASES} from '../core/quote.mjs';
 import {selfcheck} from '../core/selfcheck.mjs';
 import {loadSigningMaterial,signReceipt,verifyReceipt} from '../receipts/receipt.mjs';
 import {decodeMcpHeaderValue} from '../mcp/header-codec.mjs';
@@ -29,7 +29,7 @@ const schemaProbe={type:'object'};
 const PAID=new Set(['sledgewire.smoke','sledgewire.assay','sledgewire.invoke','sledgewire.fleet','sledgewire.seal','sledgewire.gauntlet']);
 
 export const toolDefs=[
- {name:'sledgewire.quote',description:'Free deterministic selector that returns the right Sledgewire service, exact price, and request template.',inputSchema:{type:'object',additionalProperties:false,required:['intent'],properties:{intent:{type:'string',enum:['preflight','adversarial','repair_execute','compare','certify','full_dossier']},endpoint:schemaEndpoint,targets:{type:'array',maxItems:6},tool:{type:'string'}}}},
+ {name:'sledgewire.quote',description:'Free deterministic selector. Accepts canonical intents plus simple aliases such as check, security, repair, choose, conformance and dossier; returns the exact service, price and request template.',inputSchema:{type:'object',additionalProperties:false,required:['intent'],properties:{intent:{type:'string',enum:Object.keys(QUOTE_INTENT_ALIASES)},endpoint:schemaEndpoint,targets:{type:'array',maxItems:6},tool:{type:'string'}}}},
  {name:'sledgewire.selfcheck',description:'Free hostile-fixture demonstration of Sledgewire fail-closed behavior with a signed receipt.',inputSchema:{type:'object',additionalProperties:false,properties:{}}},
  {name:'sledgewire.smoke',description:'Paid Arena service: discover and safely smoke-test a remote MCP endpoint.',inputSchema:{type:'object',additionalProperties:false,required:['endpoint'],properties:{endpoint:schemaEndpoint,probe:schemaProbe}}},
  {name:'sledgewire.assay',description:'Paid Arena service: run bounded adversarial MCP protocol checks.',inputSchema:{type:'object',additionalProperties:false,required:['endpoint'],properties:{endpoint:schemaEndpoint,probe:schemaProbe}}},
@@ -49,8 +49,10 @@ export async function handleTool(name,args={},internalOpts={}){
     if(!validation.ok)return signReceipt({service:name,state:'INCOMPATIBLE',reason:'invalid_input',detail:validation.reason},signing.privateKeyPem);
     const price=catalog.services[name].price;
     return signReceipt({service:name,state:'PAYMENT_REQUIRED',price_credits:price,arena_room_id:internalOpts.arenaRoomId??null,
+      deliverable:catalog.services[name].description,
       quickstart_url:internalOpts.publicBaseUrl?`${String(internalOpts.publicBaseUrl).replace(/\/$/,'')}/arena.md`:null,
       request_template:{type:'sledgewire.service.request.v1',request_id:'<buyer-unique-id>',service:name,input:args},
+      verification:{receipt_tool:'sledgewire.verify',trace_tool:'sledgewire.trace',exact_retry_no_reexecution:true},
       note:'Paid Arena services execute only after native SharedNet payment verification. Send this request in the official Arena Room first without payment; Sledgewire returns the exact request-bound memo and payee.'},signing.privateKeyPem);
   }
   const opts={...internalOpts,targetPolicy:internalOpts.targetPolicy??{allowHttp:false,allowPrivate:false}};
