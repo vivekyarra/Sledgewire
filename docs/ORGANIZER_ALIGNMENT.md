@@ -1,6 +1,6 @@
 # Trial Zero organizer-guide alignment
 
-Source reviewed: Trial Zero / Participant Guide, v0.9 Review Draft, SharedNet 2026.
+Sources reviewed: current Shared OS Hackathon Devpost requirements/rules plus the repository's Trial Zero participant-guide notes. Current organizer instructions override stale draft timing/details.
 
 ## Requirements that change the product
 
@@ -31,13 +31,13 @@ The Arena daemon refuses to start without the explicit Arena variable.
 
 During competition humans step away. The representative agent therefore needs to handle demonstrations, peer trials, questions, critiques, purchases and delivery without a human rescue path. docs/ARENA_AGENT_PROMPT.md is the operating contract; npm run arena:daemon is the deterministic provider/delivery rail.
 
-### Arena 1 is an overall judge ranking
+### Arena 1 has a hard participation floor
 
-The optimization target is observable usefulness and interaction quality, not architecture explanation. The fastest evidence path is the free sledgewire.selfcheck; peer agents can independently verify signed receipts. The representative agent must also try peers and give evidence-based critiques.
+The representative agent must try at least three distinct peer products, post at least one specific disagreement for every product it tried, and submit the official ranking. These are eligibility conditions, not optional optimization. The fastest Sledgewire evidence path is the free `sledgewire.selfcheck`; peer agents can independently verify signed receipts and trace proofs.
 
-### Arena 2 ranks by valid credits earned
+### Arena 2 ranks by valid credits earned and has a buyer-side spend floor
 
-Revenue optimization must never create invalid or ambiguous transactions. Sledgewire verifies buyer identity, amount, Arena Room and request-bound memo before delivery, then makes retries idempotent. The service ladder now includes a 35-credit seller-grade Gauntlet while retaining the 3-credit impulse-buy Smoke.
+The representative agent must confirm at least 80 of its 100 credits spent across at least three distinct peer products, while Sledgewire simultaneously competes for incoming credits. Revenue optimization must never create invalid or ambiguous transactions. Sledgewire verifies buyer identity, amount, Arena Room and request-bound memo before delivery, then makes retries idempotent. The service ladder includes a 35-credit seller-grade Gauntlet while retaining the 3-credit low-friction Smoke.
 
 ### Submission is once
 
@@ -45,4 +45,4 @@ npm run preflight -- --submission checks the build Room, product link, participa
 
 ## Event timing
 
-Development ends September 27 at 20:00 China Standard Time, followed by the two Arena rounds between 20:00 and 22:00. Freeze the competition commit before the deadline and use the remaining time for live connectivity and autonomous rehearsal rather than feature work.
+Do not encode a draft-guide time as runtime truth. Before handoff, the representative agent must read the current organizer/Room instructions and operate for the full official Arena window. Freeze the competition commit before the applicable deadline and use remaining preparation time for live connectivity and autonomous rehearsal rather than speculative feature work.
