@@ -34,8 +34,8 @@
 - [x] Unused legacy child-process SharedNet adapter removed from production tree.
 - [x] SharedNet secrets excluded from git and Docker context.
 - [x] SQLite close/reopen replay and two-connection one-use tests green.
-- [x] **272 / 272** automated tests green on the v0.3.11 Arena hardening branch.
-- [x] **25,000 / 25,000** MCP Smoke workflows at concurrency **192**, 0 failures; CI-fixture p95 **243 ms**, p99 **258 ms**.
+- [x] **273 / 273** automated tests green on the v0.3.11 Arena hardening branch.
+- [x] **25,000 / 25,000** MCP Smoke workflows at concurrency **192**, 0 failures; CI-fixture p95 **245 ms**, p99 **265 ms**.
 - [x] **25,000** Arena payment authorization/replay flows with **0 duplicate paid authorizations**.
 - [x] Duplicate authorization storm: **122,500 authorization attempts**, 2,500 unique claims, 57,500 in-flight duplicates refused, 60,000 cached replays, 2,500 transaction-reuse attempts refused and only **2,500 ledger reads**.
 - [x] Handler-level execution storm on file-backed SQLite/WAL: **122,500 handler requests**, **2,500 actual service executions**, **0 duplicate service executions**, **0 missing executions**, 60,000 cached replays and 2,500 ledger reads.
