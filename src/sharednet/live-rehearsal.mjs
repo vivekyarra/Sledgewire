@@ -92,7 +92,7 @@ export async function runLiveSmokeRehearsal({api,roomId,payee,publicBaseUrl,targ
     payment_txn_id:txnId,target_endpoint:targetEndpoint,public_base_url:publicBaseUrl,trace_id:delivered.body.trace_id,
     first_message_id:firstId,paid_message_id:paidId,retry_message_id:retryId,
     delivery_message_id:delivered.message.id,replay_message_id:replay.message.id,
-    receipt:delivered.body.receipt,trace_proof:trace,
+    payment_quote:quoteReply.body,receipt:delivered.body.receipt,trace_proof:trace,
     checks:{payment_quote:true,signed_payment_quote:true,native_transfer:true,signed_delivery:deliveryVerification.ok,sharedos_trace:true,trace_signature:traceVerification.ok,exact_cached_retry:true},
     completed_at:new Date().toISOString()
   };
