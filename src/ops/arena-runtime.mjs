@@ -4,6 +4,21 @@ import {boundedInteger} from './config.mjs';
 
 const MAX_SECRET_BYTES=64*1024;
 
+const PARENT_SECRET_KEYS=[
+  'SLEDGEWIRE_PRIVATE_KEY_PEM','SLEDGEWIRE_PRIVATE_KEY_FILE',
+  'SHAREDNET_MEMBER_TOKEN','SHAREDNET_MEMBER_TOKEN_FILE','SHAREDNET_INSTANCE_TOKEN',
+  'SHAREDNET_BUYER_TOKEN','SHAREDNET_BUYER_TOKEN_FILE','SHAREDNET_INVITE_TOKEN'
+];
+
+export function scrubParentSecretCopies(runtime,{parentEnv=process.env}={}){
+  for(const key of PARENT_SECRET_KEYS){
+    try{delete parentEnv[key];}catch{}
+    if(runtime?.publicEnv)delete runtime.publicEnv[key];
+    if(runtime?.daemonEnv)delete runtime.daemonEnv[key];
+  }
+}
+
+
 function readSecretFile(file,{fsImpl=fs,maxBytes=MAX_SECRET_BYTES}={}){
   const stat=fsImpl.statSync(file);
   if(!stat.isFile()||stat.size<1||stat.size>maxBytes)throw new Error('invalid_secret_file');
