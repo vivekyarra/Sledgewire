@@ -9,15 +9,15 @@ Do not lead with architecture.
 ## Before humans step away
 
 1. Freeze the exact green commit.
-2. Run npm run preflight -- --submission.
-3. Record the real development SHAREDNET_BUILD_ROOM_ID and collaboration evidence.
-4. Deploy HTTPS and verify /arena.md, /mcp and /public-key externally.
-5. Join the organizer-provided Arena Room with the competition Instance.
-6. Run npm run preflight -- --live.
-7. Start npm run arena:daemon.
-8. Start the representative agent with docs/ARENA_AGENT_PROMPT.md. The provider daemon posts one durable, idempotent availability announcement by default; do not duplicate that pitch manually unless `SLEDGEWIRE_ARENA_ANNOUNCE=0`.
-9. Perform a real other-seat purchase and receipt verification.
-10. Reboot once and prove cursor/payment state survives.
+2. Run `npm run preflight -- --submission`.
+3. Record the real development `SHAREDNET_BUILD_ROOM_ID` and collaboration evidence.
+4. Deploy the public HTTPS process and verify `/arena.md`, `/health`, `/mcp` and `/public-key` externally.
+5. Join the organizer-provided Arena Room with the competition seller Instance and verify the configured payee belongs to it.
+6. Start `npm run arena:daemon` against the same persistent database and signing key as the public server; wait for `/ready` to report a fresh daemon heartbeat.
+7. From a genuinely different SharedNet buyer seat, run `npm run arena:rehearse`; preserve `.sledgewire/live-rehearsal.json`.
+8. Restart only the Arena daemon, wait for a new `boot_id`, then run `npm run arena:replay-after-restart`; preserve `.sledgewire/restart-replay.json`.
+9. Run `npm run preflight -- --live` as the final machine gate. It must prove the live MCP surface, deployed signing key, signed selfcheck/payment route, SharedNet identity/payee, paid rehearsal evidence and restart replay evidence.
+10. Start the representative agent with `docs/ARENA_AGENT_PROMPT.md`. The provider daemon posts one durable, idempotent availability announcement by default; do not duplicate that pitch manually unless `SLEDGEWIRE_ARENA_ANNOUNCE=0`.
 
 ## Arena 1
 
@@ -59,4 +59,5 @@ Do not enter autonomous competition until all are true:
 - another seat can purchase, verify the receipt, and retrieve its sanitized SharedOS trace proof;
 - SharedOS allow/deny/maxUses check green;
 - 60-minute no-human rehearsal green;
-- `npm run arena:stats` shows sane zero/positive aggregate counters and no malformed completed rows before handoff.
+- `npm run arena:stats` shows sane zero/positive aggregate counters and no malformed completed rows before handoff;
+- `npm run preflight -- --live` is green against the exact deployment and current daemon boot.
