@@ -15,10 +15,17 @@ export function superviseProcesses({
   execPath=process.execPath,
   env=process.env,
   killTimeoutMs=5_000,
-  onExit=code=>{process.exitCode=code;}
+  onExit=code=>{process.exitCode=code;},
+  signalHost=process
 }={}){
   if(!Array.isArray(commands)||commands.length<2)throw new Error('supervisor_requires_multiple_processes');
   if(!Number.isSafeInteger(killTimeoutMs)||killTimeoutMs<100||killTimeoutMs>60_000)throw new Error('invalid_supervisor_kill_timeout');
+  const names=new Set();
+  for(const command of commands){
+    if(!command||typeof command.name!=='string'||!command.name||!Array.isArray(command.args)||command.args.some(x=>typeof x!=='string'))throw new Error('invalid_supervisor_command');
+    if(names.has(command.name))throw new Error('duplicate_supervisor_command_name');
+    names.add(command.name);
+  }
 
   const children=new Map();
   let stopping=false,shutdownSignal=null,finished=false,forceTimer=null;
@@ -49,8 +56,11 @@ export function superviseProcesses({
   };
 
   for(const command of commands){
-    if(!command||typeof command.name!=='string'||!command.name||!Array.isArray(command.args)||command.args.some(x=>typeof x!=='string'))throw new Error('invalid_supervisor_command');
-    const child=spawnImpl(execPath,command.args,{env,stdio:'inherit'});
+    let child;
+    try{child=spawnImpl(execPath,command.args,{env,stdio:'inherit'});}catch(error){
+      for(const entry of alive())send(entry,'SIGTERM');
+      throw error;
+    }
     const entry={name:command.name,child,exited:false,exitCode:null,unexpected:false};
     children.set(command.name,entry);
     child.once('error',error=>{
@@ -71,11 +81,11 @@ export function superviseProcesses({
   for(const signal of ['SIGTERM','SIGINT']){
     const handler=()=>beginShutdown(signal);
     handlers.set(signal,handler);
-    process.once(signal,handler);
+    signalHost.once(signal,handler);
   }
 
   const dispose=()=>{
-    for(const [signal,handler] of handlers)process.removeListener(signal,handler);
+    for(const [signal,handler] of handlers)signalHost.removeListener(signal,handler);
     if(forceTimer)clearTimeout(forceTimer);
   };
 
