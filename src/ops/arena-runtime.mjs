@@ -73,7 +73,7 @@ export function prepareSingleContainerRuntime({
   fsImpl.accessSync(dbDir,fsImpl.constants.R_OK|fsImpl.constants.W_OK);
 
   const publicEnv={...childEnv};
-  for(const key of ['SHAREDNET_MEMBER_TOKEN','SHAREDNET_MEMBER_TOKEN_FILE','SHAREDNET_BUYER_TOKEN','SHAREDNET_BUYER_TOKEN_FILE','SHAREDNET_INVITE_TOKEN','SHAREDNET_PAYEE_ADDRESS'])delete publicEnv[key];
+  for(const key of ['SHAREDNET_MEMBER_TOKEN','SHAREDNET_MEMBER_TOKEN_FILE','SHAREDNET_INSTANCE_TOKEN','SHAREDNET_BUYER_TOKEN','SHAREDNET_BUYER_TOKEN_FILE','SHAREDNET_INVITE_TOKEN','SHAREDNET_PAYEE_ADDRESS'])delete publicEnv[key];
 
   const daemonEnv={...childEnv};
   delete daemonEnv.SHAREDNET_INVITE_TOKEN;
