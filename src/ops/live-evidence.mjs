@@ -1,6 +1,6 @@
 import {MESSAGE,SEAT,TXN} from '../sharednet/api.mjs';
 import {verifyReceipt} from '../receipts/receipt.mjs';
-import {paymentMemo} from '../core/payment-gate.mjs';
+import {paymentMemo,requestFingerprint} from '../core/payment-gate.mjs';
 
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const LIVE_CHECKS=['payment_quote','signed_payment_quote','native_transfer','signed_delivery','sharedos_trace','trace_signature','exact_cached_retry'];
@@ -30,7 +30,9 @@ export function validateLiveRehearsalEvidence(evidence,{roomId,payee,publicBaseU
   if(!quoteCheck.ok)return fail(`live_rehearsal_quote_${quoteCheck.reason}`);
   if(quote?.type!=='sledgewire.payment_required.v1'||quote.request_id!==evidence.request_id||quote.service!==evidence.service)return fail('live_rehearsal_quote_request_mismatch');
   if(quote.room_id!==roomId||quote.payee!==payee||quote.buyer_seat!==evidence.buyer_seat)return fail('live_rehearsal_quote_scope_mismatch');
-  if(Number(quote.price_credits)!==Number(evidence.price_credits)||quote.memo!==paymentMemo(evidence.request_id,evidence.service))return fail('live_rehearsal_quote_payment_mismatch');
+  const bound={roomId,buyerSeat:evidence.buyer_seat,requestId:evidence.request_id,service:evidence.service,input:{endpoint:evidence.target_endpoint}},fingerprint=requestFingerprint(bound);
+  if(Number(quote.price_credits)!==Number(evidence.price_credits)||quote.request_fingerprint!==fingerprint||quote.memo_version!=='sledgewire.payment.v2'||quote.memo!==paymentMemo(bound))return fail('live_rehearsal_quote_payment_mismatch');
+  if(quote.next_action?.memo!==quote.memo||quote.next_action?.payee!==payee||Number(quote.next_action?.amount_credits)!==Number(evidence.price_credits))return fail('live_rehearsal_quote_next_action_mismatch');
   const receiptCheck=verifyReceipt(evidence.receipt,publicKeyPem);if(!receiptCheck.ok)return fail(`live_rehearsal_receipt_${receiptCheck.reason}`);
   if(evidence.receipt?.buyer_seat!==evidence.buyer_seat)return fail('live_rehearsal_receipt_buyer_mismatch');
   if(evidence.receipt?.payment?.txn_id!==evidence.payment_txn_id||evidence.receipt?.payment?.room_id!==roomId||Number(evidence.receipt?.payment?.price_credits)!==3)return fail('live_rehearsal_receipt_payment_mismatch');
