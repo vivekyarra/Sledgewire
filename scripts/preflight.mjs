@@ -100,7 +100,7 @@ if(live){
   let rehearsal=null;
   try{
     rehearsal=JSON.parse(fs.readFileSync(rehearsalPath,'utf8'));
-    const proof=remotePublicKeyPem?validateLiveRehearsalEvidence(rehearsal,{roomId:room,publicBaseUrl:normalizedBase,publicKeyPem:remotePublicKeyPem}):{ok:false,reason:'remote_public_key_unavailable'};
+    const proof=remotePublicKeyPem?validateLiveRehearsalEvidence(rehearsal,{roomId:room,payee,publicBaseUrl:normalizedBase,publicKeyPem:remotePublicKeyPem}):{ok:false,reason:'remote_public_key_unavailable'};
     add('external_paid_rehearsal_evidence',proof.ok,proof.ok?`txn=${proof.txn_id};buyer=${proof.buyer_seat}`:proof.reason);
   }catch(e){add('external_paid_rehearsal_evidence',false,`${rehearsalPath}:${String(e.message||e)}`);}
 
