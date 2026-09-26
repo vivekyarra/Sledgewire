@@ -11,10 +11,10 @@ const REQUEST_ID=/^[A-Za-z0-9][A-Za-z0-9._-]{2,95}$/;
 export function createArenaHandler({store,ledger,room,payee,signing,publicBaseUrl}){
   const prices=Object.fromEntries(Object.entries(catalog.services).map(([k,v])=>[k,v.price])),gate=new PaymentGate({ledger,store,prices,payee});
   async function serve(req,buyerSeat){
-    if(typeof req.request_id!=='string'||!REQUEST_ID.test(req.request_id))return failure(req,'invalid_request_id');
-    if(!catalog.services[req.service]||catalog.services[req.service].price<=0)return failure(req,'unknown_or_free_service');
+    if(typeof req.request_id!=='string'||!REQUEST_ID.test(req.request_id)){store.incrementCounter('arena.reject.invalid_request_id');return failure(req,'invalid_request_id');}
+    if(!catalog.services[req.service]||catalog.services[req.service].price<=0){store.incrementCounter('arena.reject.unknown_or_free_service');return failure(req,'unknown_or_free_service');}
     const validation=validateServiceInput(req.service,req.input);
-    if(!validation.ok)return failure(req,'invalid_input',{detail:validation.reason});
+    if(!validation.ok){store.incrementCounter('arena.reject.invalid_input');return failure(req,'invalid_input',{detail:validation.reason});}
 
     if(!req.payment_txn_id){
       const price=prices[req.service],memo=paymentMemo(req.request_id,req.service);
@@ -22,7 +22,7 @@ export function createArenaHandler({store,ledger,room,payee,signing,publicBaseUr
     }
 
     const auth=await gate.authorize({roomId:room,buyerSeat,requestId:req.request_id,service:req.service,input:req.input,txnId:req.payment_txn_id});
-    if(!auth.ok)return failure(req,auth.reason,auth);
+    if(!auth.ok){store.incrementCounter(`arena.reject.${String(auth.reason).replace(/[^a-z0-9_.-]/gi,'_').slice(0,80)}`);return failure(req,auth.reason,auth);}
     if(auth.replay)return auth.cached;
 
     try{

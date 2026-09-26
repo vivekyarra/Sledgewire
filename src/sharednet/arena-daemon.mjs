@@ -6,6 +6,8 @@ import {createArenaHandler} from './handler.mjs';
 import {deliverArenaResponse} from './delivery.mjs';
 import {loadSigningMaterial} from '../receipts/receipt.mjs';
 import {writeArenaDaemonHeartbeat} from '../ops/readiness.mjs';
+import catalog from '../../catalog.json' with {type:'json'};
+import {announceArenaOnce} from './announcement.mjs';
 
 const room=process.env.SHAREDNET_ARENA_ROOM_ID??'',payee=process.env.SHAREDNET_PAYEE_ADDRESS??'',publicBaseUrl=process.env.PUBLIC_BASE_URL??'';
 if(!ROOM.test(room)||!ADDRESS.test(payee)||!publicBaseUrl.startsWith('https://'))throw new Error('arena_environment_incomplete');
@@ -14,6 +16,9 @@ const store=new ArenaStore(dbPath),api=new SharedNetApi(),signing=loadSigningMat
 const selfSeat=identity?.instance?.id??identity?.instance_id;if(!SEAT.test(selfSeat??''))throw new Error('sharednet_identity_missing_instance');
 if(!payeeBelongsToIdentity(payee,identity))throw new Error('configured_payee_not_owned_by_current_sharednet_identity');
 await api.join(room);
+const announceEnabled=process.env.SLEDGEWIRE_ARENA_ANNOUNCE!=='0';
+try{const announcement=await announceArenaOnce({api,store,room,publicBaseUrl,enabled:announceEnabled});console.error(JSON.stringify({sledgewire:'arena-announcement',status:announcement.status,message_id:announcement.record?.message_id??null}));}
+catch(e){console.error(`arena-announcement:${e.message}`);if(process.env.SLEDGEWIRE_ARENA_ANNOUNCE_REQUIRED==='1')throw e;}
 const handle=createArenaHandler({store,ledger:api,room,payee,signing,publicBaseUrl});
 const key=`arena_cursor:${room}`;let stored=store.getMeta(key),cursor=stored===null?(process.env.SLEDGEWIRE_PROCESS_HISTORY==='1'?0:await api.latestSequence(room)):Number(stored);store.setMeta(key,String(cursor));
 const concurrency=Math.max(1,Math.min(8,Number(process.env.SLEDGEWIRE_ARENA_CONCURRENCY??4))),maxAttempts=Math.max(2,Math.min(10,Number(process.env.SLEDGEWIRE_MESSAGE_MAX_ATTEMPTS??5)));
@@ -21,9 +26,12 @@ const heartbeat=setInterval(()=>api.heartbeat().catch(e=>console.error(`heartbea
 const writeLocalHeartbeat=(status='running')=>{try{writeArenaDaemonHeartbeat(store,room,{instanceId:selfSeat,status});}catch(e){console.error(`local-heartbeat:${e.message}`);}};
 writeLocalHeartbeat();
 const localHeartbeat=setInterval(()=>writeLocalHeartbeat(),10_000);localHeartbeat.unref();
-const stop=signal=>{clearInterval(heartbeat);clearInterval(localHeartbeat);writeLocalHeartbeat('stopped');console.error(JSON.stringify({sledgewire:'arena-daemon',event:'stopping',signal}));try{store.db.close();}catch{}process.exit(0);};
+const arenaPrices=Object.fromEntries(Object.entries(catalog.services).map(([k,v])=>[k,v.price]));
+const statsEvery=Math.max(60_000,Math.min(3_600_000,Number(process.env.SLEDGEWIRE_ARENA_STATS_INTERVAL_MS??300_000)));
+const statsTimer=setInterval(()=>{try{console.error(JSON.stringify({sledgewire:'arena-stats',...store.arenaStats({prices:arenaPrices})}));}catch(e){console.error(`arena-stats:${e.message}`);}},statsEvery);statsTimer.unref();
+const stop=signal=>{clearInterval(heartbeat);clearInterval(localHeartbeat);clearInterval(statsTimer);writeLocalHeartbeat('stopped');console.error(JSON.stringify({sledgewire:'arena-daemon',event:'stopping',signal}));try{store.db.close();}catch{}process.exit(0);};
 process.once('SIGTERM',()=>stop('SIGTERM'));process.once('SIGINT',()=>stop('SIGINT'));
-console.error(JSON.stringify({sledgewire:'arena-daemon',version:'0.3.7',room,instance:selfSeat,cursor,concurrency,maxAttempts}));
+console.error(JSON.stringify({sledgewire:'arena-daemon',version:'0.3.8',room,instance:selfSeat,cursor,concurrency,maxAttempts}));
 const sequenceOf=message=>{const n=Number(message?.sequence);return Number.isSafeInteger(n)&&n>=0?n:null;};
 let backoff=500;
 for(;;){

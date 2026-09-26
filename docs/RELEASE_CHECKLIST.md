@@ -1,6 +1,6 @@
 # Trial Zero release checklist
 
-## Static code gates — v0.3.7
+## Static code gates — v0.3.8
 
 - [x] CLI and MCP with current 2026-07-28 stateless `server/discover` plus bounded legacy fallback.
 - [x] Official `@modelcontextprotocol/client` v2 Streamable HTTP integration test negotiates 2026-07-28 and calls Sledgewire.
@@ -33,7 +33,7 @@
 - [x] Unused legacy child-process SharedNet adapter removed from production tree.
 - [x] SharedNet secrets excluded from git and Docker context.
 - [x] SQLite close/reopen replay and two-connection one-use tests green.
-- [x] **224 / 224** automated tests green on v0.3.7 operational-readiness evidence commit.
+- [x] **231 / 231** automated tests green on v0.3.8 Arena-conversion evidence commit.
 - [x] **10,000 / 10,000** MCP Smoke workflows at concurrency **128**, 0 failures.
 - [x] **10,000** payment claims + 10,000 cached retries + 500 wrong-buyer rejections, 0 duplicate paid executions.
 - [x] Duplicate storm: **33,000 authorization attempts**, 1,000 unique claims, 15,000 in-flight duplicates refused, 16,000 cached replays, 1,000 transaction-reuse attempts refused, **1,000 ledger reads**, 0 duplicate paid executions.
@@ -42,6 +42,8 @@
 - [x] Production MCP Host/authority guard rejects unlisted Host headers.
 - [x] Two-process Docker Compose topology shares the same persistent SQLite/WAL volume between public MCP and Arena daemon.
 - [x] Public `/ready` fails closed when the Arena daemon heartbeat is missing, stopped or stale; live preflight checks readiness and deployed signing-key identity.
+- [x] Provider daemon posts one durable idempotent `sledgewire.available.v1` discovery message and will not repost it after restart.
+- [x] Durable `arena:stats` reports verified gross incoming credits, unique completed-delivery buyers, paid transaction count, service/outcome mix, payment rejection reasons, Smoke-to-premium conversion and delivery latency without emitting buyer identities.
 - [x] Buyer-side `npm run arena:rehearse` path is implemented and unit-tested for quote -> native transfer -> signed delivery -> trace proof -> exact cached retry.
 
 ## Submission P0
