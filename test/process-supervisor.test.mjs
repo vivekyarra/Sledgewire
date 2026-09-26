@@ -45,6 +45,21 @@ test('graceful SIGTERM is forwarded to both children and exits zero',()=>{
   s.dispose();
 });
 
+test('per-command environment overrides keep child secrets scoped',()=>{
+  const signalHost=new EventEmitter(),calls=[],children=[];
+  const spawnImpl=(execPath,args,opts)=>{calls.push({execPath,args,opts});const child=new FakeChild(args[0]);children.push(child);return child;};
+  const s=superviseProcesses({
+    commands:[
+      {name:'public',args:['public.mjs'],env:{ROLE:'public'}},
+      {name:'daemon',args:['daemon.mjs'],env:{ROLE:'daemon',TOKEN:'secret'}}
+    ],
+    spawnImpl,execPath:'/node',env:{ROLE:'default'},signalHost,killTimeoutMs:100,onExit:()=>{}
+  });
+  assert.deepEqual(calls[0].opts.env,{ROLE:'public'});
+  assert.deepEqual(calls[1].opts.env,{ROLE:'daemon',TOKEN:'secret'});
+  s.shutdown('SIGTERM');for(const child of children)child.emit('exit',0,'SIGTERM');s.dispose();
+});
+
 test('invalid or duplicate command definitions fail before spawning',()=>{
   let calls=0;
   assert.throws(()=>superviseProcesses({
