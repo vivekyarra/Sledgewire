@@ -13,8 +13,9 @@ GitHub Actions run: `36239394230`
 - Automated tests: **248 / 248 passed**, 0 failed, 0 skipped.
 - Hostile/current-protocol selfcheck: **VERIFIED**, signed receipt verification true, profile `sledgewire.selfcheck.v4`.
 - MCP stress: **10,000 / 10,000** complete Smoke workflows at concurrency **128**, **0 failures**; p50 **54 ms**, p95 **79 ms**, p99 **162 ms**, total **4.903 s**.
-- Arena ledger/replay stress: **10,000 claims**, **10,000 cached retries**, **500 wrong-buyer attempts rejected**, **0 duplicate paid executions**, total **0.898 s**.
-- Duplicate storm: **33,000 authorization attempts** across 1,000 purchases at fanout 16: 1,000 unique claims, 15,000 in-flight duplicate refusals, 16,000 cached replays, 1,000 transaction-reuse refusals, only **1,000 ledger reads**, **0 duplicate paid executions**, total **1.199 s**.
+- Arena payment authorization/replay stress: **10,000 claims**, **10,000 cached retries**, **500 wrong-buyer attempts rejected**, with one durable authorization per transaction, total **0.898 s**.
+- Duplicate authorization storm: **33,000 authorization attempts** across 1,000 purchases at fanout 16: 1,000 unique claims, 15,000 in-flight duplicate refusals, 16,000 cached replays, 1,000 transaction-reuse refusals and only **1,000 ledger reads**, total **1.199 s**. This measures payment authorization/replay, not service invocation count.
+- Handler execution storm (post-release main CI): **33,000 real Arena-handler requests** across 1,000 paid purchases at fanout 16 using file-backed SQLite/WAL: **1,000 actual service executions**, **0 duplicate service executions**, **0 missing executions**, 15,000 in-flight refusals, 16,000 exact signed cached replays, 1,000 transaction-reuse refusals and **1,000 ledger reads**, total **7.759 s** (Actions run `36249277132`).
 - SharedOS check: deny true, allow true, exhausted `maxUses` denied, **9 audit events**.
 - Static preflight: **READY**.
 - Production missing signing key fails closed; persistent key succeeds.
