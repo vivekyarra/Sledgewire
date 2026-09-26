@@ -49,6 +49,14 @@ test('arena handler returns signed buyer-bound payment requirement before execut
   const r=await handle({sender_instance_id:'i_ZYXWVUTSRQ',content:JSON.stringify({type:'sledgewire.service.request.v1',request_id:'req-abc',service:'sledgewire.smoke',input:{endpoint:'https://example.com/mcp'}})});
   assert.equal(r.type,'sledgewire.payment_required.v1');assert.equal(r.price_credits,3);assert.equal(r.room_id,'rom_ABCDEFGHIJ');assert.equal(r.memo,'sledgewire:req-abc:sledgewire.smoke');assert.equal(r.buyer_seat,'i_ZYXWVUTSRQ');assert.equal(verifyReceipt(r,kp.publicKeyPem).ok,true);
 });
+test('paid execution failure is signed and exact retries replay it without ledger read or reexecution',async()=>{
+  const store=new ArenaStore(':memory:'),kp=generateSigningKeypair();let executions=0,reads=0;
+  const ledger={async get(){reads++;return {id:'txn_ABCDEFGHIJ',buyer_instance_id:'i_ZYXWVUTSRQ',addressed_to:'p_ABCDEFGHIJ',payee_ok:true,amount:3,room_id:'rom_ABCDEFGHIJ',memo:'sledgewire:req-fail:sledgewire.smoke'};}};
+  const handle=createArenaHandler({store,ledger,room:'rom_ABCDEFGHIJ',payee:'p_ABCDEFGHIJ',signing:{privateKeyPem:kp.privateKeyPem},publicBaseUrl:'https://sledgewire.example',runService:async()=>{executions++;throw new Error('fixture_boom');}});
+  const message={sender_instance_id:'i_ZYXWVUTSRQ',content:JSON.stringify({type:'sledgewire.service.request.v1',request_id:'req-fail',service:'sledgewire.smoke',input:{endpoint:'https://example.com/mcp'},payment_txn_id:'txn_ABCDEFGHIJ'})};
+  const first=await handle(message);assert.equal(first.state,'FAILED');assert.equal(first.reason,'execution_failed');assert.equal(first.receipt.payment.txn_id,'txn_ABCDEFGHIJ');assert.equal(first.receipt.buyer_seat,'i_ZYXWVUTSRQ');assert.equal(verifyReceipt(first.receipt,kp.publicKeyPem).ok,true);
+  const second=await handle(message);assert.equal(second.receipt.proof.signature,first.receipt.proof.signature);assert.equal(executions,1);assert.equal(reads,1);
+});
 test('arena store remembers processed room messages and cursors',()=>{const s=new ArenaStore(':memory:');assert.equal(s.roomMessageSeen('msg_1'),false);s.markRoomMessage('msg_1');assert.equal(s.roomMessageSeen('msg_1'),true);s.setMeta('cursor','42');assert.equal(s.getMeta('cursor'),'42');});
 
 
