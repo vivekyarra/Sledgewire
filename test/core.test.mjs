@@ -1,7 +1,15 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {startFixture} from '../fixtures/server.mjs';import {smoke} from '../src/core/smoke.mjs';import {assay} from '../src/core/assay.mjs';import {invoke} from '../src/core/invoke.mjs';import {seal} from '../src/core/seal.mjs';import {fleet} from '../src/core/fleet.mjs';import {boundedRepair,inspectRepair} from '../src/core/repair.mjs';import {validateSchemaValue} from '../src/core/schema.mjs';
-const tp={allowHttp:true,allowPrivate:true};const probe={name:'safe_echo',arguments:{text:'ok'},safe:true};
+const tp={allowHttp:true,allowPrivate:true};const probe={name:'safe_echo',arguments:{text:'ok'},safe:true,authorizeUnknownToolProbe:true};
 for(const mode of ['clean','modern','injection','description_injection','fake_success','malformed','oversized'])test(`smoke fixture ${mode}`,async()=>{const f=await startFixture({mode});try{const r=await smoke(f.url,{targetPolicy:tp,probe,maxBytes:100_000});const expected={clean:'READY',modern:'READY',injection:'DEGRADED',description_injection:'DEGRADED',fake_success:'INCOMPATIBLE',malformed:'INCOMPATIBLE',oversized:'INCOMPATIBLE'}[mode];assert.equal(r.state,expected);}finally{await f.close();}});
 test('smoke requires explicit caller safe attestation even when target claims readOnly',async()=>{const f=await startFixture();try{const r=await smoke(f.url,{targetPolicy:tp,probe:{name:'safe_echo',arguments:{text:'ok'}}});assert.equal(r.state,'BLOCKED');assert.equal(r.checks.safe_probe.reason,'explicit_safe_probe_attestation_required');}finally{await f.close();}});
+test('assay sends no tools/call at all when no active probe authority is supplied',async()=>{
+  const f=await startFixture();try{
+    const r=await assay(f.url,{targetPolicy:tp});
+    assert.equal(r.checks.unknown_tool.status,'unknown');
+    assert.equal(r.checks.unknown_tool.reason,'unknown_tool_probe_not_authorized');
+    assert.equal(f.seen.filter(x=>x.method==='tools/call').length,0);
+  }finally{await f.close();}
+});
 test('assay refuses unknown tool',async()=>{const f=await startFixture();try{const r=await assay(f.url,{targetPolicy:tp,probe});assert.equal(r.checks.unknown_tool.status,'pass');}finally{await f.close();}});
 test('assay checks forbidden extra arg',async()=>{const f=await startFixture();try{const r=await assay(f.url,{targetPolicy:tp,probe});assert.equal(r.checks.invalid_arguments.status,'pass');}finally{await f.close();}});
 test('assay replay on safe idempotent tool is bounded',async()=>{const f=await startFixture({mode:'replay_sensitive'});try{const r=await assay(f.url,{targetPolicy:tp,probe});assert.equal(r.checks.replay.status,'pass');}finally{await f.close();}});
