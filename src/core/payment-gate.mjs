@@ -29,6 +29,18 @@ export class PaymentGate{
     if(!Number.isInteger(price)||price<=0)return {ok:false,reason:'unknown_or_free_service'};
     if(!req.txnId)return {ok:false,reason:'payment_required',price,memo:paymentMemo(req.requestId,req.service)};
 
+    const fp=requestFingerprint(req),storageKey=requestStorageKey(req);
+    const prior=this.store.inspectClaim?.({requestId:storageKey,txnId:req.txnId,fingerprint:fp,service:req.service,buyerSeat:req.buyerSeat});
+    if(prior&&prior.status!=='missing'&&prior.status!=='unattributed'){
+      if(prior.status==='conflict')return {ok:false,reason:'transaction_or_request_reused'};
+      if(prior.status==='inflight'){
+        if((prior.ageMs??0)>=this.uncertainAfterMs)return {ok:false,reason:'execution_outcome_unknown_no_retry',fingerprint:fp,storageKey,started_at:prior.startedAt,age_ms:prior.ageMs};
+        return {ok:false,reason:'request_already_inflight',fingerprint:fp,storageKey,started_at:prior.startedAt,age_ms:prior.ageMs};
+      }
+      if(prior.status==='failed')return {ok:false,reason:'previous_attempt_failed',fingerprint:fp,storageKey,error:prior.error};
+      if(prior.status==='replay')return {ok:true,replay:true,fingerprint:fp,storageKey,cached:prior.response,price};
+    }
+
     const tx=await this.lookupTransaction(req.txnId,signal);
     if(!tx)return {ok:false,reason:'transaction_not_found'};
     if(tx.id!==undefined&&tx.id!==null&&tx.id!==req.txnId)return {ok:false,reason:'wrong_transaction_id'};
@@ -48,7 +60,6 @@ export class PaymentGate{
     if(tx.room_id!==req.roomId)return {ok:false,reason:'wrong_room'};
     if(tx.memo!==memo)return {ok:false,reason:'wrong_memo'};
 
-    const fp=requestFingerprint(req),storageKey=requestStorageKey(req);
     const claim=this.store.claim({requestId:storageKey,txnId:req.txnId,fingerprint:fp,service:req.service,buyerSeat:req.buyerSeat});
     if(claim.status==='conflict')return {ok:false,reason:'transaction_or_request_reused'};
     if(claim.status==='inflight'){
