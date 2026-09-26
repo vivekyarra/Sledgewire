@@ -18,7 +18,7 @@ export function createArenaHandler({store,ledger,room,payee,signing,publicBaseUr
 
     if(!req.payment_txn_id){
       const price=prices[req.service],memo=paymentMemo(req.request_id,req.service);
-      return {type:'sledgewire.payment_required.v1',request_id:req.request_id,service:req.service,price_credits:price,payee,memo,room_id:room,note:'Pay in the official Arena room, then resend the identical request with payment_txn_id.'};
+      return signReceipt({type:'sledgewire.payment_required.v1',request_id:req.request_id,service:req.service,price_credits:price,payee,memo,room_id:room,buyer_seat:buyerSeat,issued_at:new Date().toISOString(),note:'Pay in the official Arena room, then resend the identical request with payment_txn_id.'},signing.privateKeyPem);
     }
 
     const auth=await gate.authorize({roomId:room,buyerSeat,requestId:req.request_id,service:req.service,input:req.input,txnId:req.payment_txn_id});
