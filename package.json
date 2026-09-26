@@ -24,7 +24,8 @@
     "sharedos:check": "node scripts/sharedos-check.mjs",
     "audit:flush": "node scripts/flush-audit.mjs",
     "arena:rehearse": "node scripts/live-rehearsal.mjs",
-    "arena:stats": "node scripts/arena-stats.mjs"
+    "arena:stats": "node scripts/arena-stats.mjs",
+    "arena:replay-after-restart": "node scripts/restart-replay.mjs"
   },
   "engines": {
     "node": ">=22.18.0"

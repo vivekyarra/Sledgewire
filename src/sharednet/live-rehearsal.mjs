@@ -8,6 +8,7 @@ function messageId(result){return result?.message?.id??result?.id??null;}
 function messageSequence(result){return sequenceOf(result?.message??result);}
 function buyerInstance(identity){return identity?.instance?.id??identity?.instance_id??null;}
 function eqReceipt(a,b){return a?.proof?.signature&&a.proof.signature===b?.proof?.signature&&a?.proof?.body_sha256===b?.proof?.body_sha256;}
+const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function waitForArenaReply(api,roomId,{after,replyTo,requestId,buyerSeat,timeoutMs=90_000}){
   const deadline=Date.now()+timeoutMs;let cursor=Number(after)||0;
@@ -44,10 +45,11 @@ function assertDelivery(body,{requestId,service,roomId,buyerSeat,txnId,price,pub
   return verified;
 }
 
-export async function runLiveSmokeRehearsal({api,roomId,payee,publicBaseUrl,targetEndpoint,publicKeyPem,lookupTrace,requestId=`rehearsal-${crypto.randomUUID()}`,timeoutMs=120_000}){
+export async function runLiveSmokeRehearsal({api,roomId,payee,publicBaseUrl,targetEndpoint,publicKeyPem,lookupTrace,providerBootId=null,requestId=`rehearsal-${crypto.randomUUID()}`,timeoutMs=120_000}){
   const service='sledgewire.smoke',price=3;
   if(typeof publicBaseUrl!=='string'||!publicBaseUrl.startsWith('https://'))throw new Error('rehearsal_public_base_https_required');
   if(typeof targetEndpoint!=='string'||!targetEndpoint.startsWith('https://'))throw new Error('rehearsal_target_https_required');
+  if(providerBootId!==null&&!UUID.test(String(providerBootId)))throw new Error('rehearsal_provider_boot_id_invalid');
   const identity=await api.current();const buyerSeat=buyerInstance(identity);
   if(!SEAT.test(buyerSeat??''))throw new Error('rehearsal_buyer_identity_missing');
   if(payeeBelongsToIdentity(payee,identity))throw new Error('rehearsal_buyer_must_be_different_principal');
@@ -81,12 +83,58 @@ export async function runLiveSmokeRehearsal({api,roomId,payee,publicBaseUrl,targ
   if(!eqReceipt(delivered.body.receipt,replay.body.receipt)||delivered.body.trace_id!==replay.body.trace_id)throw new Error('rehearsal_retry_was_not_exact_cached_delivery');
 
   return {
-    type:'sledgewire.live-rehearsal.v1',verified:true,service,price_credits:price,request_id:requestId,room_id:roomId,buyer_seat:buyerSeat,
+    type:'sledgewire.live-rehearsal.v2',verified:true,service,price_credits:price,request_id:requestId,room_id:roomId,buyer_seat:buyerSeat,
+    provider_boot_id:providerBootId,
     payment_txn_id:txnId,target_endpoint:targetEndpoint,public_base_url:publicBaseUrl,trace_id:delivered.body.trace_id,
     first_message_id:firstId,paid_message_id:paidId,retry_message_id:retryId,
     delivery_message_id:delivered.message.id,replay_message_id:replay.message.id,
     receipt:delivered.body.receipt,trace_proof:trace,
     checks:{payment_quote:true,native_transfer:true,signed_delivery:deliveryVerification.ok,sharedos_trace:true,trace_signature:traceVerification.ok,exact_cached_retry:true},
+    completed_at:new Date().toISOString()
+  };
+}
+
+
+function assertPreviousEvidence(evidence,{roomId,buyerSeat,publicBaseUrl,publicKeyPem}){
+  if(evidence?.type!=='sledgewire.live-rehearsal.v2'||evidence?.verified!==true)throw new Error('restart_proof_invalid_previous_evidence');
+  if(evidence.room_id!==roomId||evidence.buyer_seat!==buyerSeat)throw new Error('restart_proof_scope_mismatch');
+  if(evidence.public_base_url!==publicBaseUrl)throw new Error('restart_proof_public_base_mismatch');
+  if(evidence.service!=='sledgewire.smoke'||Number(evidence.price_credits)!==3)throw new Error('restart_proof_service_mismatch');
+  if(!TXN.test(evidence.payment_txn_id??''))throw new Error('restart_proof_transaction_invalid');
+  if(!UUID.test(String(evidence.provider_boot_id??'')))throw new Error('restart_proof_previous_boot_id_missing');
+  const oldVerified=verifyReceipt(evidence.receipt,publicKeyPem);if(!oldVerified.ok)throw new Error(`restart_proof_previous_receipt_invalid:${oldVerified.reason}`);
+  if(evidence.receipt?.buyer_seat!==buyerSeat||evidence.receipt?.payment?.txn_id!==evidence.payment_txn_id||evidence.receipt?.payment?.room_id!==roomId)throw new Error('restart_proof_previous_receipt_scope_mismatch');
+  if(evidence.receipt?.sharedos_trace_id!==evidence.trace_id)throw new Error('restart_proof_previous_trace_mismatch');
+  return oldVerified;
+}
+
+export async function runRestartReplayProof({api,roomId,publicBaseUrl,publicKeyPem,previousEvidence,currentBootId,lookupTrace,timeoutMs=120_000}){
+  if(!UUID.test(String(currentBootId??'')))throw new Error('restart_proof_current_boot_id_invalid');
+  const identity=await api.current(),buyerSeat=buyerInstance(identity);
+  if(!SEAT.test(buyerSeat??''))throw new Error('restart_proof_buyer_identity_missing');
+  const previousVerification=assertPreviousEvidence(previousEvidence,{roomId,buyerSeat,publicBaseUrl,publicKeyPem});
+  if(currentBootId===previousEvidence.provider_boot_id)throw new Error('provider_not_restarted_since_rehearsal');
+  await api.join(roomId);
+
+  const requestId=previousEvidence.request_id,service='sledgewire.smoke',price=3,txnId=previousEvidence.payment_txn_id,targetEndpoint=previousEvidence.target_endpoint;
+  if(typeof targetEndpoint!=='string'||!targetEndpoint.startsWith('https://'))throw new Error('restart_proof_target_invalid');
+  const paidRequest={type:'sledgewire.service.request.v1',request_id:requestId,service,input:{endpoint:targetEndpoint},payment_txn_id:txnId};
+  const startCursor=await api.latestSequence(roomId);
+  const post=await api.post(roomId,JSON.stringify(paidRequest),{idempotencyKey:idempotencyUuid(`rehearsal-restart:${requestId}:${currentBootId}`)});
+  const postId=messageId(post);if(!MESSAGE.test(postId??''))throw new Error('restart_proof_message_id_missing');
+  const replay=await waitForArenaReply(api,roomId,{after:Math.max(startCursor,messageSequence(post)??0),replyTo:postId,requestId,buyerSeat,timeoutMs});
+  const deliveryVerification=assertDelivery(replay.body,{requestId,service,roomId,buyerSeat,txnId,price,publicKeyPem});
+  if(!eqReceipt(previousEvidence.receipt,replay.body.receipt)||previousEvidence.trace_id!==replay.body.trace_id)throw new Error('restart_proof_not_cached_identical_delivery');
+
+  const trace=await lookupTrace(previousEvidence.trace_id);
+  if(trace?.service!=='sledgewire.trace'||trace.trace_id!==previousEvidence.trace_id||trace.state!=='READY')throw new Error(`restart_proof_trace_unavailable:${trace?.reason??trace?.state??'unknown'}`);
+  const traceVerification=verifyReceipt(trace,publicKeyPem);if(!traceVerification.ok)throw new Error(`restart_proof_trace_signature_invalid:${traceVerification.reason}`);
+
+  return {
+    type:'sledgewire.restart-replay-proof.v1',verified:true,request_id:requestId,room_id:roomId,buyer_seat:buyerSeat,payment_txn_id:txnId,
+    previous_boot_id:previousEvidence.provider_boot_id,current_boot_id:currentBootId,trace_id:previousEvidence.trace_id,
+    replay_message_id:postId,delivery_message_id:replay.message.id,
+    checks:{daemon_boot_changed:true,signing_key_persisted:previousVerification.ok,cached_delivery_identical:deliveryVerification.ok,shared_db_trace_persisted:traceVerification.ok,no_second_payment:true},
     completed_at:new Date().toISOString()
   };
 }
