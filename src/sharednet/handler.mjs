@@ -1,5 +1,5 @@
 import catalog from '../../catalog.json' with {type:'json'};
-import {PaymentGate,paymentMemo} from '../core/payment-gate.mjs';
+import {PaymentGate,paymentMemo,requestFingerprint} from '../core/payment-gate.mjs';
 import {quote} from '../core/quote.mjs';
 import {validateServiceInput} from '../core/service-input.mjs';
 import {runPaidService} from '../sharedos/host.mjs';
@@ -50,22 +50,26 @@ export function createArenaHandler({store,ledger,room,payee,signing,publicBaseUr
     if(!validation.ok){store.incrementCounter('arena.reject.invalid_input');return failure(req,'invalid_input',{detail:validation.reason});}
 
     if(!req.payment_txn_id){
-      const price=prices[req.service],memo=paymentMemo(req.request_id,req.service);
+      const price=prices[req.service],bound={roomId:room,buyerSeat,requestId:req.request_id,service:req.service,input:req.input};
+      const requestFingerprintHex=requestFingerprint(bound),memo=paymentMemo(bound);
       store.incrementCounter('arena.payment_quote.issued');
       return signReceipt({
         type:'sledgewire.payment_required.v1',
         request_id:req.request_id,
         service:req.service,
+        request_fingerprint:requestFingerprintHex,
         price_credits:price,
         deliverable:catalog.services[req.service].description,
         payee,
         memo,
+        memo_version:'sledgewire.payment.v2',
         room_id:room,
         buyer_seat:buyerSeat,
         issued_at:new Date().toISOString(),
         quickstart_url:quickstart,
+        next_action:{type:'sharednet.credit.transfer',amount_credits:price,payee,room_id:room,memo,after_payment:'resend identical request with payment_txn_id'},
         verification:{receipt_tool:'sledgewire.verify',trace_tool:'sledgewire.trace',exact_retry_no_reexecution:true},
-        note:'Pay in the official Arena room, then resend the identical request with payment_txn_id.'
+        note:'This signed quote is bound to the exact Room, buyer, request id, service and input fingerprint. Pay it, then resend the identical request with payment_txn_id.'
       },signing.privateKeyPem);
     }
 
