@@ -11,8 +11,8 @@ function buyerInstance(identity){return identity?.instance?.id??identity?.instan
 function eqReceipt(a,b){return a?.proof?.signature&&a.proof.signature===b?.proof?.signature&&a?.proof?.body_sha256===b?.proof?.body_sha256;}
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export async function waitForArenaReply(api,roomId,{after,replyTo,requestId,buyerSeat,timeoutMs=90_000}){
-  const deadline=Date.now()+timeoutMs;let cursor=Number(after)||0;
+export async function waitForArenaReply(api,roomId,{after,replyTo,requestId,buyerSeat,timeoutMs=90_000,acceptBody=null}){
+  const deadline=Date.now()+timeoutMs;let cursor=Number(after)||0,ignoredCandidates=0;
   while(Date.now()<deadline){
     const controller=new AbortController(),remaining=Math.max(1,deadline-Date.now()),timer=setTimeout(()=>controller.abort(new Error('rehearsal_reply_timeout')),remaining);
     let page;
@@ -23,7 +23,12 @@ export async function waitForArenaReply(api,roomId,{after,replyTo,requestId,buye
       if(m?.sender_instance_id===buyerSeat)continue;
       if(replyTo&&m?.reply_to_message_id!==replyTo)continue;
       const body=parseJsonMessage(m);
-      if(body?.request_id===requestId)return {message:m,body,cursor};
+      if(body?.request_id!==requestId)continue;
+      if(acceptBody){
+        let accepted=false;try{accepted=await acceptBody(body,m);}catch{}
+        if(!accepted){ignoredCandidates++;continue;}
+      }
+      return {message:m,body,cursor,ignoredCandidates};
     }
   }
   throw new Error('rehearsal_reply_timeout');
@@ -48,6 +53,19 @@ function assertDelivery(body,{requestId,service,roomId,buyerSeat,txnId,price,pub
   return verified;
 }
 
+function accepts(fn){return body=>{try{fn(body);return true;}catch{return false;}};}
+function authenticPaidReply(body,{requestId,service,roomId,buyerSeat,txnId,price,publicKeyPem}){
+  if(body?.type!=='sledgewire.service.response.v1'||body.request_id!==requestId||body.service!==service)return false;
+  if(body.state==='DELIVERED')return accepts(x=>assertDelivery(x,{requestId,service,roomId,buyerSeat,txnId,price,publicKeyPem}))(body);
+  if(body.state!=='FAILED')return false;
+  if(body.receipt){
+    const verified=verifyReceipt(body.receipt,publicKeyPem);
+    return verified.ok&&body.receipt?.request_id===requestId&&body.receipt?.buyer_seat===buyerSeat&&body.receipt?.payment?.txn_id===txnId&&body.receipt?.payment?.room_id===roomId&&Number(body.receipt?.payment?.price_credits)===price;
+  }
+  const verified=verifyReceipt(body,publicKeyPem);
+  return verified.ok&&body.room_id===roomId&&body.buyer_seat===buyerSeat&&body.payment_txn_id===txnId;
+}
+
 export async function runLiveSmokeRehearsal({api,roomId,payee,publicBaseUrl,targetEndpoint,publicKeyPem,lookupTrace,providerBootId=null,requestId=`rehearsal-${crypto.randomUUID()}`,timeoutMs=120_000}){
   const service='sledgewire.smoke',price=3;
   if(publicBaseOrigin(publicBaseUrl,{production:true})!==publicBaseUrl)throw new Error('rehearsal_public_base_not_canonical');
@@ -62,8 +80,9 @@ export async function runLiveSmokeRehearsal({api,roomId,payee,publicBaseUrl,targ
   const request={type:'sledgewire.service.request.v1',request_id:requestId,service,input:{endpoint:targetEndpoint}};
   const firstPost=await api.post(roomId,JSON.stringify(request),{idempotencyKey:idempotencyUuid(`rehearsal-request:${requestId}:quote`)});
   const firstId=messageId(firstPost);if(!MESSAGE.test(firstId??''))throw new Error('rehearsal_initial_message_id_missing');
-  const quoteReply=await waitForArenaReply(api,roomId,{after:Math.max(startCursor,messageSequence(firstPost)??0),replyTo:firstId,requestId,buyerSeat,timeoutMs});
-  assertPaymentQuote(quoteReply.body,{requestId,roomId,payee,service,price,buyerSeat,publicKeyPem});
+  const quoteCtx={requestId,roomId,payee,service,price,buyerSeat,publicKeyPem};
+  const quoteReply=await waitForArenaReply(api,roomId,{after:Math.max(startCursor,messageSequence(firstPost)??0),replyTo:firstId,requestId,buyerSeat,timeoutMs,acceptBody:accepts(body=>assertPaymentQuote(body,quoteCtx))});
+  assertPaymentQuote(quoteReply.body,quoteCtx);
 
   const payment=await api.pay(payee,price,{memo:quoteReply.body.memo,roomId,idempotencyKey:idempotencyUuid(`rehearsal-payment:${requestId}`)});
   const txnId=payment?.transfer?.id??payment?.id??null;if(!TXN.test(txnId??''))throw new Error('rehearsal_payment_transaction_missing');
@@ -71,8 +90,9 @@ export async function runLiveSmokeRehearsal({api,roomId,payee,publicBaseUrl,targ
   const paidRequest={...request,payment_txn_id:txnId};
   const paidPost=await api.post(roomId,JSON.stringify(paidRequest),{idempotencyKey:idempotencyUuid(`rehearsal-request:${requestId}:paid`)});
   const paidId=messageId(paidPost);if(!MESSAGE.test(paidId??''))throw new Error('rehearsal_paid_message_id_missing');
-  const delivered=await waitForArenaReply(api,roomId,{after:Math.max(quoteReply.cursor,messageSequence(paidPost)??0),replyTo:paidId,requestId,buyerSeat,timeoutMs});
-  const deliveryVerification=assertDelivery(delivered.body,{requestId,service,roomId,buyerSeat,txnId,price,publicKeyPem});
+  const deliveryCtx={requestId,service,roomId,buyerSeat,txnId,price,publicKeyPem};
+  const delivered=await waitForArenaReply(api,roomId,{after:Math.max(quoteReply.cursor,messageSequence(paidPost)??0),replyTo:paidId,requestId,buyerSeat,timeoutMs,acceptBody:body=>authenticPaidReply(body,deliveryCtx)});
+  const deliveryVerification=assertDelivery(delivered.body,deliveryCtx);
 
   const trace=await lookupTrace(delivered.body.trace_id);
   if(trace?.service!=='sledgewire.trace'||trace.trace_id!==delivered.body.trace_id||trace.state!=='READY')throw new Error(`rehearsal_trace_proof_unavailable:${trace?.reason??trace?.state??'unknown'}`);
@@ -81,8 +101,8 @@ export async function runLiveSmokeRehearsal({api,roomId,payee,publicBaseUrl,targ
 
   const retryPost=await api.post(roomId,JSON.stringify(paidRequest),{idempotencyKey:idempotencyUuid(`rehearsal-request:${requestId}:retry`)});
   const retryId=messageId(retryPost);if(!MESSAGE.test(retryId??''))throw new Error('rehearsal_retry_message_id_missing');
-  const replay=await waitForArenaReply(api,roomId,{after:Math.max(delivered.cursor,messageSequence(retryPost)??0),replyTo:retryId,requestId,buyerSeat,timeoutMs});
-  assertDelivery(replay.body,{requestId,service,roomId,buyerSeat,txnId,price,publicKeyPem});
+  const replay=await waitForArenaReply(api,roomId,{after:Math.max(delivered.cursor,messageSequence(retryPost)??0),replyTo:retryId,requestId,buyerSeat,timeoutMs,acceptBody:body=>authenticPaidReply(body,deliveryCtx)});
+  assertDelivery(replay.body,deliveryCtx);
   if(!eqReceipt(delivered.body.receipt,replay.body.receipt)||delivered.body.trace_id!==replay.body.trace_id)throw new Error('rehearsal_retry_was_not_exact_cached_delivery');
 
   return {
@@ -92,6 +112,7 @@ export async function runLiveSmokeRehearsal({api,roomId,payee,publicBaseUrl,targ
     first_message_id:firstId,paid_message_id:paidId,retry_message_id:retryId,
     delivery_message_id:delivered.message.id,replay_message_id:replay.message.id,
     payment_quote:quoteReply.body,receipt:delivered.body.receipt,trace_proof:trace,
+    ignored_reply_candidates:(quoteReply.ignoredCandidates??0)+(delivered.ignoredCandidates??0)+(replay.ignoredCandidates??0),
     checks:{payment_quote:true,signed_payment_quote:true,native_transfer:true,signed_delivery:deliveryVerification.ok,sharedos_trace:true,trace_signature:traceVerification.ok,exact_cached_retry:true},
     completed_at:new Date().toISOString()
   };
@@ -125,8 +146,9 @@ export async function runRestartReplayProof({api,roomId,publicBaseUrl,publicKeyP
   const startCursor=await api.latestSequence(roomId);
   const post=await api.post(roomId,JSON.stringify(paidRequest),{idempotencyKey:idempotencyUuid(`rehearsal-restart:${requestId}:${currentBootId}`)});
   const postId=messageId(post);if(!MESSAGE.test(postId??''))throw new Error('restart_proof_message_id_missing');
-  const replay=await waitForArenaReply(api,roomId,{after:Math.max(startCursor,messageSequence(post)??0),replyTo:postId,requestId,buyerSeat,timeoutMs});
-  const deliveryVerification=assertDelivery(replay.body,{requestId,service,roomId,buyerSeat,txnId,price,publicKeyPem});
+  const deliveryCtx={requestId,service,roomId,buyerSeat,txnId,price,publicKeyPem};
+  const replay=await waitForArenaReply(api,roomId,{after:Math.max(startCursor,messageSequence(post)??0),replyTo:postId,requestId,buyerSeat,timeoutMs,acceptBody:body=>authenticPaidReply(body,deliveryCtx)});
+  const deliveryVerification=assertDelivery(replay.body,deliveryCtx);
   if(!eqReceipt(previousEvidence.receipt,replay.body.receipt)||previousEvidence.trace_id!==replay.body.trace_id)throw new Error('restart_proof_not_cached_identical_delivery');
 
   const trace=await lookupTrace(previousEvidence.trace_id);
@@ -137,7 +159,7 @@ export async function runRestartReplayProof({api,roomId,publicBaseUrl,publicKeyP
     type:'sledgewire.restart-replay-proof.v2',verified:true,request_id:requestId,room_id:roomId,buyer_seat:buyerSeat,payment_txn_id:txnId,
     previous_boot_id:previousEvidence.provider_boot_id,current_boot_id:currentBootId,trace_id:previousEvidence.trace_id,
     replay_message_id:postId,delivery_message_id:replay.message.id,
-    receipt:replay.body.receipt,trace_proof:trace,
+    receipt:replay.body.receipt,trace_proof:trace,ignored_reply_candidates:replay.ignoredCandidates??0,
     checks:{daemon_boot_changed:true,signing_key_persisted:previousVerification.ok,cached_delivery_identical:deliveryVerification.ok,shared_db_trace_persisted:traceVerification.ok,no_second_payment:true},
     completed_at:new Date().toISOString()
   };
