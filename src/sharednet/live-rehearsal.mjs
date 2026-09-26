@@ -87,7 +87,7 @@ export async function runLiveSmokeRehearsal({api,roomId,payee,publicBaseUrl,targ
   if(!eqReceipt(delivered.body.receipt,replay.body.receipt)||delivered.body.trace_id!==replay.body.trace_id)throw new Error('rehearsal_retry_was_not_exact_cached_delivery');
 
   return {
-    type:'sledgewire.live-rehearsal.v2',verified:true,service,price_credits:price,request_id:requestId,room_id:roomId,buyer_seat:buyerSeat,
+    type:'sledgewire.live-rehearsal.v3',verified:true,service,price_credits:price,request_id:requestId,room_id:roomId,buyer_seat:buyerSeat,
     provider_boot_id:providerBootId,
     payment_txn_id:txnId,target_endpoint:targetEndpoint,public_base_url:publicBaseUrl,trace_id:delivered.body.trace_id,
     first_message_id:firstId,paid_message_id:paidId,retry_message_id:retryId,
@@ -100,7 +100,7 @@ export async function runLiveSmokeRehearsal({api,roomId,payee,publicBaseUrl,targ
 
 
 function assertPreviousEvidence(evidence,{roomId,buyerSeat,publicBaseUrl,publicKeyPem}){
-  if(evidence?.type!=='sledgewire.live-rehearsal.v2'||evidence?.verified!==true)throw new Error('restart_proof_invalid_previous_evidence');
+  if(evidence?.type!=='sledgewire.live-rehearsal.v3'||evidence?.verified!==true)throw new Error('restart_proof_invalid_previous_evidence');
   if(evidence.room_id!==roomId||evidence.buyer_seat!==buyerSeat)throw new Error('restart_proof_scope_mismatch');
   if(evidence.public_base_url!==publicBaseUrl)throw new Error('restart_proof_public_base_mismatch');
   if(evidence.service!=='sledgewire.smoke'||Number(evidence.price_credits)!==3)throw new Error('restart_proof_service_mismatch');
@@ -135,7 +135,7 @@ export async function runRestartReplayProof({api,roomId,publicBaseUrl,publicKeyP
   const traceVerification=verifyReceipt(trace,publicKeyPem);if(!traceVerification.ok)throw new Error(`restart_proof_trace_signature_invalid:${traceVerification.reason}`);
 
   return {
-    type:'sledgewire.restart-replay-proof.v1',verified:true,request_id:requestId,room_id:roomId,buyer_seat:buyerSeat,payment_txn_id:txnId,
+    type:'sledgewire.restart-replay-proof.v2',verified:true,request_id:requestId,room_id:roomId,buyer_seat:buyerSeat,payment_txn_id:txnId,
     previous_boot_id:previousEvidence.provider_boot_id,current_boot_id:currentBootId,trace_id:previousEvidence.trace_id,
     replay_message_id:postId,delivery_message_id:replay.message.id,
     receipt:replay.body.receipt,trace_proof:trace,
