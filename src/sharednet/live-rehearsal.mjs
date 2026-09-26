@@ -1,6 +1,7 @@
 import {idempotencyUuid,MESSAGE,SEAT,TXN,payeeBelongsToIdentity} from './api.mjs';
 import {paymentMemo} from '../core/payment-gate.mjs';
 import {verifyReceipt} from '../receipts/receipt.mjs';
+import {publicBaseOrigin} from '../ops/config.mjs';
 
 function sequenceOf(x){const n=Number(x?.sequence);return Number.isSafeInteger(n)&&n>=0?n:null;}
 function parseJsonMessage(message){if(typeof message?.content!=='string')return null;try{return JSON.parse(message.content);}catch{return null;}}
@@ -47,7 +48,7 @@ function assertDelivery(body,{requestId,service,roomId,buyerSeat,txnId,price,pub
 
 export async function runLiveSmokeRehearsal({api,roomId,payee,publicBaseUrl,targetEndpoint,publicKeyPem,lookupTrace,providerBootId=null,requestId=`rehearsal-${crypto.randomUUID()}`,timeoutMs=120_000}){
   const service='sledgewire.smoke',price=3;
-  if(typeof publicBaseUrl!=='string'||!publicBaseUrl.startsWith('https://'))throw new Error('rehearsal_public_base_https_required');
+  if(publicBaseOrigin(publicBaseUrl,{production:true})!==publicBaseUrl)throw new Error('rehearsal_public_base_not_canonical');
   if(typeof targetEndpoint!=='string'||!targetEndpoint.startsWith('https://'))throw new Error('rehearsal_target_https_required');
   if(providerBootId!==null&&!UUID.test(String(providerBootId)))throw new Error('rehearsal_provider_boot_id_invalid');
   const identity=await api.current();const buyerSeat=buyerInstance(identity);
