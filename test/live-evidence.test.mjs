@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {generateSigningKeypair,signReceipt} from '../src/receipts/receipt.mjs';
 import {validateLiveRehearsalEvidence,validateRestartReplayEvidence} from '../src/ops/live-evidence.mjs';
+import {paymentMemo,requestFingerprint} from '../src/core/payment-gate.mjs';
 
 const room='rom_ABCDEFGHIJ',buyer='i_ZYXWVUTSRQ',txn='txn_ABCDEFGHIJ';
 const oldBoot='123e4567-e89b-42d3-a456-426614174000',newBoot='223e4567-e89b-42d3-a456-426614174001';
@@ -9,7 +10,7 @@ const traceId='11111111-1111-4111-8111-111111111111',base='https://sledgewire.ex
 
 function evidence(){
   const kp=generateSigningKeypair();
-  const quote=signReceipt({type:'sledgewire.payment_required.v1',request_id:'rehearsal-fixed',service:'sledgewire.smoke',price_credits:3,payee:'p_ABCDEFGHIJ',memo:'sledgewire:rehearsal-fixed:sledgewire.smoke',room_id:room,buyer_seat:buyer,issued_at:'2026-09-26T00:00:00.000Z'},kp.privateKeyPem);
+  const bound={roomId:room,buyerSeat:buyer,requestId:'rehearsal-fixed',service:'sledgewire.smoke',input:{endpoint:'https://target.example/mcp'}},memo=paymentMemo(bound);const quote=signReceipt({type:'sledgewire.payment_required.v1',request_id:'rehearsal-fixed',service:'sledgewire.smoke',request_fingerprint:requestFingerprint(bound),price_credits:3,payee:'p_ABCDEFGHIJ',memo,memo_version:'sledgewire.payment.v2',room_id:room,buyer_seat:buyer,next_action:{type:'sharednet.credit.transfer',amount_credits:3,payee:'p_ABCDEFGHIJ',room_id:room,memo,after_payment:'resend identical request with payment_txn_id'},issued_at:'2026-09-26T00:00:00.000Z'},kp.privateKeyPem);
   const receipt=signReceipt({service:'sledgewire.smoke',state:'READY',sharedos_trace_id:traceId,buyer_seat:buyer,request_id:'rehearsal-fixed',payment:{txn_id:txn,price_credits:3,room_id:room}},kp.privateKeyPem);
   const trace=signReceipt({service:'sledgewire.trace',state:'READY',trace_id:traceId,events:[{type:'tool',outcome:'allowed'}]},kp.privateKeyPem);
   const live={type:'sledgewire.live-rehearsal.v3',verified:true,service:'sledgewire.smoke',price_credits:3,request_id:'rehearsal-fixed',room_id:room,buyer_seat:buyer,provider_boot_id:oldBoot,payment_txn_id:txn,target_endpoint:'https://target.example/mcp',public_base_url:base,trace_id:traceId,first_message_id:'msg_ABCDEFGHIJ',paid_message_id:'msg_BCDEFGHIJK',retry_message_id:'msg_CDEFGHIJKL',delivery_message_id:'msg_DEFGHIJKLM',replay_message_id:'msg_EFGHIJKLMN',payment_quote:quote,receipt,trace_proof:trace,checks:{payment_quote:true,signed_payment_quote:true,native_transfer:true,signed_delivery:true,sharedos_trace:true,trace_signature:true,exact_cached_retry:true}};
@@ -25,6 +26,8 @@ test('live evidence validator requires signed request-scoped payment and trace p
   assert.equal(validateLiveRehearsalEvidence(tampered,{roomId:room,payee:'p_ABCDEFGHIJ',publicBaseUrl:base,publicKeyPem:kp.publicKeyPem}).ok,false);
   const badQuote=structuredClone(live);badQuote.payment_quote.payee='p_ZYXWVUTSRQ';
   assert.equal(validateLiveRehearsalEvidence(badQuote,{roomId:room,payee:'p_ABCDEFGHIJ',publicBaseUrl:base,publicKeyPem:kp.publicKeyPem}).ok,false);
+  const changedInput=structuredClone(live);changedInput.target_endpoint='https://changed.example/mcp';
+  assert.equal(validateLiveRehearsalEvidence(changedInput,{roomId:room,payee:'p_ABCDEFGHIJ',publicBaseUrl:base,publicKeyPem:kp.publicKeyPem}).reason,'live_rehearsal_quote_payment_mismatch');
 });
 
 test('restart evidence must carry the identical signed receipt and match the current daemon boot',()=>{
