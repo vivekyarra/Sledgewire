@@ -103,7 +103,9 @@ Use the checked-in `compose.arena.yml` so the public MCP process and SharedNet A
 
 On native Linux, the production image runs as the non-root `node` user (uid/gid 1000). Docker Compose file-backed secrets are bind mounts and do not remap ownership. Keep the sensitive files mode 0600 and make their ownership explicit before startup:
 
+    sudo chown 1000:1000 .sledgewire .sledgewire/keys .sharednet
     sudo chown 1000:1000 .sledgewire/keys/ed25519-private.pem .sledgewire/keys/ed25519-public.pem .sharednet/sledgewire-arena-token
+    chmod 700 .sledgewire .sledgewire/keys .sharednet
     chmod 600 .sledgewire/keys/ed25519-private.pem .sharednet/sledgewire-arena-token
     chmod 644 .sledgewire/keys/ed25519-public.pem
 
