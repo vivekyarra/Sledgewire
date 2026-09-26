@@ -7,14 +7,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {ArenaStore} from '../store/arena-store.mjs';
 import {readArenaDaemonReadiness} from '../ops/readiness.mjs';
+import {boundedInteger,publicBaseOrigin} from '../ops/config.mjs';
 
-const port=Number(process.env.PORT||8787);
-const base=process.env.PUBLIC_BASE_URL||`http://127.0.0.1:${port}`;
+const port=boundedInteger(process.env.PORT,{name:'port',defaultValue:8787,min:1,max:65535});
 const production=process.env.NODE_ENV==='production',paidBypass=process.env.SLEDGEWIRE_PUBLIC_PAID_EXECUTION==='1';
-if(production&&!base.startsWith('https://'))throw new Error('production_public_base_url_https_required');
-if(base.startsWith('https://')&&!production)throw new Error('public_https_requires_node_env_production');
+const base=publicBaseOrigin(process.env.PUBLIC_BASE_URL||`http://127.0.0.1:${port}`,{production});
 if(production&&paidBypass)throw new Error('production_paid_execution_bypass_forbidden');
-let active=0;const maxActive=Math.max(4,Math.min(256,Number(process.env.SLEDGEWIRE_HTTP_CONCURRENCY??64)));
+let active=0;const maxActive=boundedInteger(process.env.SLEDGEWIRE_HTTP_CONCURRENCY,{name:'http_concurrency',defaultValue:64,min:4,max:256});
 const publicArena=!paidBypass;
 const arenaRoomId=process.env.SHAREDNET_ARENA_ROOM_ID??null;
 const dbPath=process.env.SLEDGEWIRE_DB??'.sledgewire/arena.db';fs.mkdirSync(path.dirname(path.resolve(dbPath)),{recursive:true});const traceStore=new ArenaStore(dbPath);
@@ -55,5 +54,6 @@ const server=http.createServer(async(req,res)=>{
     return json(res,200,out);
   }finally{active--;}
 });
+server.requestTimeout=15_000;server.headersTimeout=10_000;server.keepAliveTimeout=5_000;
 server.listen(port,()=>console.error(`sledgewire http listening on ${port}`));
 function json(res,status,value){res.statusCode=status;res.setHeader('content-type','application/json');res.end(JSON.stringify(value));}
