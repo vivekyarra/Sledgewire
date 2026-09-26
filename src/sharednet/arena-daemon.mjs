@@ -25,15 +25,14 @@ catch(e){console.error(`arena-announcement:${e.message}`);if(process.env.SLEDGEW
 const handle=createArenaHandler({store,ledger:api,room,payee,signing,publicBaseUrl});
 const key=`arena_cursor:${room}`;let stored=store.getMeta(key),cursor=stored===null?(process.env.SLEDGEWIRE_PROCESS_HISTORY==='1'?0:await api.latestSequence(room)):Number(stored);store.setMeta(key,String(cursor));
 const concurrency=boundedInteger(process.env.SLEDGEWIRE_ARENA_CONCURRENCY,{name:'arena_concurrency',defaultValue:4,min:1,max:8}),maxAttempts=boundedInteger(process.env.SLEDGEWIRE_MESSAGE_MAX_ATTEMPTS,{name:'message_max_attempts',defaultValue:5,min:2,max:10});
-const heartbeat=setInterval(()=>api.heartbeat().catch(e=>console.error(`heartbeat:${e.message}`)),20_000);heartbeat.unref();
 const daemonBootId=crypto.randomUUID();
 const writeLocalHeartbeat=(status='running')=>{try{writeArenaDaemonHeartbeat(store,room,{instanceId:selfSeat,bootId:daemonBootId,status});}catch(e){console.error(`local-heartbeat:${e.message}`);}};
-writeLocalHeartbeat();
-const localHeartbeat=setInterval(()=>writeLocalHeartbeat(),10_000);localHeartbeat.unref();
+writeLocalHeartbeat(); // identity + Room join already succeeded above, so initial readiness has external evidence.
+const heartbeat=setInterval(()=>api.heartbeat().then(()=>writeLocalHeartbeat()).catch(e=>console.error(`heartbeat:${e.message}`)),20_000);heartbeat.unref();
 const arenaPrices=Object.fromEntries(Object.entries(catalog.services).map(([k,v])=>[k,v.price]));
 const statsEvery=boundedInteger(process.env.SLEDGEWIRE_ARENA_STATS_INTERVAL_MS,{name:'arena_stats_interval_ms',defaultValue:300_000,min:60_000,max:3_600_000});
 const statsTimer=setInterval(()=>{try{console.error(JSON.stringify({sledgewire:'arena-stats',...store.arenaStats({prices:arenaPrices})}));}catch(e){console.error(`arena-stats:${e.message}`);}},statsEvery);statsTimer.unref();
-const stop=signal=>{clearInterval(heartbeat);clearInterval(localHeartbeat);clearInterval(statsTimer);writeLocalHeartbeat('stopped');console.error(JSON.stringify({sledgewire:'arena-daemon',event:'stopping',signal}));try{store.db.close();}catch{}process.exit(0);};
+const stop=signal=>{clearInterval(heartbeat);clearInterval(statsTimer);writeLocalHeartbeat('stopped');console.error(JSON.stringify({sledgewire:'arena-daemon',event:'stopping',signal}));try{store.db.close();}catch{}process.exit(0);};
 process.once('SIGTERM',()=>stop('SIGTERM'));process.once('SIGINT',()=>stop('SIGINT'));
 console.error(JSON.stringify({sledgewire:'arena-daemon',version:VERSION,room,instance:selfSeat,boot_id:daemonBootId,cursor,concurrency,maxAttempts}));
 const sequenceOf=message=>{const n=Number(message?.sequence);return Number.isSafeInteger(n)&&n>=0?n:null;};
