@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {prepareSingleContainerRuntime} from '../src/ops/arena-runtime.mjs';
+import {prepareSingleContainerRuntime,scrubParentSecretCopies} from '../src/ops/arena-runtime.mjs';
 
 test('single-container runtime hydrates root-only files and isolates public SharedNet secrets',()=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'sledgewire-runtime-'));
@@ -39,6 +39,21 @@ test('single-container runtime hydrates root-only files and isolates public Shar
     assert.equal(r.daemonEnv.SLEDGEWIRE_PUBLIC_KEY_FILE,undefined);
     assert.equal(r.daemonEnv.SHAREDNET_MEMBER_TOKEN_FILE,undefined);
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+test('supervisor secret copies are scrubbed after child spawn',()=>{
+  const parentEnv={SLEDGEWIRE_PRIVATE_KEY_PEM:'PRIVATE',SHAREDNET_MEMBER_TOKEN:'sni_'+ 'A'.repeat(43),KEEP:'yes'};
+  const runtime={
+    publicEnv:{SLEDGEWIRE_PRIVATE_KEY_PEM:'PRIVATE',KEEP:'public'},
+    daemonEnv:{SLEDGEWIRE_PRIVATE_KEY_PEM:'PRIVATE',SHAREDNET_MEMBER_TOKEN:'sni_'+ 'A'.repeat(43),KEEP:'daemon'}
+  };
+  scrubParentSecretCopies(runtime,{parentEnv});
+  assert.equal(parentEnv.SLEDGEWIRE_PRIVATE_KEY_PEM,undefined);
+  assert.equal(parentEnv.SHAREDNET_MEMBER_TOKEN,undefined);
+  assert.equal(parentEnv.KEEP,'yes');
+  assert.equal(runtime.publicEnv.SLEDGEWIRE_PRIVATE_KEY_PEM,undefined);
+  assert.equal(runtime.daemonEnv.SHAREDNET_MEMBER_TOKEN,undefined);
+  assert.equal(runtime.daemonEnv.KEEP,'daemon');
 });
 
 test('Railway system variables derive canonical public base and persistent database path',()=>{
