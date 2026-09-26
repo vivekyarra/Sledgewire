@@ -90,7 +90,7 @@ export class ArenaStore{
   }
   arenaStats({prices={}}={}){
     const rows=this.db.prepare('SELECT service,txn_id,buyer_seat,status,response_json,started_at,completed_at FROM requests ORDER BY rowid ASC').all();
-    const paidBuyers=new Set(),completedBuyers=new Set(),txns=new Set(),paidServiceMix={},serviceMix={},outcomeMix={},latencies=[],smokeBuyers=new Set(),premiumBuyers=new Set();
+    const paidBuyers=new Set(),completedBuyers=new Set(),txns=new Set(),paidServiceMix={},serviceMix={},creditsByService={},outcomeMix={},latencies=[],smokeBuyers=new Set(),premiumBuyers=new Set();
     let earned=0,unknownPrice=0,legacyUnattributed=0,malformed=0,signedDeliveries=0,traceDeliveries=0,completed=0,failed=0,inflight=0;
     for(const row of rows){
       if(row.txn_id)txns.add(row.txn_id);
@@ -104,7 +104,7 @@ export class ArenaStore{
       }else legacyUnattributed++;
       const configuredPrice=Number(prices?.[row.service]),receiptPrice=Number(receipt?.payment?.price_credits);
       const price=Number.isInteger(configuredPrice)&&configuredPrice>0?configuredPrice:(Number.isInteger(receiptPrice)&&receiptPrice>0?receiptPrice:null);
-      if(price===null)unknownPrice++;else earned+=price;
+      if(price===null)unknownPrice++;else{earned+=price;creditsByService[row.service]=(creditsByService[row.service]??0)+price;}
       if(row.status==='inflight'){inflight++;continue;}
       if(row.status==='failed'){failed++;continue;}
       if(row.status!=='completed')continue;
@@ -120,6 +120,8 @@ export class ArenaStore{
     latencies.sort((a,b)=>a-b);const percentile=p=>latencies.length?latencies[Math.min(latencies.length-1,Math.max(0,Math.ceil(latencies.length*p)-1))]:null;
     let converted=0;for(const b of smokeBuyers)if(premiumBuyers.has(b))converted++;
     const rejects=this.counterMap('arena.reject.'),rejections={};for(const [k,v] of Object.entries(rejects))rejections[k.slice('arena.reject.'.length)]=v;
+    const engagementRaw=this.counterMap('arena.'),engagement={};for(const [k,v] of Object.entries(engagementRaw))if(!k.startsWith('arena.reject.'))engagement[k.slice('arena.'.length)]=v;
+    const revenueLeaders=Object.entries(creditsByService).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]));
     return {
       schema:'sledgewire.arena.stats.v2',
       earned_credits:earned,
@@ -132,6 +134,8 @@ export class ArenaStore{
       inflight_requests:inflight,
       credits_per_unique_buyer:paidBuyers.size?Number((earned/paidBuyers.size).toFixed(2)):0,
       paid_service_mix:paidServiceMix,
+      credits_by_service:creditsByService,
+      top_revenue_service:revenueLeaders[0]?.[0]??null,
       service_mix:serviceMix,
       outcome_mix:outcomeMix,
       payment_rejections:rejections,
@@ -139,6 +143,8 @@ export class ArenaStore{
       smoke_buyers:smokeBuyers.size,
       smoke_to_premium_buyers:converted,
       smoke_to_premium_conversion:smokeBuyers.size?Number((converted/smokeBuyers.size).toFixed(4)):0,
+      delivery_success_rate:(completed+failed)?Number((completed/(completed+failed)).toFixed(4)):null,
+      engagement,
       integrity:{signed_deliveries:signedDeliveries,trace_bound_deliveries:traceDeliveries,malformed_completed_rows:malformed,unknown_price_claims:unknownPrice,legacy_unattributed_claims:legacyUnattributed}
     };
   }
