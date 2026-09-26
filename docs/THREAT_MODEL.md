@@ -21,7 +21,7 @@ Target URL, DNS result, MCP catalog/description/schema, MCP tool output, redirec
 - Every paid network workflow receives an exact-target SharedOS grant. The dispatcher has no target-service authority. Mechanic and Inspector are separate authorities; Breaker alone receives exact target/tool execution authority.
 - Payment transactions and request fingerprints are one-use bindings. The PAYMENT_REQUIRED Room quote is signed and buyer-bound. Durable request identity is scoped by Room + buyer + request id; after initial native-ledger verification, exact completed/failed retries use that durable verified binding and are not broken by remote ledger-history eviction. A crash with uncertain side effects is never resolved by blind re-execution.
 - Successful receipts and post-payment execution-failure receipts are signed; tampering must fail verification. Receipt canonicalization has explicit depth, node, cycle and byte ceilings.
-- Audit or durable usage-store failure blocks paid success.
+- Audit or durable usage-store failure blocks paid success. External SharedOS audit export requires a credential-free HTTPS URL, refuses redirects, and never sends its bearer key over plaintext HTTP.
 - SharedNet API bodies are bounded before JSON parsing, ledger lookups are coalesced/cached under retry storms, message processing has bounded retries, and poison messages become terminal dead letters rather than permanent head-of-line blockers.
 - Public SharedOS trace proofs require an exact UUID trace id, expose no global listing and omit host metadata, authority/owner identities and raw target arguments/outputs.
 

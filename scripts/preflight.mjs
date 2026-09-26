@@ -7,6 +7,7 @@ import {SharedNetApi,ROOM,ADDRESS,INSTANCE_TOKEN,payeeBelongsToIdentity,loadShar
 import {McpSession,MODERN_PROTOCOL_VERSION} from '../src/mcp/client.mjs';
 import {validateLiveRehearsalEvidence,validateRestartReplayEvidence} from '../src/ops/live-evidence.mjs';
 import {publicBaseOrigin} from '../src/ops/config.mjs';
+import {auditSinkUrl} from '../src/ops/audit-sink.mjs';
 
 const live=process.argv.includes('--live'),submission=process.argv.includes('--submission'),checks=[];
 const add=(name,ok,detail='')=>checks.push({name,ok,detail});
@@ -111,8 +112,10 @@ if(live){
   }catch(e){add('restart_replay_evidence',false,`${restartPath}:${String(e.message||e)}`);}
 
   if(process.env.SLEDGEWIRE_SHAREDOS_REQUIRED==='1'){
-    add('sharedos_audit_url',Boolean(process.env.SHAREDOS_AUDIT_URL),'required');
-    add('sharedos_key',Boolean(process.env.SHAREDOS_KEY),'required');
+    let auditUrlOk=false,auditUrlDetail='missing';
+    try{auditUrlDetail=auditSinkUrl(process.env.SHAREDOS_AUDIT_URL);auditUrlOk=true;}catch(e){auditUrlDetail=String(e.message||e);}
+    add('sharedos_audit_url',auditUrlOk,auditUrlDetail);
+    add('sharedos_key',Boolean(process.env.SHAREDOS_KEY?.trim()),process.env.SHAREDOS_KEY?'present':'missing');
     add('sharedos_audit_confirmed',process.env.SHAREDOS_AUDIT_CONFIRMED==='1','requires real visible trace');
   }
 }

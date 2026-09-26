@@ -20,6 +20,7 @@
 - [x] Every paid network workflow uses an exact-target SharedOS grant; dispatcher has no direct target authority.
 - [x] Invoke/Gauntlet real execution preserves Scout -> Mechanic -> Inspector -> Breaker authority separation.
 - [x] SharedOS bounded-use state and durable audit/outbox.
+- [x] External SharedOS audit export requires credential-free HTTPS, refuses redirects, bounds its bearer key, and live preflight validates the sink before handoff.
 - [x] Paid receipts carry a SharedOS trace id; free `sledgewire.trace` returns a sanitized signed trace proof with no global listing.
 - [x] Native SharedNet credit verification binds buyer, exact/fallback-safe payee evidence, integer amount, Arena Room, memo and one-use transaction.
 - [x] Request storage/grant identity is scoped by Room + buyer + request fingerprint, preventing cross-buyer request-label collisions.
