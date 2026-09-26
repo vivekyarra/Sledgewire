@@ -8,6 +8,7 @@ import {McpSession,MODERN_PROTOCOL_VERSION} from '../src/mcp/client.mjs';
 import {validateLiveRehearsalEvidence,validateRestartReplayEvidence} from '../src/ops/live-evidence.mjs';
 import {publicBaseOrigin} from '../src/ops/config.mjs';
 import {auditSinkUrl} from '../src/ops/audit-sink.mjs';
+import {VERSION} from '../src/version.mjs';
 
 const live=process.argv.includes('--live'),submission=process.argv.includes('--submission'),checks=[];
 const add=(name,ok,detail='')=>checks.push({name,ok,detail});
@@ -52,7 +53,7 @@ if(live){
   if(normalizedBase){
     try{
       const health=await fetchJsonBounded(`${normalizedBase}/health`,64_000);
-      add('public_health',health.response.ok&&health.json?.ok===true,`status=${health.response.status};version=${health.json?.version??'unknown'}`);
+      add('public_health',health.response.ok&&health.json?.ok===true&&health.json?.version===VERSION,`status=${health.response.status};version=${health.json?.version??'unknown'};expected=${VERSION}`);
 
       const ready=await fetchJsonBounded(`${normalizedBase}/ready`,64_000);
       currentBootId=ready.json?.arena_daemon?.boot_id??null;
@@ -60,9 +61,10 @@ if(live){
       add('public_arena_daemon_fresh',ready.json?.arena_daemon?.required===true&&ready.json?.arena_daemon?.ready===true&&typeof currentBootId==='string',`age_ms=${ready.json?.arena_daemon?.age_ms??'unknown'};boot_id=${currentBootId??'missing'}`);
 
       const arena=await fetchTextBounded(`${normalizedBase}/arena.md`,128_000);
-      add('public_arena_card',arena.response.ok&&arena.text.includes(`${normalizedBase}/mcp`)&&arena.text.includes('sledgewire.selfcheck'),`status=${arena.response.status};bytes=${Buffer.byteLength(arena.text)}`);
+      add('public_arena_card',arena.response.ok&&arena.text.includes(`${normalizedBase}/mcp`)&&arena.text.includes('sledgewire.selfcheck')&&arena.text.includes('30-second judge path')&&arena.text.includes('Fast buyer path'),`status=${arena.response.status};bytes=${Buffer.byteLength(arena.text)}`);
 
       const machineCard=await fetchJsonBounded(`${normalizedBase}/arena.json`,128_000),authority=machineCard.json?.sharedos_authority;
+      add('public_competition_card',machineCard.response.ok&&machineCard.json?.version===VERSION&&machineCard.json?.arena1_judge_path?.[1]?.tool==='sledgewire.selfcheck'&&Number(machineCard.json?.arena2_buyer_path?.best_first_paid?.price_credits)===3&&machineCard.json?.proofs?.paid_trace?.includes('sledgewire.trace'),`status=${machineCard.response.status};version=${machineCard.json?.version??'missing'}`);
       add('public_sharedos_authority_card',machineCard.response.ok&&authority?.purpose==='sledgewire.test-repair-and-invoke-agent-services'&&String(authority?.roles?.dispatcher??'').includes('no target execution grant')&&authority?.proof?.tool==='sledgewire.trace',`status=${machineCard.response.status};purpose=${authority?.purpose??'missing'};trace=${authority?.proof?.tool??'missing'}`);
 
       const pub=await fetchTextBounded(`${normalizedBase}/public-key`,16_384);remotePublicKeyPem=pub.text;
@@ -78,7 +80,7 @@ if(live){
 
       const route=(await mcp.callTool('sledgewire.smoke',{endpoint:'https://example.com/mcp'}))?.structuredContent;
       const routeSig=remotePublicKeyPem?verifyReceipt(route,remotePublicKeyPem):{ok:false,reason:'missing_public_key'};
-      add('public_paid_mcp_route',route?.state==='PAYMENT_REQUIRED'&&Number(route?.price_credits)===3&&route?.arena_room_id===room&&routeSig.ok,`state=${route?.state??'missing'};price=${route?.price_credits??'missing'};room=${route?.arena_room_id??'missing'};signature=${routeSig.ok?'ok':routeSig.reason}`);
+      add('public_paid_mcp_route',route?.state==='PAYMENT_REQUIRED'&&Number(route?.price_credits)===3&&typeof route?.deliverable==='string'&&route.deliverable.length>0&&route?.verification?.exact_retry_no_reexecution===true&&route?.arena_room_id===room&&routeSig.ok,`state=${route?.state??'missing'};price=${route?.price_credits??'missing'};room=${route?.arena_room_id??'missing'};signature=${routeSig.ok?'ok':routeSig.reason}`);
     }catch(e){add('public_live_surface',false,String(e.message||e));}
   }
 
