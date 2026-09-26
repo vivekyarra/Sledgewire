@@ -4,7 +4,7 @@
 
 - [x] CLI and MCP with current 2026-07-28 stateless `server/discover` plus bounded legacy fallback.
 - [x] Official `@modelcontextprotocol/client` v2 Streamable HTTP integration test negotiates 2026-07-28 and calls Sledgewire.
-- [x] Modern requests enforce protocol/method/name/session rules; Unicode-safe sentinel headers and reachable `x-mcp-header` mirroring are covered.
+- [x] Modern requests enforce required per-request `clientCapabilities` plus protocol/method/name/session rules; malformed 2026-07-28 envelopes fail with HTTP 400 / JSON-RPC `-32602`. Unicode-safe sentinel headers and reachable `x-mcp-header` mirroring are covered.
 - [x] Modern responses emit required `resultType`; cacheable discovery/catalog responses emit `ttlMs` and `cacheScope`.
 - [x] Modern downgrade refuses to hide timeout/internal errors as legacy compatibility.
 - [x] Exact JSON media-type checks, target request ceilings, response content-length/stream ceilings and deadlines fail closed.
@@ -38,7 +38,7 @@
 - [x] **10,000** payment claims + 10,000 cached retries + 500 wrong-buyer rejections, 0 duplicate paid executions.
 - [x] Duplicate storm: **33,000 authorization attempts**, 1,000 unique claims, 15,000 in-flight duplicates refused, 16,000 cached replays, 1,000 transaction-reuse attempts refused, **1,000 ledger reads**, 0 duplicate paid executions.
 - [x] SharedOS deny / allow / maxUses / durable-audit check green.
-- [x] Static preflight green; live preflight additionally requires production mode and disabled paid bypass.
+- [x] Static preflight green; hardened live preflight additionally requires production mode, disabled paid bypass, public modern MCP negotiation, signed selfcheck/payment route, authenticated seller identity/payee, cryptographically validated second-seat rehearsal evidence, and restart-replay evidence matching the current daemon boot.
 - [x] Production MCP Host/authority guard rejects unlisted Host headers.
 - [x] Two-process Docker Compose topology shares the same persistent SQLite/WAL volume between public MCP and Arena daemon.
 - [x] Public `/ready` fails closed when the Arena daemon heartbeat is missing, stopped or stale; live preflight checks readiness and deployed signing-key identity.
@@ -74,3 +74,4 @@
 - [ ] Representative agent follows `docs/ARENA_AGENT_PROMPT.md`.
 - [ ] 60-minute no-human rehearsal passes.
 - [ ] Real Smoke p95 below 25 seconds and all paid calls below hard deadlines.
+- [ ] Final `npm run preflight -- --live` is green against the exact deployment and current daemon boot.
