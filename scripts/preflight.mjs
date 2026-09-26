@@ -62,6 +62,9 @@ if(live){
       const arena=await fetchTextBounded(`${normalizedBase}/arena.md`,128_000);
       add('public_arena_card',arena.response.ok&&arena.text.includes(`${normalizedBase}/mcp`)&&arena.text.includes('sledgewire.selfcheck'),`status=${arena.response.status};bytes=${Buffer.byteLength(arena.text)}`);
 
+      const machineCard=await fetchJsonBounded(`${normalizedBase}/arena.json`,128_000),authority=machineCard.json?.sharedos_authority;
+      add('public_sharedos_authority_card',machineCard.response.ok&&authority?.purpose==='sledgewire.test-repair-and-invoke-agent-services'&&String(authority?.roles?.dispatcher??'').includes('no target execution grant')&&authority?.proof?.tool==='sledgewire.trace',`status=${machineCard.response.status};purpose=${authority?.purpose??'missing'};trace=${authority?.proof?.tool??'missing'}`);
+
       const pub=await fetchTextBounded(`${normalizedBase}/public-key`,16_384);remotePublicKeyPem=pub.text;
       let remoteKeyId=null;try{remoteKeyId=keyId(pub.text);}catch{}
       add('public_signing_key_matches',Boolean(localSigningKeyId)&&remoteKeyId===localSigningKeyId,remoteKeyId??'invalid_remote_public_key');
