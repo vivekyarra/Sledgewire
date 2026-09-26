@@ -35,6 +35,23 @@ jobs:
           SHAREDNET_ARENA_ROOM_ID=rom_ABCDEFGHIJ \
           SHAREDNET_PAYEE_ADDRESS=p_ABCDEFGHIJ \
           docker compose -f compose.arena.yml config >/dev/null
+      - name: Railway deployment contract parses
+        run: |
+          node - <<'NODE'
+          const fs=require('node:fs');
+          const x=JSON.parse(fs.readFileSync('railway.json','utf8'));
+          const d=x.deploy||{},b=x.build||{};
+          const ok=
+            x.$schema==='https://railway.com/railway.schema.json' &&
+            b.dockerfilePath==='Dockerfile' &&
+            d.startCommand==='npm run arena:all' &&
+            d.healthcheckPath==='/ready' &&
+            Number(d.healthcheckTimeout)>=120 &&
+            d.restartPolicyType==='ON_FAILURE' &&
+            Number(d.restartPolicyMaxRetries)>=10 &&
+            Number(d.drainingSeconds)>=10;
+          if(!ok){console.error(JSON.stringify(x,null,2));process.exit(1);}
+          NODE
       - name: production key fail-closed check
         run: |
           if NODE_ENV=production node -e "import('./src/server/protocol.mjs')"; then
