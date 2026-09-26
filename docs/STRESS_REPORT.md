@@ -6,15 +6,15 @@ This report separates executed CI evidence from live-event facts. It does not cl
 
 ## Current green code evidence
 
-Evidence commit: `9c15ae5bafa5d54efaa590d3607a2a1b45f17691`
+Evidence commit: `2dfb73716d10ae6abc3a046b6b22307d2272eb5c`
 
-GitHub Actions run: `36239219171`
+GitHub Actions run: `36239339905`
 
 - Automated tests: **248 / 248 passed**, 0 failed, 0 skipped.
 - Hostile/current-protocol selfcheck: **VERIFIED**, signed receipt verification true, profile `sledgewire.selfcheck.v4`.
-- MCP stress: **10,000 / 10,000** complete Smoke workflows at concurrency **128**, **0 failures**; p50 **103 ms**, p95 **118 ms**, p99 **192 ms**, total **8.632 s**.
-- Arena ledger/replay stress: **10,000 claims**, **10,000 cached retries**, **500 wrong-buyer attempts rejected**, **0 duplicate paid executions**, total **1.055 s**.
-- Duplicate storm: **33,000 authorization attempts** across 1,000 purchases at fanout 16: 1,000 unique claims, 15,000 in-flight duplicate refusals, 16,000 cached replays, 1,000 transaction-reuse refusals, only **1,000 ledger reads**, **0 duplicate paid executions**, total **1.228 s**.
+- MCP stress: **10,000 / 10,000** complete Smoke workflows at concurrency **128**, **0 failures**; p50 **141 ms**, p95 **157 ms**, p99 **266 ms**, total **11.730 s**.
+- Arena ledger/replay stress: **10,000 claims**, **10,000 cached retries**, **500 wrong-buyer attempts rejected**, **0 duplicate paid executions**, total **1.674 s**.
+- Duplicate storm: **33,000 authorization attempts** across 1,000 purchases at fanout 16: 1,000 unique claims, 15,000 in-flight duplicate refusals, 16,000 cached replays, 1,000 transaction-reuse refusals, only **1,000 ledger reads**, **0 duplicate paid executions**, total **1.763 s**.
 - SharedOS check: deny true, allow true, exhausted `maxUses` denied, **9 audit events**.
 - Static preflight: **READY**.
 - Production missing signing key fails closed; persistent key succeeds.
