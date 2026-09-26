@@ -28,7 +28,13 @@ const concurrency=boundedInteger(process.env.SLEDGEWIRE_ARENA_CONCURRENCY,{name:
 const daemonBootId=crypto.randomUUID();
 const writeLocalHeartbeat=(status='running')=>{try{writeArenaDaemonHeartbeat(store,room,{instanceId:selfSeat,bootId:daemonBootId,status});}catch(e){console.error(`local-heartbeat:${e.message}`);}};
 writeLocalHeartbeat(); // identity + Room join already succeeded above, so initial readiness has external evidence.
-const heartbeat=setInterval(()=>api.heartbeat().then(()=>writeLocalHeartbeat()).catch(e=>console.error(`heartbeat:${e.message}`)),20_000);heartbeat.unref();
+async function refreshExternalReadiness(){
+  await api.heartbeat();
+  const detail=await api.request(`/api/v1/rooms/${room}`);
+  if(detail?.room?.id!==room)throw new Error('arena_room_membership_unconfirmed');
+  writeLocalHeartbeat();
+}
+const heartbeat=setInterval(()=>refreshExternalReadiness().catch(e=>console.error(`heartbeat:${e.message}`)),20_000);heartbeat.unref();
 const arenaPrices=Object.fromEntries(Object.entries(catalog.services).map(([k,v])=>[k,v.price]));
 const statsEvery=boundedInteger(process.env.SLEDGEWIRE_ARENA_STATS_INTERVAL_MS,{name:'arena_stats_interval_ms',defaultValue:300_000,min:60_000,max:3_600_000});
 const statsTimer=setInterval(()=>{try{console.error(JSON.stringify({sledgewire:'arena-stats',...store.arenaStats({prices:arenaPrices})}));}catch(e){console.error(`arena-stats:${e.message}`);}},statsEvery);statsTimer.unref();
