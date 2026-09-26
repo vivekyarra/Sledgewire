@@ -3,6 +3,7 @@ const TYPES=new Set(['string','integer','boolean','number']);
 const NONREACHABLE=['items','prefixItems','contains','additionalProperties','unevaluatedProperties','unevaluatedItems','propertyNames','patternProperties','dependentSchemas','oneOf','anyOf','allOf','not','if','then','else','$defs','definitions'];
 const OBJECT_BRANCHES=new Set(['patternProperties','dependentSchemas','$defs','definitions']);
 const PREFIX='=?base64?',SUFFIX='?=';
+const MAX_SCHEMA_SCAN_DEPTH=64,MAX_SCHEMA_SCAN_NODES=10_000;
 
 function pathName(path){return path.length?path.join('.'):'<root>';}
 export function encodeMcpHeaderValue(value){
@@ -24,9 +25,11 @@ export function decodeMcpHeaderValue(value){
   }catch{return undefined;}
 }
 export function scanXMcpHeaderDeclarations(schema){
-  const declarations=[],seen=new Map();
-  function visit(node,path,reachable){
+  const declarations=[],seen=new Map(),state={nodes:0};
+  function visit(node,path,reachable,depth){
+    if(depth>MAX_SCHEMA_SCAN_DEPTH)return 'schema_depth_limit';
     if(!node||typeof node!=='object'||Array.isArray(node))return null;
+    if(++state.nodes>MAX_SCHEMA_SCAN_NODES)return 'schema_node_limit';
     if(Object.prototype.hasOwnProperty.call(node,'x-mcp-header')){
       if(!reachable||path.length===0)return `${pathName(path)}:x-mcp-header_unreachable`;
       const name=node['x-mcp-header'],type=node.type;
@@ -36,16 +39,16 @@ export function scanXMcpHeaderDeclarations(schema){
       declarations.push({path:[...path],headerName:name,type});
     }
     if(node.properties&&typeof node.properties==='object'&&!Array.isArray(node.properties)){
-      for(const [k,v] of Object.entries(node.properties)){const e=visit(v,[...path,k],reachable);if(e)return e;}
+      for(const [k,v] of Object.entries(node.properties)){const e=visit(v,[...path,k],reachable,depth+1);if(e)return e;}
     }
     for(const key of NONREACHABLE){
       const sub=node[key];if(sub===undefined)continue;
       const branches=Array.isArray(sub)?sub:(sub&&typeof sub==='object'&&OBJECT_BRANCHES.has(key)?Object.values(sub):[sub]);
-      for(const branch of branches){const e=visit(branch,[...path,`<${key}>`],false);if(e)return e;}
+      for(const branch of branches){const e=visit(branch,[...path,`<${key}>`],false,depth+1);if(e)return e;}
     }
     return null;
   }
-  const reason=visit(schema,[],true);
+  const reason=visit(schema,[],true,0);
   return reason?{valid:false,reason}:{valid:true,declarations};
 }
 function at(root,path){let x=root;for(const k of path){if(!x||typeof x!=='object')return undefined;x=x[k];}return x;}
