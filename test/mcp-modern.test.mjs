@@ -39,7 +39,15 @@ test('server/discover advertises modern plus legacy and identity only in _meta',
   const r=await handleRpc({jsonrpc:'2.0',id:'d1',method:'server/discover',params:{_meta:{'io.modelcontextprotocol/protocolVersion':'2026-07-28','io.modelcontextprotocol/clientCapabilities':{},'io.modelcontextprotocol/clientInfo':{name:'test',version:'1'}}}});
   assert.equal(r.result.resultType,'complete');assert.equal(r.result.ttlMs,0);assert.equal(r.result.cacheScope,'private');assert.ok(r.result.supportedVersions.includes('2026-07-28'));assert.ok(r.result.supportedVersions.includes('2025-11-25'));assert.equal(r.result.serverInfo,undefined);assert.equal(r.result._meta['io.modelcontextprotocol/serverInfo'].version,'0.3.9');
 });
-test('modern tools/list wire result carries required result type and cache hints',async()=>{const r=await handleRpc({jsonrpc:'2.0',id:9,method:'tools/list',params:{_meta:{'io.modelcontextprotocol/protocolVersion':'2026-07-28'}}});assert.equal(r.result.resultType,'complete');assert.equal(r.result.ttlMs,0);assert.equal(r.result.cacheScope,'private');});
+test('modern tools/list wire result carries required result type and cache hints',async()=>{const r=await handleRpc({jsonrpc:'2.0',id:9,method:'tools/list',params:{_meta:{'io.modelcontextprotocol/protocolVersion':'2026-07-28','io.modelcontextprotocol/clientCapabilities':{}}}});assert.equal(r.result.resultType,'complete');assert.equal(r.result.ttlMs,0);assert.equal(r.result.cacheScope,'private');});
+test('modern requests reject missing or malformed required clientCapabilities with Invalid params',async()=>{
+  for(const caps of [undefined,null,[],true,'nope']){
+    const meta={'io.modelcontextprotocol/protocolVersion':'2026-07-28'};if(caps!==undefined)meta['io.modelcontextprotocol/clientCapabilities']=caps;
+    const msg={jsonrpc:'2.0',id:10,method:'tools/list',params:{_meta:meta}};
+    const h=validateHttpMcp(msg,{'mcp-protocol-version':'2026-07-28','mcp-method':'tools/list'});assert.equal(h.ok,false);assert.equal(h.status,400);assert.equal(h.body.error.code,-32602);
+    const direct=await handleRpc(msg);assert.equal(direct.error.code,-32602);
+  }
+});
 test('modern HTTP requires matching protocol and method headers',()=>{
   const msg={jsonrpc:'2.0',id:1,method:'tools/list',params:{_meta:{'io.modelcontextprotocol/protocolVersion':'2026-07-28','io.modelcontextprotocol/clientCapabilities':{}}}};
   assert.equal(validateHttpMcp(msg,{'mcp-protocol-version':'2026-07-28','mcp-method':'tools/list'}).ok,true);
@@ -58,7 +66,7 @@ test('modern HTTP rejects method name and removed session header mismatches',()=
 });
 test('modern HTTP decodes sentinel-encoded Mcp-Name',()=>{
   const name='工具/echo';
-  const msg={jsonrpc:'2.0',id:1,method:'tools/call',params:{name,arguments:{},_meta:{'io.modelcontextprotocol/protocolVersion':'2026-07-28'}}};
+  const msg={jsonrpc:'2.0',id:1,method:'tools/call',params:{name,arguments:{},_meta:{'io.modelcontextprotocol/protocolVersion':'2026-07-28','io.modelcontextprotocol/clientCapabilities':{}}}};
   const r=validateHttpMcp(msg,{'mcp-protocol-version':'2026-07-28','mcp-method':'tools/call','mcp-name':encodeMcpHeaderValue(name)});
   assert.equal(r.ok,true);
 });
