@@ -51,7 +51,7 @@ jobs:
           chmod 777 /tmp/swdata
           # Official node images run the app as uid/gid 1000. File-backed Docker
           # secrets are bind mounts, so preserve 0600 while making ownership explicit.
-          sudo chown 1000:1000 /tmp/swkeys/ed25519-private.pem /tmp/swkeys/ed25519-public.pem
+          sudo chown 1000:1000 /tmp/swkeys /tmp/swkeys/ed25519-private.pem /tmp/swkeys/ed25519-public.pem
           docker run -d --name sledgewire-ci-run -p 18787:8787 \
             -e NODE_ENV=production \
             -e PUBLIC_BASE_URL=https://sledgewire.example \
@@ -63,8 +63,13 @@ jobs:
           trap 'docker rm -f sledgewire-ci-run >/dev/null 2>&1 || true' EXIT
           for i in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:18787/health >/tmp/health.json; then break; fi
+            if [ "$(docker inspect -f '{{.State.Running}}' sledgewire-ci-run 2>/dev/null || true)" != "true" ]; then
+              docker logs sledgewire-ci-run >&2 || true
+              exit 1
+            fi
             sleep 1
           done
+          test -s /tmp/health.json || { docker logs sledgewire-ci-run >&2 || true; exit 1; }
           node -e "const x=JSON.parse(require('fs').readFileSync('/tmp/health.json','utf8')); if(x.ok!==true||x.version!=='0.3.10') process.exit(1)"
           curl -fsS http://127.0.0.1:18787/mcp \
             -H 'Host: sledgewire.example' \
