@@ -23,7 +23,7 @@ const announceEnabled=process.env.SLEDGEWIRE_ARENA_ANNOUNCE!=='0';
 try{const announcement=await announceArenaOnce({api,store,room,publicBaseUrl,enabled:announceEnabled});console.error(JSON.stringify({sledgewire:'arena-announcement',status:announcement.status,message_id:announcement.record?.message_id??null}));}
 catch(e){console.error(`arena-announcement:${e.message}`);if(process.env.SLEDGEWIRE_ARENA_ANNOUNCE_REQUIRED==='1')throw e;}
 const handle=createArenaHandler({store,ledger:api,room,payee,signing,publicBaseUrl});
-const key=`arena_cursor:${room}`;let stored=store.getMeta(key),cursor=stored===null?(process.env.SLEDGEWIRE_PROCESS_HISTORY==='1'?0:await api.latestSequence(room)):Number(stored);store.setMeta(key,String(cursor));
+const key=`arena_cursor:${room}`;let stored=store.getMeta(key),cursor=stored===null?(process.env.SLEDGEWIRE_PROCESS_HISTORY==='1'?0:await api.latestSequence(room)):boundedInteger(stored,{name:'arena_cursor',defaultValue:0,min:0,max:Number.MAX_SAFE_INTEGER});store.setMeta(key,String(cursor));
 const concurrency=boundedInteger(process.env.SLEDGEWIRE_ARENA_CONCURRENCY,{name:'arena_concurrency',defaultValue:4,min:1,max:8}),maxAttempts=boundedInteger(process.env.SLEDGEWIRE_MESSAGE_MAX_ATTEMPTS,{name:'message_max_attempts',defaultValue:5,min:2,max:10});
 const daemonBootId=crypto.randomUUID();
 const writeLocalHeartbeat=(status='running')=>{try{writeArenaDaemonHeartbeat(store,room,{instanceId:selfSeat,bootId:daemonBootId,status});}catch(e){console.error(`local-heartbeat:${e.message}`);}};
