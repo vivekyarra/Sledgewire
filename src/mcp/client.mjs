@@ -1,6 +1,7 @@
 import {postJsonPinned} from './transport.mjs';
 import {resolveTarget} from '../security/target-policy.mjs';
 import {buildMcpParamHeaders,encodeMcpHeaderValue,scanXMcpHeaderDeclarations} from './header-codec.mjs';
+import {VERSION} from '../version.mjs';
 
 export const MODERN_PROTOCOL_VERSION='2026-07-28';
 export const LEGACY_PROTOCOL_VERSION='2025-11-25';
