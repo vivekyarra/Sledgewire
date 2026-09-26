@@ -1,5 +1,5 @@
 import {idempotencyUuid,MESSAGE,SEAT,TXN,payeeBelongsToIdentity} from './api.mjs';
-import {paymentMemo} from '../core/payment-gate.mjs';
+import {paymentMemo,requestFingerprint} from '../core/payment-gate.mjs';
 import {verifyReceipt} from '../receipts/receipt.mjs';
 import {publicBaseOrigin} from '../ops/config.mjs';
 
@@ -29,13 +29,15 @@ export async function waitForArenaReply(api,roomId,{after,replyTo,requestId,buye
   throw new Error('rehearsal_reply_timeout');
 }
 
-function assertPaymentQuote(body,{requestId,roomId,payee,service,price,buyerSeat,publicKeyPem}){
+function assertPaymentQuote(body,{requestId,roomId,payee,service,price,buyerSeat,input,publicKeyPem}){
   if(body?.type!=='sledgewire.payment_required.v1')throw new Error('rehearsal_missing_payment_required');
   if(body.request_id!==requestId||body.service!==service)throw new Error('rehearsal_quote_request_mismatch');
   if(body.room_id!==roomId||body.payee!==payee)throw new Error('rehearsal_quote_destination_mismatch');
   if(body.buyer_seat!==buyerSeat)throw new Error('rehearsal_quote_buyer_mismatch');
   if(Number(body.price_credits)!==price)throw new Error('rehearsal_quote_price_mismatch');
-  if(body.memo!==paymentMemo(requestId,service))throw new Error('rehearsal_quote_memo_mismatch');
+  const bound={roomId,buyerSeat,requestId,service,input},fingerprint=requestFingerprint(bound);
+  if(body.request_fingerprint!==fingerprint||body.memo_version!=='sledgewire.payment.v2'||body.memo!==paymentMemo(bound))throw new Error('rehearsal_quote_request_binding_mismatch');
+  if(body.next_action?.memo!==body.memo||body.next_action?.payee!==payee||Number(body.next_action?.amount_credits)!==price)throw new Error('rehearsal_quote_next_action_mismatch');
   const verified=verifyReceipt(body,publicKeyPem);if(!verified.ok)throw new Error(`rehearsal_quote_signature_invalid:${verified.reason}`);
 }
 function assertDelivery(body,{requestId,service,roomId,buyerSeat,txnId,price,publicKeyPem}){
@@ -63,7 +65,7 @@ export async function runLiveSmokeRehearsal({api,roomId,payee,publicBaseUrl,targ
   const firstPost=await api.post(roomId,JSON.stringify(request),{idempotencyKey:idempotencyUuid(`rehearsal-request:${requestId}:quote`)});
   const firstId=messageId(firstPost);if(!MESSAGE.test(firstId??''))throw new Error('rehearsal_initial_message_id_missing');
   const quoteReply=await waitForArenaReply(api,roomId,{after:Math.max(startCursor,messageSequence(firstPost)??0),replyTo:firstId,requestId,buyerSeat,timeoutMs});
-  assertPaymentQuote(quoteReply.body,{requestId,roomId,payee,service,price,buyerSeat,publicKeyPem});
+  assertPaymentQuote(quoteReply.body,{requestId,roomId,payee,service,price,buyerSeat,input:request.input,publicKeyPem});
 
   const payment=await api.pay(payee,price,{memo:quoteReply.body.memo,roomId,idempotencyKey:idempotencyUuid(`rehearsal-payment:${requestId}`)});
   const txnId=payment?.transfer?.id??payment?.id??null;if(!TXN.test(txnId??''))throw new Error('rehearsal_payment_transaction_missing');
