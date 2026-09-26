@@ -2,7 +2,7 @@ import {MESSAGE,SEAT,TXN} from '../sharednet/api.mjs';
 import {verifyReceipt} from '../receipts/receipt.mjs';
 
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const LIVE_CHECKS=['payment_quote','native_transfer','signed_delivery','sharedos_trace','trace_signature','exact_cached_retry'];
+const LIVE_CHECKS=['payment_quote','signed_payment_quote','native_transfer','signed_delivery','sharedos_trace','trace_signature','exact_cached_retry'];
 const RESTART_CHECKS=['daemon_boot_changed','signing_key_persisted','cached_delivery_identical','shared_db_trace_persisted','no_second_payment'];
 
 function fail(reason){return {ok:false,reason};}
