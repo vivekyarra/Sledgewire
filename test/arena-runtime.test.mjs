@@ -37,6 +37,21 @@ test('single-container runtime hydrates root-only files and isolates public Shar
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 
+test('Railway system variables derive canonical public base and persistent database path',()=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'sledgewire-railway-'));
+  try{
+    const processOps={getuid:()=>1000,getgid:()=>1000};
+    const r=prepareSingleContainerRuntime({
+      env:{RAILWAY_PUBLIC_DOMAIN:'seller.up.railway.app',RAILWAY_VOLUME_MOUNT_PATH:dir,SLEDGEWIRE_PRIVATE_KEY_PEM:'PRIVATE'},
+      processOps
+    });
+    assert.equal(r.publicEnv.PUBLIC_BASE_URL,'https://seller.up.railway.app');
+    assert.equal(r.daemonEnv.PUBLIC_BASE_URL,'https://seller.up.railway.app');
+    assert.equal(r.dbPath,path.join(dir,'sledgewire.db'));
+    assert.equal(r.daemonEnv.SLEDGEWIRE_DB,path.join(dir,'sledgewire.db'));
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
 test('root runtime chowns persistent database directory then drops groups gid and uid',()=>{
   const calls=[];let uid=0,gid=0;
   const fsImpl={
