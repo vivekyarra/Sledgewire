@@ -134,6 +134,7 @@ export async function runRestartReplayProof({api,roomId,publicBaseUrl,publicKeyP
     type:'sledgewire.restart-replay-proof.v1',verified:true,request_id:requestId,room_id:roomId,buyer_seat:buyerSeat,payment_txn_id:txnId,
     previous_boot_id:previousEvidence.provider_boot_id,current_boot_id:currentBootId,trace_id:previousEvidence.trace_id,
     replay_message_id:postId,delivery_message_id:replay.message.id,
+    receipt:replay.body.receipt,trace_proof:trace,
     checks:{daemon_boot_changed:true,signing_key_persisted:previousVerification.ok,cached_delivery_identical:deliveryVerification.ok,shared_db_trace_persisted:traceVerification.ok,no_second_payment:true},
     completed_at:new Date().toISOString()
   };
