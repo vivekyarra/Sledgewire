@@ -77,6 +77,11 @@ test('same external request id is isolated by buyer seat',async()=>{
   const b=await g.authorize({...base,buyerSeat:'i_BUYERBBBB',requestId:'same-id',txnId:'txn_BUYERBBBB'});
   assert.equal(a.ok,true);assert.equal(b.ok,true);assert.notEqual(a.storageKey,b.storageKey);assert.notEqual(a.fingerprint,b.fingerprint);
 });
+test('durable transaction binding rejects a different buyer without re-reading the ledger',async()=>{
+  const s=new ArenaStore(),g1=new PaymentGate({ledger:ledger(),store:s,prices,payee}),a=await g1.authorize(base);s.complete(a.storageKey,a.fingerprint,{delivered:true});
+  let reads=0;const g2=new PaymentGate({ledger:{async get(){reads++;throw new Error('ledger_should_not_be_called');}},store:s,prices,payee});
+  const r=await g2.authorize({...base,buyerSeat:'i_ZYXWVUTSRQ'});assert.equal(r.reason,'wrong_buyer');assert.equal(reads,0);
+});
 test('fingerprint deterministic',()=>assert.equal(requestFingerprint(base),requestFingerprint(base)));
 test('failed request never silently reexecutes',async()=>{
   const s=new ArenaStore(),g=new PaymentGate({ledger:ledger(),store:s,prices,payee}),a=await g.authorize(base);
