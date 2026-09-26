@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {SEAT,ADDRESS,ROOM,TXN,INSTANCE_TOKEN,normalizeTransfer,SharedNetApi,parseWatchBatch,senderInstance,payeeBelongsToIdentity,MAX_ARTIFACT_BYTES,MAX_SHAREDNET_JSON_BYTES,MAX_SHAREDNET_PAGE_BYTES} from '../src/sharednet/api.mjs';
 import {ArenaStore} from '../src/store/arena-store.mjs';
 import {createArenaHandler} from '../src/sharednet/handler.mjs';
-import {generateSigningKeypair} from '../src/receipts/receipt.mjs';
+import {generateSigningKeypair,verifyReceipt} from '../src/receipts/receipt.mjs';
 
 test('SharedNet live short identifier formats are accepted',()=>{
   assert.ok(SEAT.test('i_AbCdEfGhIj'));assert.ok(ADDRESS.test('p_AbCdEfGhIj'));assert.ok(ADDRESS.test('a_AbCdEfGhIj'));assert.ok(ROOM.test('rom_AbCdEfGhIj'));assert.ok(TXN.test('txn_AbCdEfGhIj'));assert.ok(INSTANCE_TOKEN.test('sni_'+ 'A'.repeat(43)));
@@ -44,10 +44,10 @@ test('arena handler answers product demo questions without payment',async()=>{
   const store=new ArenaStore(':memory:');const kp=generateSigningKeypair();const handle=createArenaHandler({store,ledger:{get:async()=>null},room:'rom_ABCDEFGHIJ',payee:'p_ABCDEFGHIJ',signing:{privateKeyPem:kp.privateKeyPem},publicBaseUrl:'https://sledgewire.example'});
   const r=await handle({sender_instance_id:'i_ZYXWVUTSRQ',content:'@sledgewire show me a demo'});assert.equal(r.type,'sledgewire.info.v1');assert.match(r.message,/selfcheck/i);
 });
-test('arena handler returns exact payment requirement before execution',async()=>{
+test('arena handler returns signed buyer-bound payment requirement before execution',async()=>{
   const store=new ArenaStore(':memory:');const kp=generateSigningKeypair();const handle=createArenaHandler({store,ledger:{get:async()=>null},room:'rom_ABCDEFGHIJ',payee:'p_ABCDEFGHIJ',signing:{privateKeyPem:kp.privateKeyPem},publicBaseUrl:'https://sledgewire.example'});
   const r=await handle({sender_instance_id:'i_ZYXWVUTSRQ',content:JSON.stringify({type:'sledgewire.service.request.v1',request_id:'req-abc',service:'sledgewire.smoke',input:{endpoint:'https://example.com/mcp'}})});
-  assert.equal(r.type,'sledgewire.payment_required.v1');assert.equal(r.price_credits,3);assert.equal(r.room_id,'rom_ABCDEFGHIJ');assert.equal(r.memo,'sledgewire:req-abc:sledgewire.smoke');
+  assert.equal(r.type,'sledgewire.payment_required.v1');assert.equal(r.price_credits,3);assert.equal(r.room_id,'rom_ABCDEFGHIJ');assert.equal(r.memo,'sledgewire:req-abc:sledgewire.smoke');assert.equal(r.buyer_seat,'i_ZYXWVUTSRQ');assert.equal(verifyReceipt(r,kp.publicKeyPem).ok,true);
 });
 test('arena store remembers processed room messages and cursors',()=>{const s=new ArenaStore(':memory:');assert.equal(s.roomMessageSeen('msg_1'),false);s.markRoomMessage('msg_1');assert.equal(s.roomMessageSeen('msg_1'),true);s.setMeta('cursor','42');assert.equal(s.getMeta('cursor'),'42');});
 
