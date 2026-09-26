@@ -74,6 +74,16 @@ test('arena handler returns signed buyer-bound payment requirement before execut
   const r=await handle({sender_instance_id:'i_ZYXWVUTSRQ',content:JSON.stringify({type:'sledgewire.service.request.v1',request_id:'req-abc',service:'sledgewire.smoke',input:{endpoint:'https://example.com/mcp'}})});
   const bound={roomId:'rom_ABCDEFGHIJ',buyerSeat:'i_ZYXWVUTSRQ',requestId:'req-abc',service:'sledgewire.smoke',input:{endpoint:'https://example.com/mcp'}};assert.equal(r.type,'sledgewire.payment_required.v1');assert.equal(r.price_credits,3);assert.match(r.deliverable,/smoke test/i);assert.equal(r.verification.exact_retry_no_reexecution,true);assert.equal(r.room_id,'rom_ABCDEFGHIJ');assert.equal(r.memo,paymentMemo(bound));assert.equal(r.request_fingerprint,requestFingerprint(bound));assert.equal(r.memo_version,'sledgewire.payment.v2');assert.equal(r.next_action.memo,r.memo);assert.equal(r.buyer_seat,'i_ZYXWVUTSRQ');assert.equal(verifyReceipt(r,kp.publicKeyPem).ok,true);
 });
+test('Room payment quote cannot authorize changed target input on first paid resend',async()=>{
+  const store=new ArenaStore(':memory:'),kp=generateSigningKeypair();let executions=0,reads=0,quotedMemo=null;
+  const ledger={async get(){reads++;return {id:'txn_ABCDEFGHIJ',buyer_instance_id:'i_ZYXWVUTSRQ',addressed_to:'p_ABCDEFGHIJ',payee_ok:true,amount:3,room_id:'rom_ABCDEFGHIJ',memo:quotedMemo};}};
+  const handle=createArenaHandler({store,ledger,room:'rom_ABCDEFGHIJ',payee:'p_ABCDEFGHIJ',signing:{privateKeyPem:kp.privateKeyPem},publicBaseUrl:'https://sledgewire.example',runService:async()=>{executions++;return {service:'sledgewire.smoke',state:'READY'};}});
+  const original={type:'sledgewire.service.request.v1',request_id:'req-bind',service:'sledgewire.smoke',input:{endpoint:'https://one.example/mcp'}};
+  const quote=await handle({sender_instance_id:'i_ZYXWVUTSRQ',content:JSON.stringify(original)});quotedMemo=quote.memo;
+  const altered={...original,input:{endpoint:'https://two.example/mcp'},payment_txn_id:'txn_ABCDEFGHIJ'};
+  const r=await handle({sender_instance_id:'i_ZYXWVUTSRQ',content:JSON.stringify(altered)});
+  assert.equal(r.state,'FAILED');assert.equal(r.reason,'wrong_memo');assert.equal(reads,1);assert.equal(executions,0);
+});
 test('paid execution failure is signed and exact retries replay it without ledger read or reexecution',async()=>{
   const store=new ArenaStore(':memory:'),kp=generateSigningKeypair();let executions=0,reads=0;
   const bound={roomId:'rom_ABCDEFGHIJ',buyerSeat:'i_ZYXWVUTSRQ',requestId:'req-fail',service:'sledgewire.smoke',input:{endpoint:'https://example.com/mcp'}};const ledger={async get(){reads++;return {id:'txn_ABCDEFGHIJ',buyer_instance_id:'i_ZYXWVUTSRQ',addressed_to:'p_ABCDEFGHIJ',payee_ok:true,amount:3,room_id:'rom_ABCDEFGHIJ',memo:paymentMemo(bound)};}};
