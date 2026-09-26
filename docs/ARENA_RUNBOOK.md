@@ -58,4 +58,5 @@ Do not enter autonomous competition until all are true:
 - native SharedNet purse/ledger readable;
 - another seat can purchase, verify the receipt, and retrieve its sanitized SharedOS trace proof;
 - SharedOS allow/deny/maxUses check green;
-- 60-minute no-human rehearsal green.
+- 60-minute no-human rehearsal green;
+- `npm run arena:stats` shows sane zero/positive aggregate counters and no malformed completed rows before handoff.
