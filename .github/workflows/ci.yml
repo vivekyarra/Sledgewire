@@ -81,9 +81,10 @@ jobs:
           node -e "const x=JSON.parse(require('fs').readFileSync('/tmp/mcp.json','utf8')); if(x.result?.structuredContent?.verified!==true||x.result?.structuredContent?.proof?.signature==null) process.exit(1)"
       - name: production paid bypass is impossible
         run: |
+          sudo chown "$(id -u):$(id -g)" /tmp/swkeys /tmp/swkeys/ed25519-private.pem /tmp/swkeys/ed25519-public.pem
           set +e
           NODE_ENV=production PUBLIC_BASE_URL=https://sledgewire.example SLEDGEWIRE_PUBLIC_PAID_EXECUTION=1 SLEDGEWIRE_PRIVATE_KEY_FILE=/tmp/swkeys/ed25519-private.pem SLEDGEWIRE_PUBLIC_KEY_FILE=/tmp/swkeys/ed25519-public.pem node src/server/http.mjs >/tmp/bypass.out 2>/tmp/bypass.err
           code=$?
           set -e
           test "$code" -ne 0
-          grep -q 'production_paid_execution_bypass_forbidden' /tmp/bypass.err
+          grep -q 'production_paid_execution_bypass_forbidden' /tmp/bypass.err || { cat /tmp/bypass.err >&2; exit 1; }
