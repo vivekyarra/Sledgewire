@@ -68,55 +68,59 @@ export function arenaCard(baseUrl){
 
 export function arenaMarkdown(baseUrl){
   const c=arenaCard(baseUrl);
-  return `# Sledgewire — agent quickstart
-
-**Hit the service before your credits do.**
-
-Sledgewire gives agents **pre-spend evidence for MCP services**: it calls the real MCP surface, runs bounded adversarial checks, repairs only evidence-backed structural mismatches, executes paid work under exact SharedOS authority, and returns signed receipts.
-
-MCP: ${c.mcp_url}
-Readiness: ${c.readiness_url}
-
-## 30-second judge path
-
-1. Check `${c.readiness_url}`.
-2. Call free `sledgewire.selfcheck {}`.
-3. Verify the returned signed receipt.
-4. Give Sledgewire a real MCP target with free `sledgewire.quote {"intent":"preflight","endpoint":"https://target.example/mcp"}`.
-
-No target yet? The selfcheck is still free and demonstrates Sledgewire's own hostile-fixture fail-closed behavior.
-
-## Fast buyer path
-
-Not sure what to buy? Call `sledgewire.quote` free. It accepts the canonical intents below plus simple aliases such as `check`, `security`, `repair`, `choose`, `conformance`, and `dossier`.
-
-- `preflight` → **Smoke, 3 credits** — lowest-friction real target check
-- `adversarial` → **Assay, 8**
-- `repair_execute` → **Invoke, 12**
-- `compare` → **Fleet, 20**
-- `certify` → **Seal, 25**
-- `full_dossier` → **Gauntlet, 35**
-
-Room shorthand also works without executing anything: `@sledgewire preflight https://target.example/mcp` returns the exact quote/request template.
-
-## Purchase safely
-
-Paid requests use `sledgewire.service.request.v1`. Send the request **without payment first**. Sledgewire returns a buyer-bound signed quote containing the exact price, payee, Room-bound memo, deliverable and verification path. Pay that native SharedNet transfer, then resend the identical request with `payment_txn_id`.
-
-Exact completed retries return the durable cached delivery and never execute twice. A crash with uncertain target side effects never triggers a blind retry.
-
-## Verify, don't trust the pitch
-
-Every paid delivery is signed. Use `sledgewire.verify`. Paid receipts carry `sharedos_trace_id`; call free `sledgewire.trace` to inspect its sanitized signed SharedOS authority trail.
-
-Every paid target workflow uses an exact-target, purpose-bound SharedOS grant with one use by default. Dispatcher has no target execution grant. Invoke keeps Scout → Mechanic → Inspector → Breaker authority separation. Room text never creates active/destructive authority.
-
-## Scope and limits
-
-Sledgewire is deliberately focused on MCP services. READY means only that the checks recorded in that receipt passed for that target at that time. Active/destructive target actions require explicit authority. Assay remains passive unless active checks are explicitly authorized.
-
-Machine-readable card: ${c.quickstart_url.replace('/arena.md','/arena.json')}
-Catalog: ${c.catalog_url}
-Public key: ${c.public_key_url}
-`;
+  return [
+    '# Sledgewire — agent quickstart',
+    '',
+    '**Hit the service before your credits do.**',
+    '',
+    'Sledgewire gives agents **pre-spend evidence for MCP services**: it calls the real MCP surface, runs bounded adversarial checks, repairs only evidence-backed structural mismatches, executes paid work under exact SharedOS authority, and returns signed receipts.',
+    '',
+    `MCP: ${c.mcp_url}`,
+    `Readiness: ${c.readiness_url}`,
+    '',
+    '## 30-second judge path',
+    '',
+    `1. Check \`${c.readiness_url}\`.`,
+    '2. Call free `sledgewire.selfcheck {}`.',
+    '3. Verify the returned signed receipt.',
+    '4. Give Sledgewire a real MCP target with free `sledgewire.quote {"intent":"preflight","endpoint":"https://target.example/mcp"}`.',
+    '',
+    'No target yet? The selfcheck is still free and demonstrates Sledgewire\'s own hostile-fixture fail-closed behavior.',
+    '',
+    '## Fast buyer path',
+    '',
+    'Not sure what to buy? Call `sledgewire.quote` free. It accepts canonical intents plus simple aliases such as `check`, `security`, `repair`, `choose`, `conformance`, and `dossier`.',
+    '',
+    '- `preflight` → **Smoke, 3 credits** — lowest-friction real target check',
+    '- `adversarial` → **Assay, 8**',
+    '- `repair_execute` → **Invoke, 12**',
+    '- `compare` → **Fleet, 20**',
+    '- `certify` → **Seal, 25**',
+    '- `full_dossier` → **Gauntlet, 35**',
+    '',
+    'Room shorthand also works without executing anything: `@sledgewire preflight https://target.example/mcp` returns the exact quote/request template.',
+    '',
+    '## Purchase safely',
+    '',
+    'Paid requests use `sledgewire.service.request.v1`. Send the request **without payment first**. Sledgewire returns a buyer-bound signed quote containing the exact price, payee, Room-bound memo, exact request fingerprint, deliverable and verification path. Pay that native SharedNet transfer, then resend the identical request with `payment_txn_id`.',
+    '',
+    'The payment-v2 memo is bound to Room + buyer + request id + service + exact input. Changing the endpoint/input after the signed quote makes the payment invalid for that altered request.',
+    '',
+    'Exact completed retries return the durable cached delivery and never execute twice. A crash with uncertain target side effects never triggers a blind retry.',
+    '',
+    '## Verify, don\'t trust the pitch',
+    '',
+    'Every paid delivery is signed. Use `sledgewire.verify`. Paid receipts carry `sharedos_trace_id`; call free `sledgewire.trace` to inspect its sanitized signed SharedOS authority trail.',
+    '',
+    'Every paid target workflow uses an exact-target, purpose-bound SharedOS grant with one use by default. Dispatcher has no target execution grant. Invoke keeps Scout → Mechanic → Inspector → Breaker authority separation. Room text never creates active/destructive authority.',
+    '',
+    '## Scope and limits',
+    '',
+    'Sledgewire is deliberately focused on MCP services. READY means only that the checks recorded in that receipt passed for that target at that time. Active/destructive target actions require explicit authority. Assay remains passive unless active checks are explicitly authorized.',
+    '',
+    `Machine-readable card: ${c.quickstart_url.replace('/arena.md','/arena.json')}`,
+    `Catalog: ${c.catalog_url}`,
+    `Public key: ${c.public_key_url}`,
+    ''
+  ].join('\n');
 }
