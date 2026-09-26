@@ -71,7 +71,7 @@ MCP compatibility: **2026-07-28 stateless `server/discover` first, with required
 
 Requires Node 22.18+.
 
-    npm install
+    npm ci --ignore-scripts
     node bin/sledgewire.mjs selfcheck
     node bin/sledgewire.mjs quote preflight https://target.example/mcp
     node bin/sledgewire.mjs smoke https://target.example/mcp safe_tool --safe
