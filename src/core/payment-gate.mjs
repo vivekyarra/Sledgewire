@@ -32,6 +32,7 @@ export class PaymentGate{
     const fp=requestFingerprint(req),storageKey=requestStorageKey(req);
     const prior=this.store.inspectClaim?.({requestId:storageKey,txnId:req.txnId,fingerprint:fp,service:req.service,buyerSeat:req.buyerSeat});
     if(prior&&prior.status!=='missing'&&prior.status!=='unattributed'){
+      if(prior.status==='wrong_buyer')return {ok:false,reason:'wrong_buyer'};
       if(prior.status==='conflict')return {ok:false,reason:'transaction_or_request_reused'};
       if(prior.status==='inflight'){
         if((prior.ageMs??0)>=this.uncertainAfterMs)return {ok:false,reason:'execution_outcome_unknown_no_retry',fingerprint:fp,storageKey,started_at:prior.startedAt,age_ms:prior.ageMs};
