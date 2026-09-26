@@ -6,6 +6,7 @@ import {exactPriceMap} from '../src/core/catalog-policy.mjs';
 import {SharedNetApi,ROOM,ADDRESS,INSTANCE_TOKEN,payeeBelongsToIdentity,loadSharedNetToken} from '../src/sharednet/api.mjs';
 import {McpSession,MODERN_PROTOCOL_VERSION} from '../src/mcp/client.mjs';
 import {validateLiveRehearsalEvidence,validateRestartReplayEvidence} from '../src/ops/live-evidence.mjs';
+import {publicBaseOrigin} from '../src/ops/config.mjs';
 
 const live=process.argv.includes('--live'),submission=process.argv.includes('--submission'),checks=[];
 const add=(name,ok,detail='')=>checks.push({name,ok,detail});
@@ -43,9 +44,9 @@ if(submission){
 }
 if(live){
   const room=process.env.SHAREDNET_ARENA_ROOM_ID??'',payee=process.env.SHAREDNET_PAYEE_ADDRESS??'',token=loadSharedNetToken();
-  const normalizedBase=publicBase.replace(/\/$/,'');
+  let normalizedBase=null;try{normalizedBase=publicBaseOrigin(publicBase,{production:true});}catch(e){add('public_base_origin',false,String(e.message||e));}
   let remotePublicKeyPem=null,currentBootId=null;
-  if(publicBase.startsWith('https://')){
+  if(normalizedBase){
     try{
       const health=await fetchJsonBounded(`${normalizedBase}/health`,64_000);
       add('public_health',health.response.ok&&health.json?.ok===true,`status=${health.response.status};version=${health.json?.version??'unknown'}`);
