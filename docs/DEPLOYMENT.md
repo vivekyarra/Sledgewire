@@ -100,6 +100,15 @@ Use the checked-in `compose.arena.yml` so the public MCP process and SharedNet A
     npm run keygen -- .sledgewire/keys
     # Place the already-joined seller seat token at:
     # .sharednet/sledgewire-arena-token
+
+On native Linux, the production image runs as the non-root `node` user (uid/gid 1000). Docker Compose file-backed secrets are bind mounts and do not remap ownership. Keep the sensitive files mode 0600 and make their ownership explicit before startup:
+
+    sudo chown 1000:1000 .sledgewire/keys/ed25519-private.pem .sledgewire/keys/ed25519-public.pem .sharednet/sledgewire-arena-token
+    chmod 600 .sledgewire/keys/ed25519-private.pem .sharednet/sledgewire-arena-token
+    chmod 644 .sledgewire/keys/ed25519-public.pem
+
+Do not make the private key or seat token world-readable to work around a mount-permission error.
+
     cp deploy/arena.env.example deploy/arena.env
     # edit deploy/arena.env with the real public URL, Arena Room and payee
     docker compose --env-file deploy/arena.env -f compose.arena.yml up -d --build
