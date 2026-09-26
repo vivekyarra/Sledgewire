@@ -1,9 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import catalog from '../catalog.json' with {type:'json'};
-import {loadSigningMaterial,keyId} from '../src/receipts/receipt.mjs';
+import {loadSigningMaterial,keyId,verifyReceipt} from '../src/receipts/receipt.mjs';
 import {exactPriceMap} from '../src/core/catalog-policy.mjs';
 import {SharedNetApi,ROOM,ADDRESS,INSTANCE_TOKEN,payeeBelongsToIdentity,loadSharedNetToken} from '../src/sharednet/api.mjs';
+import {McpSession,MODERN_PROTOCOL_VERSION} from '../src/mcp/client.mjs';
+import {validateLiveRehearsalEvidence,validateRestartReplayEvidence} from '../src/ops/live-evidence.mjs';
 
 const live=process.argv.includes('--live'),submission=process.argv.includes('--submission'),checks=[];
 const add=(name,ok,detail='')=>checks.push({name,ok,detail});
@@ -41,16 +43,38 @@ if(submission){
 }
 if(live){
   const room=process.env.SHAREDNET_ARENA_ROOM_ID??'',payee=process.env.SHAREDNET_PAYEE_ADDRESS??'',token=loadSharedNetToken();
+  const normalizedBase=publicBase.replace(/\/$/,'');
+  let remotePublicKeyPem=null,currentBootId=null;
   if(publicBase.startsWith('https://')){
     try{
-      const ready=await fetchJsonBounded(`${publicBase.replace(/\/$/,'')}/ready`,64_000);
+      const health=await fetchJsonBounded(`${normalizedBase}/health`,64_000);
+      add('public_health',health.response.ok&&health.json?.ok===true,`status=${health.response.status};version=${health.json?.version??'unknown'}`);
+
+      const ready=await fetchJsonBounded(`${normalizedBase}/ready`,64_000);
+      currentBootId=ready.json?.arena_daemon?.boot_id??null;
       add('public_ready',ready.response.ok&&ready.json?.ready===true,`status=${ready.response.status};daemon=${ready.json?.arena_daemon?.status??'unknown'}`);
-      add('public_arena_daemon_fresh',ready.json?.arena_daemon?.ready===true,`age_ms=${ready.json?.arena_daemon?.age_ms??'unknown'}`);
-      const pub=await fetchTextBounded(`${publicBase.replace(/\/$/,'')}/public-key`,16_384);
+      add('public_arena_daemon_fresh',ready.json?.arena_daemon?.required===true&&ready.json?.arena_daemon?.ready===true&&typeof currentBootId==='string',`age_ms=${ready.json?.arena_daemon?.age_ms??'unknown'};boot_id=${currentBootId??'missing'}`);
+
+      const arena=await fetchTextBounded(`${normalizedBase}/arena.md`,128_000);
+      add('public_arena_card',arena.response.ok&&arena.text.includes(`${normalizedBase}/mcp`)&&arena.text.includes('sledgewire.selfcheck'),`status=${arena.response.status};bytes=${Buffer.byteLength(arena.text)}`);
+
+      const pub=await fetchTextBounded(`${normalizedBase}/public-key`,16_384);remotePublicKeyPem=pub.text;
       let remoteKeyId=null;try{remoteKeyId=keyId(pub.text);}catch{}
       add('public_signing_key_matches',Boolean(localSigningKeyId)&&remoteKeyId===localSigningKeyId,remoteKeyId??'invalid_remote_public_key');
+
+      const mcp=new McpSession(`${normalizedBase}/mcp`,{}),init=await mcp.initialize();
+      add('public_mcp_modern_protocol',init.era==='modern'&&init.protocolVersion===MODERN_PROTOCOL_VERSION,`era=${init.era};version=${init.protocolVersion}`);
+
+      const selfcheck=(await mcp.callTool('sledgewire.selfcheck',{}))?.structuredContent;
+      const selfSig=remotePublicKeyPem?verifyReceipt(selfcheck,remotePublicKeyPem):{ok:false,reason:'missing_public_key'};
+      add('public_signed_selfcheck',selfcheck?.verified===true&&selfcheck?.state==='READY'&&selfSig.ok,selfSig.ok?'signed READY selfcheck':String(selfSig.reason??'invalid_selfcheck'));
+
+      const route=(await mcp.callTool('sledgewire.smoke',{endpoint:'https://example.com/mcp'}))?.structuredContent;
+      const routeSig=remotePublicKeyPem?verifyReceipt(route,remotePublicKeyPem):{ok:false,reason:'missing_public_key'};
+      add('public_paid_mcp_route',route?.state==='PAYMENT_REQUIRED'&&Number(route?.price_credits)===3&&route?.arena_room_id===room&&routeSig.ok,`state=${route?.state??'missing'};price=${route?.price_credits??'missing'};room=${route?.arena_room_id??'missing'};signature=${routeSig.ok?'ok':routeSig.reason}`);
     }catch(e){add('public_live_surface',false,String(e.message||e));}
   }
+
   add('arena_room_is_separate_explicit_env',ROOM.test(room),room||'missing');
   if(ROOM.test(buildRoom))add('build_and_arena_rooms_are_distinct',buildRoom!==room,`build=${buildRoom};arena=${room}`);
   add('sharednet_payee',ADDRESS.test(payee),payee||'missing');
@@ -67,7 +91,22 @@ if(live){
       add('credits_endpoint',Number.isFinite(Number(credits?.credits?.balance)),`balance=${credits?.credits?.balance??'unknown'}`);
     }catch(e){add('sharednet_live_api',false,String(e.message||e));}
   }
-  add('external_call_confirmed',process.env.SHAREDNET_EXTERNAL_CALL_CONFIRMED==='1','requires real other-seat call');
+
+  const rehearsalPath=process.env.SLEDGEWIRE_REHEARSAL_EVIDENCE??'.sledgewire/live-rehearsal.json';
+  let rehearsal=null;
+  try{
+    rehearsal=JSON.parse(fs.readFileSync(rehearsalPath,'utf8'));
+    const proof=remotePublicKeyPem?validateLiveRehearsalEvidence(rehearsal,{roomId:room,publicBaseUrl:normalizedBase,publicKeyPem:remotePublicKeyPem}):{ok:false,reason:'remote_public_key_unavailable'};
+    add('external_paid_rehearsal_evidence',proof.ok,proof.ok?`txn=${proof.txn_id};buyer=${proof.buyer_seat}`:proof.reason);
+  }catch(e){add('external_paid_rehearsal_evidence',false,`${rehearsalPath}:${String(e.message||e)}`);}
+
+  const restartPath=process.env.SLEDGEWIRE_RESTART_REPLAY_EVIDENCE??'.sledgewire/restart-replay.json';
+  try{
+    const restart=JSON.parse(fs.readFileSync(restartPath,'utf8'));
+    const proof=remotePublicKeyPem&&rehearsal?validateRestartReplayEvidence(restart,{roomId:room,rehearsal,publicKeyPem:remotePublicKeyPem,currentBootId}):{ok:false,reason:'live_rehearsal_or_public_key_unavailable'};
+    add('restart_replay_evidence',proof.ok,proof.ok?`current_boot_id=${proof.current_boot_id}`:proof.reason);
+  }catch(e){add('restart_replay_evidence',false,`${restartPath}:${String(e.message||e)}`);}
+
   if(process.env.SLEDGEWIRE_SHAREDOS_REQUIRED==='1'){
     add('sharedos_audit_url',Boolean(process.env.SHAREDOS_AUDIT_URL),'required');
     add('sharedos_key',Boolean(process.env.SHAREDOS_KEY),'required');
