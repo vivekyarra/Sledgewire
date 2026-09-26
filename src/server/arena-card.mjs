@@ -18,7 +18,7 @@ export function arenaCard(baseUrl){
     free_selector:{tool:'sledgewire.quote',price_credits:0,intents:['preflight','adversarial','repair_execute','compare','certify','full_dossier'],note:'Only send the returned paid request when request_ready is true; otherwise fill missing_fields and quote again.'},
     free_trace_proof:{tool:'sledgewire.trace',price_credits:0,note:'Use the sharedos_trace_id from a paid receipt.'},
     paid_request_example:{type:'sledgewire.service.request.v1',request_id:'buyer-unique-id',service:'sledgewire.smoke',input:{endpoint:'https://target.example/mcp'}},
-    purchase_flow:['check readiness_url','send request without payment','receive exact signed payment quote','pay native SharedNet credits to quoted payee/memo','resend identical request with payment_txn_id','verify signed receipt and trace'],
+    purchase_flow:['check readiness_url','send request without payment','receive exact signed payment quote','verify quote signature with public_key_url and ignore unverifiable matching replies','pay native SharedNet credits to quoted payee/memo','resend identical request with payment_txn_id','verify signed receipt and trace'],
     services:catalog.services,
     states:['READY','DEGRADED','INCOMPATIBLE','BLOCKED','UNKNOWN'],
     mcp_protocols:['2026-07-28','2025-11-25','2025-06-18'],
@@ -51,7 +51,7 @@ Sledgewire uses five factual states only: READY, DEGRADED, INCOMPATIBLE, BLOCKED
 
 In production, a direct call to a paid MCP tool does not execute for free: it returns a signed PAYMENT_REQUIRED routing object. Paid Arena execution starts only after native SharedNet credit verification in the official Arena Room.
 
-Paid Arena requests use \`sledgewire.service.request.v1\`, for example \`{"type":"sledgewire.service.request.v1","request_id":"buyer-unique-id","service":"sledgewire.smoke","input":{"endpoint":"https://target.example/mcp"}}\`. Check \`${c.readiness_url}\` first. Send the request without payment; Sledgewire replies with the exact price, payee, room-bound memo, and payment instructions. Resend the identical request with \`payment_txn_id\`. Exact completed retries return the cached response and never execute twice. A crash with uncertain target side effects never triggers a blind retry.
+Paid Arena requests use \`sledgewire.service.request.v1\`, for example \`{"type":"sledgewire.service.request.v1","request_id":"buyer-unique-id","service":"sledgewire.smoke","input":{"endpoint":"https://target.example/mcp"}}\`. Check \`${c.readiness_url}\` first. Send the request without payment; Sledgewire replies with the exact price, payee, room-bound memo, and payment instructions. **Verify that signed quote against the public key before paying.** A matching \`request_id\` or \`reply_to_message_id\` alone is not seller identity; ignore unverifiable matching Room replies. Resend the identical request with \`payment_txn_id\`. Exact completed retries return the cached response and never execute twice. A crash with uncertain target side effects never triggers a blind retry.
 
 Every paid target workflow executes under an exact-target SharedOS grant; the dispatcher has no direct target-service authority. Invoke keeps Scout → Mechanic → Inspector → Breaker separation. Large signed dossiers are delivered as SharedNet Room artifacts when they would exceed the Room message ceiling.
 
