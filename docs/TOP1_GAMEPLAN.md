@@ -1,43 +1,57 @@
-# First-place-oriented game plan
+# Competition game plan
 
-First place cannot be guaranteed because the field and judge behavior are external. The engineering target is to remove the avoidable reasons Sledgewire could lose either Arena.
+Winning cannot be guaranteed because other agents and products are external. The engineering objective is to remove avoidable ways Sledgewire can become ineligible, fail to convert demand, or fail to prove its SharedOS design.
 
-## Arena 1 objective
+## Zero-th priority: stay eligible
 
-Required targets:
+The representative agent contract in `docs/ARENA_AGENT_PROMPT.md` is a hard operating constraint, not advice.
 
-- one-link instructions load successfully;
-- free selfcheck fits naturally in the conversation;
-- receipt verifies independently;
-- multiple real peer products are tried when the field allows it;
-- every direct product question receives a factual answer;
-- critiques cite observed tests rather than generic opinions;
-- no human rescue is needed;
-- no security claim exceeds what a receipt proves.
+Round 1 must finish with:
 
-Strongest short sequence:
+- at least 3 distinct peer products actually tried;
+- at least one specific evidence-based disagreement posted for every product tried;
+- the official ranking submitted and accepted.
+
+Round 2 must finish with:
+
+- at least 80 confirmed Arena credits spent;
+- purchases covering at least 3 distinct peer products;
+- only legitimate official transactions counted.
+
+The seller and representative agent must remain online for the full Arena, with no human rescue path.
+
+## Agents' Choice: be easiest to evaluate
+
+The strongest short sequence is:
 
     one-line problem
-    -> call sledgewire.selfcheck
-    -> show hostile fixture contained and bad protocol rejected
-    -> verify receipt
-    -> explain SharedOS role separation only if asked
+    -> free sledgewire.selfcheck
+    -> signed proof
+    -> free quote against the peer's real target
+    -> smallest useful paid service
+    -> independent receipt / trace verification
 
-## Arena 2 objective
+Do not lead with architecture. Demonstrate the product, then expose the authority map when the peer wants to inspect why the result is trustworthy.
 
-The organizer ranks by valid credits earned, so the primary scoreboard metric is gross valid incoming credits, not nominal balance.
+For every peer product Sledgewire's representative tries, record the exact call, observed result, one concrete strength, and one concrete disagreement or limitation. That produces a defensible ranking instead of generic commentary.
 
-Track automatically with `npm run arena:stats` (gross earned credits are derived from verified payment claims, including a valid payment whose execution later fails):
+## Top Earner: remove purchase friction
+
+The primary scoreboard metric is gross valid incoming credits. Reliability and conversion are therefore one system.
+
+Use `npm run arena:stats` to track:
 
     earned_credits
     unique_buyers
-    buyers / other_agents
     paid_transactions
-    credits / unique_buyer
+    paid service mix
+    completed delivery mix
+    credits / unique buyer
     smoke-to-premium conversion
     delivery p50 / p95
-    invalid payment rejections
-    signed/trace evidence coverage
+    payment rejection reasons
+    signed receipt coverage
+    SharedOS trace coverage
     duplicate paid executions
 
 Hard reliability targets:
@@ -47,24 +61,58 @@ Hard reliability targets:
     wrong-room deliveries     = 0
     unsigned paid deliveries  = 0
     paid delivery without SharedOS trace = 0
+    seller /ready red while advertising availability = 0
 
-Commercial coverage:
+Commercial ladder:
 
-- Smoke 3: impulse purchase before another service is trusted.
-- Assay 8: deeper adversarial check.
-- Invoke 12: buyer has a real broken call and wants it executed.
-- Fleet 20: buyer compares several sellers.
-- Seal 25: seller purchases portable proof.
-- Gauntlet 35: seller purchases the strongest one-shot dossier.
+- Smoke 3: lowest-friction pre-spend reality check.
+- Assay 8: adversarial protocol/safety checks.
+- Invoke 12: evidence-backed repair + independent inspection + bounded execution.
+- Fleet 20: compare up to six candidate services.
+- Seal 25: portable conformance evidence.
+- Gauntlet 35: strongest seller/buyer dossier.
 
-This covers both sides of the market: buyers reduce integration risk and sellers buy portable evidence.
+The free quote must route buyers to the smallest service that satisfies their stated need. Premium conversion should come from unresolved evidence, not pressure.
 
-## Revenue sensitivity
+## Judges' Pick: make SharedOS inspectable
 
-Run npm run economy. The script prints deterministic adoption scenarios across several field sizes. It is a sensitivity model, not a prediction.
+A judge should not need to infer the authority design from source code.
 
-## What not to do
+Sledgewire exposes and documents:
 
-Do not add generic chat, a dashboard, an LLM trust score, speculative reputation, or more services merely to look larger. Every additional surface adds discovery cost and failure modes.
+- purpose string: `sledgewire.test-repair-and-invoke-agent-services`;
+- deny-by-default exact-scope grants;
+- one use by default;
+- Dispatcher with no target execution grant;
+- Scout with exact discovery authority;
+- Mechanic with local repair authority only;
+- Inspector with independent validation authority only;
+- Breaker with exact target/workflow execution authority;
+- explicit request authority for active/destructive mutations;
+- durable grant usage and audit state;
+- paid `sharedos_trace_id` plus free signed `sledgewire.trace`;
+- event-visible external SharedOS decision evidence as a mandatory final live-gate condition.
 
-Do not optimize for top three. Ask a harder question: if Sledgewire loses first, was it because another product genuinely created more value, or because we left an avoidable integration, evidence, latency or conversion failure? Only the former is acceptable.
+The full map is in `docs/SHAREDOS_AUTHORITY_MAP.md`, while the deployed `/arena.json` exposes the concise machine-readable form.
+
+Sledgewire deliberately does not create new target authority from arbitrary Room text. In a no-human Arena, a destructive or active request without explicit authority stays blocked instead of silently escalating itself.
+
+## Live proof sequence
+
+Do not replace the product link with a hosted seller until this exact chain is green:
+
+    persistent deployment
+    -> external public:probe --arena
+    -> different-seat 3-credit arena:rehearse
+    -> seller restart with persistent DB/key
+    -> arena:replay-after-restart
+    -> visible external SharedOS audit evidence
+    -> preflight --live
+
+A live gate that is red is a deployment fact, not a documentation problem. Never paper over it.
+
+## What not to build now
+
+Do not add generic chat, a dashboard, an LLM trust score, speculative reputation, or extra paid SKUs merely to look larger. Every new surface creates discovery cost and failure modes.
+
+Do not optimize only for Top Earner. The product should simultaneously be easy for agents to try, economically useful enough to buy, and simple for organizers to audit.

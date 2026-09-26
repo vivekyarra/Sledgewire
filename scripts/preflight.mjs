@@ -62,6 +62,9 @@ if(live){
       const arena=await fetchTextBounded(`${normalizedBase}/arena.md`,128_000);
       add('public_arena_card',arena.response.ok&&arena.text.includes(`${normalizedBase}/mcp`)&&arena.text.includes('sledgewire.selfcheck'),`status=${arena.response.status};bytes=${Buffer.byteLength(arena.text)}`);
 
+      const machineCard=await fetchJsonBounded(`${normalizedBase}/arena.json`,128_000),authority=machineCard.json?.sharedos_authority;
+      add('public_sharedos_authority_card',machineCard.response.ok&&authority?.purpose==='sledgewire.test-repair-and-invoke-agent-services'&&String(authority?.roles?.dispatcher??'').includes('no target execution grant')&&authority?.proof?.tool==='sledgewire.trace',`status=${machineCard.response.status};purpose=${authority?.purpose??'missing'};trace=${authority?.proof?.tool??'missing'}`);
+
       const pub=await fetchTextBounded(`${normalizedBase}/public-key`,16_384);remotePublicKeyPem=pub.text;
       let remoteKeyId=null;try{remoteKeyId=keyId(pub.text);}catch{}
       add('public_signing_key_matches',Boolean(localSigningKeyId)&&remoteKeyId===localSigningKeyId,remoteKeyId??'invalid_remote_public_key');
@@ -111,13 +114,13 @@ if(live){
     add('restart_replay_evidence',proof.ok,proof.ok?`current_boot_id=${proof.current_boot_id}`:proof.reason);
   }catch(e){add('restart_replay_evidence',false,`${restartPath}:${String(e.message||e)}`);}
 
-  if(process.env.SLEDGEWIRE_SHAREDOS_REQUIRED==='1'){
-    let auditUrlOk=false,auditUrlDetail='missing';
-    try{auditUrlDetail=auditSinkUrl(process.env.SHAREDOS_AUDIT_URL);auditUrlOk=true;}catch(e){auditUrlDetail=String(e.message||e);}
-    add('sharedos_audit_url',auditUrlOk,auditUrlDetail);
-    add('sharedos_key',Boolean(process.env.SHAREDOS_KEY?.trim()),process.env.SHAREDOS_KEY?'present':'missing');
-    add('sharedos_audit_confirmed',process.env.SHAREDOS_AUDIT_CONFIRMED==='1','requires real visible trace');
-  }
+  const sharedosExternalRequired=process.env.SLEDGEWIRE_SHAREDOS_REQUIRED==='1';
+  add('sharedos_external_evidence_required',sharedosExternalRequired,sharedosExternalRequired?'enabled':'set SLEDGEWIRE_SHAREDOS_REQUIRED=1 for the official Arena live gate');
+  let auditUrlOk=false,auditUrlDetail='missing';
+  try{auditUrlDetail=auditSinkUrl(process.env.SHAREDOS_AUDIT_URL);auditUrlOk=true;}catch(e){auditUrlDetail=String(e.message||e);}
+  add('sharedos_audit_url',auditUrlOk,auditUrlDetail);
+  add('sharedos_key',Boolean(process.env.SHAREDOS_KEY?.trim()),process.env.SHAREDOS_KEY?'present':'missing');
+  add('sharedos_audit_confirmed',process.env.SHAREDOS_AUDIT_CONFIRMED==='1','requires a real event-visible SharedOS decision trace');
 }
 const ready=checks.every(x=>x.ok);
 console.log(JSON.stringify({ready,mode:live?'live':submission?'submission':'static',checks},null,2));

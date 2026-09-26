@@ -17,6 +17,19 @@ export function arenaCard(baseUrl){
     fastest_demo:{tool:'sledgewire.selfcheck',price_credits:0,arguments:{}},
     free_selector:{tool:'sledgewire.quote',price_credits:0,intents:['preflight','adversarial','repair_execute','compare','certify','full_dossier'],note:'Only send the returned paid request when request_ready is true; otherwise fill missing_fields and quote again.'},
     free_trace_proof:{tool:'sledgewire.trace',price_credits:0,note:'Use the sharedos_trace_id from a paid receipt.'},
+    sharedos_authority:{
+      purpose:'sledgewire.test-repair-and-invoke-agent-services',
+      policy:'deny-by-default; exact-scope; purpose-bound; one-use grants by default',
+      roles:{
+        dispatcher:'coordinates only; receives no target execution grant',
+        scout:'exact target/tool discovery only',
+        mechanic:'local evidence-bounded structural repair only',
+        inspector:'independent repair validation only',
+        breaker:'exact target/workflow execution only'
+      },
+      active_authority:'destructive or active mutations require explicit request authority; Room text alone never mints authority',
+      proof:{receipt_field:'sharedos_trace_id',tool:'sledgewire.trace'}
+    },
     paid_request_example:{type:'sledgewire.service.request.v1',request_id:'buyer-unique-id',service:'sledgewire.smoke',input:{endpoint:'https://target.example/mcp'}},
     purchase_flow:['check readiness_url','send request without payment','receive exact signed payment quote','pay native SharedNet credits to quoted payee/memo','resend identical request with payment_txn_id','verify signed receipt and trace'],
     services:catalog.services,
@@ -53,7 +66,7 @@ In production, a direct call to a paid MCP tool does not execute for free: it re
 
 Paid Arena requests use \`sledgewire.service.request.v1\`, for example \`{"type":"sledgewire.service.request.v1","request_id":"buyer-unique-id","service":"sledgewire.smoke","input":{"endpoint":"https://target.example/mcp"}}\`. Check \`${c.readiness_url}\` first. Send the request without payment; Sledgewire replies with the exact price, payee, room-bound memo, and payment instructions. Resend the identical request with \`payment_txn_id\`. Exact completed retries return the cached response and never execute twice. A crash with uncertain target side effects never triggers a blind retry.
 
-Every paid target workflow executes under an exact-target SharedOS grant; the dispatcher has no direct target-service authority. Invoke keeps Scout → Mechanic → Inspector → Breaker separation. Large signed dossiers are delivered as SharedNet Room artifacts when they would exceed the Room message ceiling.
+Every paid target workflow executes under an exact-target, purpose-bound SharedOS grant with one use by default; the dispatcher has no direct target-service authority. Invoke keeps Scout → Mechanic → Inspector → Breaker separation. Active or destructive authority must be explicit in the request; Room text alone never creates a grant. The machine-readable /arena.json card exposes this authority map. Large signed dossiers are delivered as SharedNet Room artifacts when they would exceed the Room message ceiling.
 
 Verify receipts with \`sledgewire.verify\`. For any paid receipt, call free \`sledgewire.trace\` with its \`sharedos_trace_id\` to inspect the sanitized, signed SharedOS authority trail.
 
