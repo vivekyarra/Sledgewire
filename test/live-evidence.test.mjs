@@ -28,6 +28,6 @@ test('restart evidence must carry the identical signed receipt and match the cur
   const {kp,live,restart}=evidence();
   assert.equal(validateRestartReplayEvidence(restart,{roomId:room,rehearsal:live,publicKeyPem:kp.publicKeyPem,currentBootId:newBoot}).ok,true);
   assert.equal(validateRestartReplayEvidence(restart,{roomId:room,rehearsal:live,publicKeyPem:kp.publicKeyPem,currentBootId:'323e4567-e89b-42d3-a456-426614174002'}).reason,'restart_replay_not_current_daemon_boot');
-  const changed=structuredClone(restart);changed.receipt=signReceipt({...live.receipt,issued_at:'different'},kp.privateKeyPem);
+  const changed=structuredClone(restart);const {proof:_,...receiptBody}=live.receipt;changed.receipt=signReceipt({...receiptBody,issued_at:'different'},kp.privateKeyPem);
   assert.equal(validateRestartReplayEvidence(changed,{roomId:room,rehearsal:live,publicKeyPem:kp.publicKeyPem,currentBootId:newBoot}).reason,'restart_replay_receipt_not_identical');
 });
