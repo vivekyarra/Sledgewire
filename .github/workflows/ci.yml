@@ -25,6 +25,7 @@ jobs:
       - run: npm run stress -- 10000 128
       - run: npm run stress:arena -- 10000
       - run: npm run stress:dupes -- 1000 16
+      - run: npm run stress:handler -- 1000 16 1
       - run: npm run economy
       - run: npm run sharedos:check
       - run: npm run preflight
