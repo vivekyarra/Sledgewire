@@ -35,7 +35,7 @@ const server=http.createServer(async(req,res)=>{
   if(req.method==='GET'&&req.url==='/arena.json')return json(res,200,arenaCard(base));
   if(req.method==='GET'&&req.url==='/arena.md'){res.statusCode=200;res.setHeader('content-type','text/markdown; charset=utf-8');return res.end(arenaMarkdown(base));}
   if(req.method==='GET'&&req.url==='/public-key'){res.statusCode=200;res.setHeader('content-type','text/plain; charset=utf-8');return res.end(PUBLIC);}
-  if(req.method==='GET'&&req.url==='/.well-known/agent.json'){const card=arenaCard(base);return json(res,200,{name:'Sledgewire',description:card.one_line,version:VERSION,mcp_url:card.mcp_url,quickstart_url:card.quickstart_url,catalog_url:card.catalog_url,public_key_url:card.public_key_url,fastest_demo:card.fastest_demo,tools:toolDefs.map(x=>x.name)});}
+  if(req.method==='GET'&&req.url==='/.well-known/agent.json'){const card=arenaCard(base);return json(res,200,{name:'Sledgewire',description:card.one_line,scope:card.scope,version:VERSION,mcp_url:card.mcp_url,quickstart_url:card.quickstart_url,readiness_url:card.readiness_url,catalog_url:card.catalog_url,public_key_url:card.public_key_url,fastest_demo:card.fastest_demo,best_first_paid:card.arena2_buyer_path.best_first_paid,proofs:card.proofs,tools:toolDefs.map(x=>x.name)});}
   if(req.method!=='POST'||req.url!=='/mcp'){res.statusCode=404;return res.end('not found');}
   if(production&&!hostHeaderAllowed(req.headers.host,allowedHosts))return json(res,403,{jsonrpc:'2.0',id:null,error:{code:-32000,message:'Host not allowed'}});
   const origin=String(req.headers.origin??'');if(origin&&!allowedOrigins.has(origin))return json(res,403,{jsonrpc:'2.0',id:null,error:{code:-32000,message:'Origin not allowed'}});
