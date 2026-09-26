@@ -17,6 +17,8 @@ test('single-container runtime hydrates root-only files and isolates public Shar
       SLEDGEWIRE_PRIVATE_KEY_FILE:priv,
       SLEDGEWIRE_PUBLIC_KEY_FILE:pub,
       SHAREDNET_MEMBER_TOKEN_FILE:token,
+      SHAREDNET_BUYER_TOKEN:'sni_'+ 'B'.repeat(43),
+      SHAREDNET_BUYER_TOKEN_FILE:'/should/not/reach/public',
       SHAREDNET_PAYEE_ADDRESS:'p_ABCDEFGHIJ',
       SHAREDNET_INVITE_TOKEN:'rit_SECRET'
     };
@@ -27,6 +29,8 @@ test('single-container runtime hydrates root-only files and isolates public Shar
     assert.equal(r.publicEnv.SLEDGEWIRE_PUBLIC_KEY_PEM,'PUBLIC');
     assert.equal(r.publicEnv.SHAREDNET_MEMBER_TOKEN,undefined);
     assert.equal(r.publicEnv.SHAREDNET_PAYEE_ADDRESS,undefined);
+    assert.equal(r.publicEnv.SHAREDNET_BUYER_TOKEN,undefined);
+    assert.equal(r.publicEnv.SHAREDNET_BUYER_TOKEN_FILE,undefined);
     assert.equal(r.publicEnv.SHAREDNET_INVITE_TOKEN,undefined);
     assert.equal(r.daemonEnv.SHAREDNET_MEMBER_TOKEN,'sni_'+ 'A'.repeat(43));
     assert.equal(r.daemonEnv.SHAREDNET_PAYEE_ADDRESS,'p_ABCDEFGHIJ');
