@@ -28,6 +28,7 @@ export class ArenaStore{
     const byReq=this.db.prepare('SELECT * FROM requests WHERE request_id=?').get(requestId),byTxn=this.db.prepare('SELECT * FROM requests WHERE txn_id=?').get(txnId),existing=byReq??byTxn;
     if(!existing)return {status:'missing'};
     const sameCore=existing.request_id===requestId&&existing.txn_id===txnId&&existing.fingerprint===fingerprint&&existing.service===service;
+    if(existing.buyer_seat!==null&&buyerSeat!==null&&existing.buyer_seat!==buyerSeat&&byTxn?.txn_id===txnId)return {status:'wrong_buyer'};
     if(sameCore&&existing.buyer_seat===null)return {status:'unattributed'};
     if(!sameCore||buyerSeat===null||existing.buyer_seat!==buyerSeat)return {status:'conflict'};
     if(existing.status==='completed')return {status:'replay',response:JSON.parse(existing.response_json)};
