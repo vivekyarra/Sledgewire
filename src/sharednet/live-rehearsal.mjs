@@ -30,12 +30,14 @@ export async function waitForArenaReply(api,roomId,{after,replyTo,requestId,buye
   throw new Error('rehearsal_reply_timeout');
 }
 
-function assertPaymentQuote(body,{requestId,roomId,payee,service,price}){
+function assertPaymentQuote(body,{requestId,roomId,payee,service,price,buyerSeat,publicKeyPem}){
   if(body?.type!=='sledgewire.payment_required.v1')throw new Error('rehearsal_missing_payment_required');
   if(body.request_id!==requestId||body.service!==service)throw new Error('rehearsal_quote_request_mismatch');
   if(body.room_id!==roomId||body.payee!==payee)throw new Error('rehearsal_quote_destination_mismatch');
+  if(body.buyer_seat!==buyerSeat)throw new Error('rehearsal_quote_buyer_mismatch');
   if(Number(body.price_credits)!==price)throw new Error('rehearsal_quote_price_mismatch');
   if(body.memo!==paymentMemo(requestId,service))throw new Error('rehearsal_quote_memo_mismatch');
+  const verified=verifyReceipt(body,publicKeyPem);if(!verified.ok)throw new Error(`rehearsal_quote_signature_invalid:${verified.reason}`);
 }
 function assertDelivery(body,{requestId,service,roomId,buyerSeat,txnId,price,publicKeyPem}){
   if(body?.type!=='sledgewire.service.response.v1'||body.state!=='DELIVERED')throw new Error(`rehearsal_delivery_failed:${body?.reason??body?.state??'unknown'}`);
@@ -62,7 +64,7 @@ export async function runLiveSmokeRehearsal({api,roomId,payee,publicBaseUrl,targ
   const firstPost=await api.post(roomId,JSON.stringify(request),{idempotencyKey:idempotencyUuid(`rehearsal-request:${requestId}:quote`)});
   const firstId=messageId(firstPost);if(!MESSAGE.test(firstId??''))throw new Error('rehearsal_initial_message_id_missing');
   const quoteReply=await waitForArenaReply(api,roomId,{after:Math.max(startCursor,messageSequence(firstPost)??0),replyTo:firstId,requestId,buyerSeat,timeoutMs});
-  assertPaymentQuote(quoteReply.body,{requestId,roomId,payee,service,price});
+  assertPaymentQuote(quoteReply.body,{requestId,roomId,payee,service,price,buyerSeat,publicKeyPem});
 
   const payment=await api.pay(payee,price,{memo:quoteReply.body.memo,roomId,idempotencyKey:idempotencyUuid(`rehearsal-payment:${requestId}`)});
   const txnId=payment?.transfer?.id??payment?.id??null;if(!TXN.test(txnId??''))throw new Error('rehearsal_payment_transaction_missing');
@@ -91,7 +93,7 @@ export async function runLiveSmokeRehearsal({api,roomId,payee,publicBaseUrl,targ
     first_message_id:firstId,paid_message_id:paidId,retry_message_id:retryId,
     delivery_message_id:delivered.message.id,replay_message_id:replay.message.id,
     receipt:delivered.body.receipt,trace_proof:trace,
-    checks:{payment_quote:true,native_transfer:true,signed_delivery:deliveryVerification.ok,sharedos_trace:true,trace_signature:traceVerification.ok,exact_cached_retry:true},
+    checks:{payment_quote:true,signed_payment_quote:true,native_transfer:true,signed_delivery:deliveryVerification.ok,sharedos_trace:true,trace_signature:traceVerification.ok,exact_cached_retry:true},
     completed_at:new Date().toISOString()
   };
 }
