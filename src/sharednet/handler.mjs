@@ -13,6 +13,7 @@ export function createArenaHandler({store,ledger,room,payee,signing,publicBaseUr
   const safeRequestId=req=>typeof req?.request_id==='string'&&REQUEST_ID.test(req.request_id)?req.request_id:null;
   const safeService=req=>typeof req?.service==='string'&&req.service.length<=128?req.service:null;
   const signedFailure=(req,buyerSeat,reason,extra={})=>signReceipt({
+    ...extra,
     type:'sledgewire.service.response.v1',
     request_id:safeRequestId(req),
     service:safeService(req),
@@ -21,7 +22,6 @@ export function createArenaHandler({store,ledger,room,payee,signing,publicBaseUr
     room_id:room,
     buyer_seat:buyerSeat,
     ...(typeof req?.payment_txn_id==='string'&&req.payment_txn_id.length<=160?{payment_txn_id:req.payment_txn_id}:{}),
-    ...extra,
     issued_at:new Date().toISOString(),
     response_version:'sledgewire.room-response.v1'
   },signing.privateKeyPem);
