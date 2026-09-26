@@ -1,6 +1,6 @@
 # Deployment
 
-v0.3.10 uses a two-process Docker Compose topology plus cryptographically verified second-seat and restart rehearsals. The public server and Arena daemon share one persistent volume so paid outcomes and SharedOS traces survive daemon restarts and remain resolvable through the public `sledgewire.trace` tool.
+v0.3.11 uses a two-process Docker Compose topology plus cryptographically verified second-seat and restart rehearsals. The public server and Arena daemon share one persistent volume so paid outcomes and SharedOS traces survive daemon restarts and remain resolvable through the public `sledgewire.trace` tool.
 
 ## Public HTTPS MCP
 
@@ -88,7 +88,7 @@ Before autonomous competition, first start the seller daemon, complete the real 
 
     npm run preflight -- --live
 
-The live gate does not trust a manual "external call confirmed" flag. It negotiates the deployed MCP endpoint, verifies a signed free selfcheck and signed paid routing response against the deployed public key, verifies the SharedNet seller identity/payee, validates `.sledgewire/live-rehearsal.json`, and validates `.sledgewire/restart-replay.json` against the current daemon boot. If any required fact is absent or stale, the gate stays red.
+The live gate does not trust a manual "external call confirmed" flag. It also rejects a stale deployment: `/health` and `/arena.json` must report the exact expected version and current judge/buyer card. It negotiates the deployed MCP endpoint, verifies a signed free selfcheck and signed paid routing response against the deployed public key, verifies the SharedNet seller identity/payee, validates `.sledgewire/live-rehearsal.json`, and validates `.sledgewire/restart-replay.json` against the current daemon boot. If any required fact is absent or stale, the gate stays red.
 
 The pinned Trial Zero guide makes SharedOS an optional award track, so external SharedOS audit export is not a main-Arena launch prerequisite. If you intentionally want stronger SharedOS award evidence, set `SLEDGEWIRE_SHAREDOS_REQUIRED=1`, configure a credential-free HTTPS `SHAREDOS_AUDIT_URL` plus `SHAREDOS_KEY`, observe a real external decision trace, then set `SHAREDOS_AUDIT_CONFIRMED=1`. See `docs/SHAREDOS_AUTHORITY_MAP.md` for the authority and audit model.
 
@@ -148,7 +148,7 @@ By default the rehearsal Smoke-tests the public Sledgewire MCP endpoint itself. 
 
     export SLEDGEWIRE_REHEARSAL_TARGET=https://another-public-mcp.example/mcp
 
-A successful rehearsal proves, in one automated path: second-seat Room request, buyer-bound signed PAYMENT_REQUIRED quote, native SharedNet transfer, paid Room request, SharedOS-mediated execution, signed delivery verification against the deployed public key, public `sledgewire.trace` lookup, trace proof signature verification, and exact paid retry returning the identical cached receipt. The hardened evidence schema is `sledgewire.live-rehearsal.v3`.
+A successful rehearsal proves, in one automated path: second-seat Room request, buyer-bound signed PAYMENT_REQUIRED quote whose payment-v2 memo binds Room + buyer + request id + service + exact input fingerprint, native SharedNet transfer, paid Room request, SharedOS-mediated execution, signed delivery verification against the deployed public key, public `sledgewire.trace` lookup, trace proof signature verification, and exact paid retry returning the identical cached receipt. The hardened evidence schema is `sledgewire.live-rehearsal.v3`.
 
 The redacted evidence packet is written mode 0600 to `.sledgewire/live-rehearsal.json` by default. It never stores the buyer seat token.
 
