@@ -1,5 +1,5 @@
 import {superviseProcesses} from '../src/ops/process-supervisor.mjs';
-import {prepareSingleContainerRuntime} from '../src/ops/arena-runtime.mjs';
+import {prepareSingleContainerRuntime,scrubParentSecretCopies} from '../src/ops/arena-runtime.mjs';
 
 const runtime=prepareSingleContainerRuntime();
 const supervisor=superviseProcesses({
@@ -8,6 +8,7 @@ const supervisor=superviseProcesses({
     {name:'arena-daemon',args:['src/sharednet/arena-daemon.mjs'],env:runtime.daemonEnv}
   ]
 });
+scrubParentSecretCopies(runtime);
 console.error(JSON.stringify({
   sledgewire:'arena-all',
   event:'started',
