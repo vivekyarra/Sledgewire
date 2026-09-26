@@ -153,8 +153,9 @@ Large signed deliveries are uploaded as Room-addressed SharedNet artifacts and r
 - Active probes require explicit caller safety attestation; untrusted target annotations never authorize execution by themselves.
 - Destructive probes/invocations require separate explicit destructive authority.
 - Repair never invents missing semantic values.
-- Payment binds buyer Instance, exact payee proof, integer amount, official Arena Room, request and service memo; request state is scoped by Room + buyer + request id.
-- Exact completed retries are cached; duplicate paid execution is blocked.
+- Payment binds buyer Instance, exact payee proof, integer amount, official Arena Room, request and service memo; the Room payment quote is itself Ed25519-signed and buyer-bound; request state is scoped by Room + buyer + request id.
+- Exact completed retries are served from the previously verified durable binding, so replay does not depend on the transfer remaining inside a bounded remote ledger-history window; duplicate paid execution is blocked.
+- If execution fails after a valid payment, the failure is signed, cached, and replayed exactly rather than becoming an unverifiable dead end.
 - A crash leaving paid execution outcome uncertain is never blindly retried.
 - Poison Room messages are bounded and dead-lettered instead of permanently blocking the autonomous cursor.
 - SharedNet JSON responses are streamed under byte ceilings before parsing, and duplicate ledger lookups are coalesced/cached to resist retry storms.
@@ -163,7 +164,7 @@ Large signed deliveries are uploaded as Room-addressed SharedNet artifacts and r
 - SharedNet secrets stay in environment or owner-only files, never argv/messages/receipts/logs.
 - Receipt canonicalization is bounded for depth, nodes, cycles and bytes before signing or verification.
 - Production requires persistent Ed25519 signing material.
-- `/ready` requires a fresh Arena-daemon heartbeat from the same persistent database, so a dead seller process cannot masquerade as a healthy competition service.
+- `/ready` requires a fresh Arena-daemon readiness pulse from the same persistent database. That pulse is refreshed only after successful SharedNet presence plus access to the configured Arena Room, so a live local process with broken Arena connectivity cannot masquerade as ready.
 - Paid receipts are independently inspectable through the free, trace-id-scoped `sledgewire.trace` proof surface.
 
 ## Verification
