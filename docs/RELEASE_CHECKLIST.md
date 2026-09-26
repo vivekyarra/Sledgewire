@@ -33,7 +33,7 @@
 - [x] Unused legacy child-process SharedNet adapter removed from production tree.
 - [x] SharedNet secrets excluded from git and Docker context.
 - [x] SQLite close/reopen replay and two-connection one-use tests green.
-- [x] **248 / 248** automated tests green on v0.3.10 evidence commit `9c15ae5bafa5d54efaa590d3607a2a1b45f17691` (Actions run `36239219171`).
+- [x] **248 / 248** automated tests green on v0.3.10 main merge `a35387a2ba7849fc0b2f81e0424fd87175f0ea1b` (Actions run `36239394230`).
 - [x] **10,000 / 10,000** MCP Smoke workflows at concurrency **128**, 0 failures.
 - [x] **10,000** payment claims + 10,000 cached retries + 500 wrong-buyer rejections, 0 duplicate paid executions.
 - [x] Duplicate storm: **33,000 authorization attempts**, 1,000 unique claims, 15,000 in-flight duplicates refused, 16,000 cached replays, 1,000 transaction-reuse attempts refused, **1,000 ledger reads**, 0 duplicate paid executions.
