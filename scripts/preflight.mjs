@@ -7,6 +7,7 @@ import {SharedNetApi,ROOM,ADDRESS,INSTANCE_TOKEN,payeeBelongsToIdentity,loadShar
 import {McpSession,MODERN_PROTOCOL_VERSION} from '../src/mcp/client.mjs';
 import {validateLiveRehearsalEvidence,validateRestartReplayEvidence} from '../src/ops/live-evidence.mjs';
 import {publicBaseOrigin} from '../src/ops/config.mjs';
+import {publicBaseOrigin} from '../src/ops/config.mjs';
 
 const live=process.argv.includes('--live'),submission=process.argv.includes('--submission'),checks=[];
 const add=(name,ok,detail='')=>checks.push({name,ok,detail});
@@ -26,14 +27,16 @@ try{const dir=path.dirname(path.resolve(db));fs.mkdirSync(dir,{recursive:true});
 catch(e){add('durable_store_path',false,String(e));}
 
 const publicBase=process.env.PUBLIC_BASE_URL??'',productUrl=process.env.SLEDGEWIRE_PRODUCT_URL??(publicBase?`${publicBase.replace(/\/$/,'')}/arena.md`:''),paidBypass=process.env.SLEDGEWIRE_PUBLIC_PAID_EXECUTION==='1';
-function isHttpsUrl(value){try{const u=new URL(value);return u.protocol==='https:'&&Boolean(u.hostname)&&!u.username&&!u.password&&!u.search&&!u.hash&&(u.pathname===''||u.pathname==='/');}catch{return false;}}
+function isHttpsUrl(value){try{const u=new URL(value);return u.protocol==='https:'&&Boolean(u.hostname)&&!u.username&&!u.password;}catch{return false;}}
+function canonicalHttpsOrigin(value){try{return publicBaseOrigin(value,{production:true});}catch{return null;}}
+function isHttpsOrigin(value){return canonicalHttpsOrigin(value)!==null;}
 if(submission){
   add('public_product_link',isHttpsUrl(productUrl),productUrl||'missing');
 }
 if(live||submission){
   add('public_paid_bypass_disabled',!paidBypass,paidBypass?'SLEDGEWIRE_PUBLIC_PAID_EXECUTION=1 is forbidden':'disabled');
 }
-if(live)add('public_mcp_base',isHttpsUrl(publicBase),publicBase||'missing');
+if(live)add('public_mcp_base',isHttpsOrigin(publicBase),publicBase||'missing');
 if(live)add('node_env_production',process.env.NODE_ENV==='production',process.env.NODE_ENV??'missing');
 
 const buildRoom=process.env.SHAREDNET_BUILD_ROOM_ID??'';
