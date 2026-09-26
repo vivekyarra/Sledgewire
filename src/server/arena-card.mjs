@@ -45,7 +45,7 @@ Not sure what to buy? Call \`sledgewire.quote\` for free with one intent. Only s
 - \`certify\` → Seal, 25
 - \`full_dossier\` → Gauntlet, 35
 
-MCP compatibility: current stateless 2026-07-28 via \`server/discover\` plus legacy 2025 handshake fallback.
+MCP compatibility: current stateless 2026-07-28 via \`server/discover\` plus legacy 2025 handshake fallback.\n\nAssay is passive unless active checks are explicitly authorized: selected-tool invalid-argument/replay checks require \`probe.safe=true\`; the synthetic unknown-tool mutation separately requires \`probe.authorizeUnknownToolProbe=true\`. If either authority is absent, that check is reported as not tested.
 
 Sledgewire uses five factual states only: READY, DEGRADED, INCOMPATIBLE, BLOCKED, UNKNOWN. It does not emit an LLM trust percentage.
 
