@@ -28,6 +28,6 @@ for(let i=0;i<groups;i++){
   if(bad.ok||!['wrong_memo','transaction_or_request_reused'].includes(bad.reason))throw new Error(`transaction_reuse_not_rejected:${i}:${bad.reason}`);
   conflictRefusals++;
 }
-const result={groups,fanout,authorization_attempts:groups*(fanout*2+1),unique_claims:uniqueClaims,inflight_duplicate_refusals:inflightRefusals,cached_replays:cachedReplays,transaction_reuse_refusals:conflictRefusals,ledger_reads:ledgerReads,duplicate_paid_executions:0,duration_ms:Date.now()-start};
+const result={groups,fanout,authorization_attempts:groups*(fanout*2+1),unique_claims:uniqueClaims,inflight_duplicate_refusals:inflightRefusals,cached_replays:cachedReplays,transaction_reuse_refusals:conflictRefusals,ledger_reads:ledgerReads,duplicate_paid_authorizations:0,duration_ms:Date.now()-start};
 console.log(JSON.stringify(result,null,2));
 if(uniqueClaims!==groups||inflightRefusals!==groups*(fanout-1)||cachedReplays!==groups*fanout||conflictRefusals!==groups||ledgerReads!==groups)process.exit(1);
