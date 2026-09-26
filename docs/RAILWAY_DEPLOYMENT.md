@@ -19,25 +19,17 @@ A single Railway service with one attached volume avoids cross-service SQLite sh
 
 ## Railway service settings
 
-Deploy the repository with the checked-in `Dockerfile`.
+The repository now includes `railway.json` as config-as-code. It pins the Dockerfile build, `npm run arena:all` start command, `/ready` healthcheck, 120-second startup timeout, On Failure restart policy and 15-second drain window.
 
-Set the custom start command to:
+The platform steps that cannot be safely encoded in the repository are:
 
-    npm run arena:all
+1. Create one Railway service from this GitHub repository.
+2. Attach exactly one persistent volume at `/persistent`.
+3. Generate a public Railway domain.
+4. Keep the service at one replica. Railway volumes do not support replicas, and SQLite is intentionally single-writer here.
+5. Set the required service variables/secrets below, including `RAILWAY_RUN_UID=0`.
 
-Attach one persistent volume at:
-
-    /persistent
-
-Set the deployment healthcheck path to:
-
-    /ready
-
-Use a healthcheck timeout of at least 120 seconds for the first deployment.
-
-Keep the service at one replica. SQLite + one attached volume is intentionally single-writer in this deployment mode.
-
-Set restart policy to On Failure.
+Do not override the checked-in start command or healthcheck unless you also update and re-run the repository deployment tests.
 
 Generate a public Railway domain before the final Arena rehearsal. `arena:all` automatically derives:
 
@@ -84,15 +76,21 @@ Do not generate a new key on every deployment. The same key must survive restart
 
 ## First deployment verification
 
-The deployment must not be considered Arena-ready until all of these work on the public domain:
+The deployment must not be considered Arena-ready until an unrelated network client can prove it. Run from outside Railway:
 
-    GET /health
-    GET /ready
-    GET /arena.md
-    GET /public-key
-    POST /mcp
+    npm run public:probe -- https://YOUR-RAILWAY-DOMAIN --arena
 
-`/ready` is intentionally stricter than `/health`. It becomes green only after the Arena daemon has authenticated to SharedNet and confirmed access to the configured Arena Room.
+That no-secret probe verifies:
+
+- `GET /health`
+- fresh daemon-backed `GET /ready`
+- `GET /arena.md`
+- `GET /public-key`
+- current 2026-07-28 MCP negotiation on `POST /mcp`
+- a signed free `sledgewire.selfcheck`
+- a signed 3-credit `PAYMENT_REQUIRED` route bound to a valid Arena Room
+
+It never pays or executes paid work. `/ready` is intentionally stricter than `/health`: it becomes green only after the Arena daemon has authenticated to SharedNet and confirmed access to the configured Arena Room.
 
 Then perform the real buyer path from a different SharedNet seat:
 
@@ -112,9 +110,10 @@ Preserve:
 
 Finally run:
 
+    npm run public:probe -- https://YOUR-RAILWAY-DOMAIN --arena
     npm run preflight -- --live
 
-Do not replace the submission product link with the Railway `/arena.md` URL until that command returns `ready: true`.
+Do not replace the submission product link with the Railway `/arena.md` URL until both commands are green.
 
 ## Failure behavior
 
