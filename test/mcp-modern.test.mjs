@@ -37,7 +37,7 @@ test('client falls back when old endpoint returns plain HTTP 404 to discover pro
 });
 test('server/discover advertises modern plus legacy and identity only in _meta',async()=>{
   const r=await handleRpc({jsonrpc:'2.0',id:'d1',method:'server/discover',params:{_meta:{'io.modelcontextprotocol/protocolVersion':'2026-07-28','io.modelcontextprotocol/clientCapabilities':{},'io.modelcontextprotocol/clientInfo':{name:'test',version:'1'}}}});
-  assert.equal(r.result.resultType,'complete');assert.equal(r.result.ttlMs,0);assert.equal(r.result.cacheScope,'private');assert.ok(r.result.supportedVersions.includes('2026-07-28'));assert.ok(r.result.supportedVersions.includes('2025-11-25'));assert.equal(r.result.serverInfo,undefined);assert.equal(r.result._meta['io.modelcontextprotocol/serverInfo'].version,'0.3.8');
+  assert.equal(r.result.resultType,'complete');assert.equal(r.result.ttlMs,0);assert.equal(r.result.cacheScope,'private');assert.ok(r.result.supportedVersions.includes('2026-07-28'));assert.ok(r.result.supportedVersions.includes('2025-11-25'));assert.equal(r.result.serverInfo,undefined);assert.equal(r.result._meta['io.modelcontextprotocol/serverInfo'].version,'0.3.9');
 });
 test('modern tools/list wire result carries required result type and cache hints',async()=>{const r=await handleRpc({jsonrpc:'2.0',id:9,method:'tools/list',params:{_meta:{'io.modelcontextprotocol/protocolVersion':'2026-07-28'}}});assert.equal(r.result.resultType,'complete');assert.equal(r.result.ttlMs,0);assert.equal(r.result.cacheScope,'private');});
 test('modern HTTP requires matching protocol and method headers',()=>{
@@ -68,7 +68,7 @@ test('unsupported protocol version fails explicitly',()=>{
 });
 test('legacy initialize still accepts 2025-11-25',async()=>{
   const r=await handleRpc({jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2025-11-25',capabilities:{},clientInfo:{name:'legacy',version:'1'}}});
-  assert.equal(r.result.protocolVersion,'2025-11-25');assert.equal(r.result.serverInfo.version,'0.3.8');
+  assert.equal(r.result.protocolVersion,'2025-11-25');assert.equal(r.result.serverInfo.version,'0.3.9');
 });
 
 test('modern target client mirrors x-mcp-header tool arguments with sentinel encoding',async()=>{

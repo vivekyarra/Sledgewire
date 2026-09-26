@@ -1,4 +1,4 @@
-# Sledgewire v0.3.8 stress report
+# Sledgewire v0.3.9 stress report
 
 Date: 2026-09-25
 
@@ -6,15 +6,15 @@ This report separates executed CI evidence from live-event facts. It does not cl
 
 ## Current green code evidence
 
-Evidence commit: `720fc8f015786a51b70f7ee64dd54ac0a0afdbe9`
+Evidence commit: `727bc886ef8d7e5ed0dfacea6fdd4a98825963e2`
 
-GitHub Actions run: `36178460020`
+GitHub Actions run: `36222875380`
 
-- Automated tests: **231 / 231 passed**, 0 failed, 0 skipped.
+- Automated tests: **233 / 233 passed**, 0 failed, 0 skipped.
 - Hostile/current-protocol selfcheck: **VERIFIED**, signed receipt verification true, profile `sledgewire.selfcheck.v4`.
-- MCP stress: **10,000 / 10,000** complete Smoke workflows at concurrency **128**, **0 failures**; p50 **151 ms**, p95 **168 ms**, p99 **272 ms**, total **12.453 s**.
-- Arena ledger/replay stress: **10,000 claims**, **10,000 cached retries**, **500 wrong-buyer attempts rejected**, **0 duplicate paid executions**, total **1.581 s**.
-- Duplicate storm: **33,000 authorization attempts** across 1,000 purchases at fanout 16: 1,000 unique claims, 15,000 in-flight duplicate refusals, 16,000 cached replays, 1,000 transaction-reuse refusals, only **1,000 ledger reads**, **0 duplicate paid executions**, total **1.489 s**.
+- MCP stress: **10,000 / 10,000** complete Smoke workflows at concurrency **128**, **0 failures**; p50 **153 ms**, p95 **166 ms**, p99 **262 ms**, total **12.592 s**.
+- Arena ledger/replay stress: **10,000 claims**, **10,000 cached retries**, **500 wrong-buyer attempts rejected**, **0 duplicate paid executions**, total **1.647 s**.
+- Duplicate storm: **33,000 authorization attempts** across 1,000 purchases at fanout 16: 1,000 unique claims, 15,000 in-flight duplicate refusals, 16,000 cached replays, 1,000 transaction-reuse refusals, only **1,000 ledger reads**, **0 duplicate paid executions**, total **1.640 s**.
 - SharedOS check: deny true, allow true, exhausted `maxUses` denied, **9 audit events**.
 - Static preflight: **READY**.
 - Production missing signing key fails closed; persistent key succeeds.
@@ -22,7 +22,7 @@ GitHub Actions run: `36178460020`
 
 These timings are GitHub Actions/local fixture measurements only. They are not SharedNet, public Internet, SharedOS Cloud, or third-party MCP latency claims.
 
-## Red-team flaws found and closed through v0.3.8
+## Red-team flaws found and closed through v0.3.9
 
 1. **Cross-buyer request-label collision.** Buyer-controlled `request_id` was previously a global store/grant identity. Durable state is now scoped by Room + buyer + request id, and SharedOS grant ids derive from the full request fingerprint.
 2. **Pay-for-invalid-work trap.** Paid input used to be fully rejected only after payment. Service-specific endpoint/probe/invoke/fleet shapes and resource budgets are now validated before PAYMENT_REQUIRED or ledger lookup.
@@ -42,7 +42,9 @@ These timings are GitHub Actions/local fixture measurements only. They are not S
 16. **False-green deployment state.** The public server could be alive while the separate seller daemon was dead. The daemon now writes a 10-second heartbeat into the shared database; public `/ready` fails closed after 45 seconds, and live preflight checks both that readiness signal and the deployed signing-key identity.
 17. **Discovery depended on a representative agent remembering to pitch.** The provider daemon now emits one small, machine-readable `sledgewire.available.v1` message with the free proof path, paid ladder and quickstart. The send is idempotent and durably recorded, so restart does not create spam.
 18. **Arena economics were not observable from durable state.** `npm run arena:stats` now derives gross verified incoming credits from claimed native payments, paid transaction count, completed-delivery buyer count, service/outcome mix, rejection reasons, Smoke-to-premium conversion, latency and signed/trace evidence coverage without printing buyer identities.
-19. Earlier hardening remains active: explicit active-probe safety, destructive authorization, exact-target SharedOS grants, unknown-outcome no-retry, poison-message dead-letter, DNS/IP pinning, expanded SSRF blocking, watch-mode single-message delivery, production paid-bypass refusal and restart-safe SQLite replay.
+19. **Buyer economics were lossy on failed paid executions.** Paid claims now persist the verified buyer seat before target execution, so gross-credit, unique-buyer and conversion metrics remain accurate even when execution fails after payment. Arena stats v2 separates all paid service mix from completed-delivery service mix.
+20. **Schema upgrade could strand an existing competition database.** Startup now performs an online additive migration for the buyer-seat column; exact legacy retries safely backfill buyer identity while preserving cached replay behavior.
+21. Earlier hardening remains active: explicit active-probe safety, destructive authorization, exact-target SharedOS grants, unknown-outcome no-retry, poison-message dead-letter, DNS/IP pinning, expanded SSRF blocking, watch-mode single-message delivery, production paid-bypass refusal and restart-safe SQLite replay.
 
 ## Live facts still required
 

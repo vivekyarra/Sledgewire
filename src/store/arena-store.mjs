@@ -1,10 +1,17 @@
 import {DatabaseSync} from 'node:sqlite';
 
+function hasColumn(db,table,column){return db.prepare(`PRAGMA table_info(${table})`).all().some(r=>r.name===column);}
+function ensureColumn(db,table,column,definition){
+  if(hasColumn(db,table,column))return;
+  try{db.exec(`ALTER TABLE ${table} ADD COLUMN ${definition}`);}
+  catch(e){if(!hasColumn(db,table,column))throw e;}
+}
+
 export class ArenaStore{
   constructor(path=':memory:'){
     this.db=new DatabaseSync(path);this.db.exec('PRAGMA journal_mode=WAL');this.db.exec('PRAGMA busy_timeout=5000');
     this.db.exec(`
-      CREATE TABLE IF NOT EXISTS requests(request_id TEXT PRIMARY KEY,txn_id TEXT NOT NULL UNIQUE,fingerprint TEXT NOT NULL,service TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('inflight','completed','failed')),response_json TEXT,error_json TEXT,started_at TEXT NOT NULL,completed_at TEXT);
+      CREATE TABLE IF NOT EXISTS requests(request_id TEXT PRIMARY KEY,txn_id TEXT NOT NULL UNIQUE,fingerprint TEXT NOT NULL,service TEXT NOT NULL,buyer_seat TEXT,status TEXT NOT NULL CHECK(status IN ('inflight','completed','failed')),response_json TEXT,error_json TEXT,started_at TEXT NOT NULL,completed_at TEXT);
       CREATE TABLE IF NOT EXISTS grants(namespace_id TEXT NOT NULL,grant_id TEXT NOT NULL,grant_json TEXT NOT NULL,revoked_at TEXT,PRIMARY KEY(namespace_id,grant_id));
       CREATE TABLE IF NOT EXISTS grant_usage(namespace_id TEXT NOT NULL,grant_id TEXT NOT NULL,used INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(namespace_id,grant_id));
       CREATE TABLE IF NOT EXISTS audit(event_id TEXT PRIMARY KEY,at TEXT NOT NULL,trace_id TEXT,event_json TEXT NOT NULL);
@@ -13,18 +20,24 @@ export class ArenaStore{
       CREATE TABLE IF NOT EXISTS metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS counters(key TEXT PRIMARY KEY,value INTEGER NOT NULL DEFAULT 0);
     `);
+    // Online migration for pre-v0.3.9 databases. Duplicate-column races are
+    // accepted only after the column is visible on this connection.
+    ensureColumn(this.db,'requests','buyer_seat','buyer_seat TEXT');
   }
-  claim({requestId,txnId,fingerprint,service}){
+  claim({requestId,txnId,fingerprint,service,buyerSeat=null}){
     this.db.exec('BEGIN IMMEDIATE');try{
       const byReq=this.db.prepare('SELECT * FROM requests WHERE request_id=?').get(requestId),byTxn=this.db.prepare('SELECT * FROM requests WHERE txn_id=?').get(txnId),existing=byReq??byTxn;
       if(existing){
-        this.db.exec('COMMIT');const exact=existing.request_id===requestId&&existing.txn_id===txnId&&existing.fingerprint===fingerprint&&existing.service===service;
+        const buyerExact=existing.buyer_seat===null||buyerSeat===null||existing.buyer_seat===buyerSeat;
+        const exact=existing.request_id===requestId&&existing.txn_id===txnId&&existing.fingerprint===fingerprint&&existing.service===service&&buyerExact;
+        if(exact&&existing.buyer_seat===null&&buyerSeat!==null)this.db.prepare('UPDATE requests SET buyer_seat=? WHERE request_id=? AND buyer_seat IS NULL').run(buyerSeat,existing.request_id);
+        this.db.exec('COMMIT');
         if(!exact)return {status:'conflict'};
         if(existing.status==='completed')return {status:'replay',response:JSON.parse(existing.response_json)};
         if(existing.status==='failed')return {status:'failed',error:existing.error_json?JSON.parse(existing.error_json):null};
         return {status:'inflight',startedAt:existing.started_at,ageMs:Math.max(0,Date.now()-Date.parse(existing.started_at))};
       }
-      this.db.prepare(`INSERT INTO requests(request_id,txn_id,fingerprint,service,status,started_at) VALUES(?,?,?,?, 'inflight',?)`).run(requestId,txnId,fingerprint,service,new Date().toISOString());this.db.exec('COMMIT');return {status:'claimed'};
+      this.db.prepare(`INSERT INTO requests(request_id,txn_id,fingerprint,service,buyer_seat,status,started_at) VALUES(?,?,?,?,?, 'inflight',?)`).run(requestId,txnId,fingerprint,service,buyerSeat,new Date().toISOString());this.db.exec('COMMIT');return {status:'claimed'};
     }catch(e){this.db.exec('ROLLBACK');throw e;}
   }
   complete(requestId,fingerprint,response){const r=this.db.prepare(`UPDATE requests SET status='completed',response_json=?,completed_at=? WHERE request_id=? AND fingerprint=? AND status='inflight'`).run(JSON.stringify(response),new Date().toISOString(),requestId,fingerprint);if(r.changes!==1)throw new Error('request_completion_conflict');}
@@ -65,25 +78,31 @@ export class ArenaStore{
     return Object.fromEntries(rows.map(r=>[r.key,Number(r.value)]));
   }
   arenaStats({prices={}}={}){
-    const rows=this.db.prepare('SELECT service,txn_id,status,response_json,started_at,completed_at FROM requests ORDER BY rowid ASC').all();
-    const buyers=new Set(),txns=new Set(),serviceMix={},outcomeMix={},latencies=[],smokeBuyers=new Set(),premiumBuyers=new Set();
-    let earned=0,unknownPrice=0,malformed=0,signedDeliveries=0,traceDeliveries=0,completed=0,failed=0,inflight=0;
+    const rows=this.db.prepare('SELECT service,txn_id,buyer_seat,status,response_json,started_at,completed_at FROM requests ORDER BY rowid ASC').all();
+    const paidBuyers=new Set(),completedBuyers=new Set(),txns=new Set(),paidServiceMix={},serviceMix={},outcomeMix={},latencies=[],smokeBuyers=new Set(),premiumBuyers=new Set();
+    let earned=0,unknownPrice=0,legacyUnattributed=0,malformed=0,signedDeliveries=0,traceDeliveries=0,completed=0,failed=0,inflight=0;
     for(const row of rows){
       if(row.txn_id)txns.add(row.txn_id);
-      const configuredPrice=Number(prices?.[row.service]);
+      paidServiceMix[row.service]=(paidServiceMix[row.service]??0)+1;
       let response=null,receipt=null;
       if(row.response_json){try{response=JSON.parse(row.response_json);receipt=response?.receipt??null;}catch{malformed++;}}
-      const receiptPrice=Number(receipt?.payment?.price_credits),price=Number.isInteger(configuredPrice)&&configuredPrice>0?configuredPrice:(Number.isInteger(receiptPrice)&&receiptPrice>0?receiptPrice:null);
+      const buyer=typeof row.buyer_seat==='string'&&row.buyer_seat?row.buyer_seat:(typeof receipt?.buyer_seat==='string'&&receipt.buyer_seat?receipt.buyer_seat:null);
+      if(buyer){
+        paidBuyers.add(buyer);
+        if(row.service==='sledgewire.smoke')smokeBuyers.add(buyer);else premiumBuyers.add(buyer);
+      }else legacyUnattributed++;
+      const configuredPrice=Number(prices?.[row.service]),receiptPrice=Number(receipt?.payment?.price_credits);
+      const price=Number.isInteger(configuredPrice)&&configuredPrice>0?configuredPrice:(Number.isInteger(receiptPrice)&&receiptPrice>0?receiptPrice:null);
       if(price===null)unknownPrice++;else earned+=price;
       if(row.status==='inflight'){inflight++;continue;}
       if(row.status==='failed'){failed++;continue;}
       if(row.status!=='completed')continue;
       completed++;serviceMix[row.service]=(serviceMix[row.service]??0)+1;
+      if(buyer)completedBuyers.add(buyer);
       const start=Date.parse(row.started_at),end=Date.parse(row.completed_at);if(Number.isFinite(start)&&Number.isFinite(end)&&end>=start)latencies.push(end-start);
       if(!response)continue;
-      const buyer=receipt?.buyer_seat,outcome=response?.outcome_state??receipt?.state??'UNKNOWN';
+      const outcome=response?.outcome_state??receipt?.state??'UNKNOWN';
       outcomeMix[String(outcome)]=(outcomeMix[String(outcome)]??0)+1;
-      if(typeof buyer==='string'&&buyer){buyers.add(buyer);if(row.service==='sledgewire.smoke')smokeBuyers.add(buyer);else premiumBuyers.add(buyer);}
       if(receipt?.proof?.signature)signedDeliveries++;
       if(typeof response?.trace_id==='string'&&response.trace_id&&response.trace_id===receipt?.sharedos_trace_id)traceDeliveries++;
     }
@@ -91,15 +110,17 @@ export class ArenaStore{
     let converted=0;for(const b of smokeBuyers)if(premiumBuyers.has(b))converted++;
     const rejects=this.counterMap('arena.reject.'),rejections={};for(const [k,v] of Object.entries(rejects))rejections[k.slice('arena.reject.'.length)]=v;
     return {
-      schema:'sledgewire.arena.stats.v1',
+      schema:'sledgewire.arena.stats.v2',
       earned_credits:earned,
       earned_credits_basis:'verified payment claims in local durable store; configured catalog price preferred',
-      unique_buyers:buyers.size,
+      unique_buyers:paidBuyers.size,
+      unique_completed_buyers:completedBuyers.size,
       paid_transactions:txns.size,
       completed_deliveries:completed,
       failed_requests:failed,
       inflight_requests:inflight,
-      credits_per_unique_buyer:buyers.size?Number((earned/buyers.size).toFixed(2)):0,
+      credits_per_unique_buyer:paidBuyers.size?Number((earned/paidBuyers.size).toFixed(2)):0,
+      paid_service_mix:paidServiceMix,
       service_mix:serviceMix,
       outcome_mix:outcomeMix,
       payment_rejections:rejections,
@@ -107,7 +128,7 @@ export class ArenaStore{
       smoke_buyers:smokeBuyers.size,
       smoke_to_premium_buyers:converted,
       smoke_to_premium_conversion:smokeBuyers.size?Number((converted/smokeBuyers.size).toFixed(4)):0,
-      integrity:{signed_deliveries:signedDeliveries,trace_bound_deliveries:traceDeliveries,malformed_completed_rows:malformed,unknown_price_claims:unknownPrice}
+      integrity:{signed_deliveries:signedDeliveries,trace_bound_deliveries:traceDeliveries,malformed_completed_rows:malformed,unknown_price_claims:unknownPrice,legacy_unattributed_claims:legacyUnattributed}
     };
   }
   getMeta(key){return this.db.prepare('SELECT value FROM metadata WHERE key=?').get(key)?.value??null;}

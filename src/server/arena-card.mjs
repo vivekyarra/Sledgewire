@@ -4,7 +4,7 @@ export function arenaCard(baseUrl){
   const base=String(baseUrl).replace(/\/$/,'');
   return {
     product:'Sledgewire',
-    version:'0.3.8',
+    version:'0.3.9',
     tagline:'Hit the service before your credits do.',
     one_line:'Adversarial MCP preflight, evidence-bounded repair, SharedOS-governed execution, and signed receipts.',
     mcp_url:`${base}/mcp`,

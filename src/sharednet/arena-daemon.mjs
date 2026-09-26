@@ -31,7 +31,7 @@ const statsEvery=Math.max(60_000,Math.min(3_600_000,Number(process.env.SLEDGEWIR
 const statsTimer=setInterval(()=>{try{console.error(JSON.stringify({sledgewire:'arena-stats',...store.arenaStats({prices:arenaPrices})}));}catch(e){console.error(`arena-stats:${e.message}`);}},statsEvery);statsTimer.unref();
 const stop=signal=>{clearInterval(heartbeat);clearInterval(localHeartbeat);clearInterval(statsTimer);writeLocalHeartbeat('stopped');console.error(JSON.stringify({sledgewire:'arena-daemon',event:'stopping',signal}));try{store.db.close();}catch{}process.exit(0);};
 process.once('SIGTERM',()=>stop('SIGTERM'));process.once('SIGINT',()=>stop('SIGINT'));
-console.error(JSON.stringify({sledgewire:'arena-daemon',version:'0.3.8',room,instance:selfSeat,cursor,concurrency,maxAttempts}));
+console.error(JSON.stringify({sledgewire:'arena-daemon',version:'0.3.9',room,instance:selfSeat,cursor,concurrency,maxAttempts}));
 const sequenceOf=message=>{const n=Number(message?.sequence);return Number.isSafeInteger(n)&&n>=0?n:null;};
 let backoff=500;
 for(;;){

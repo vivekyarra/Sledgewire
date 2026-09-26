@@ -49,7 +49,7 @@ export class PaymentGate{
     if(tx.memo!==memo)return {ok:false,reason:'wrong_memo'};
 
     const fp=requestFingerprint(req),storageKey=requestStorageKey(req);
-    const claim=this.store.claim({requestId:storageKey,txnId:req.txnId,fingerprint:fp,service:req.service});
+    const claim=this.store.claim({requestId:storageKey,txnId:req.txnId,fingerprint:fp,service:req.service,buyerSeat:req.buyerSeat});
     if(claim.status==='conflict')return {ok:false,reason:'transaction_or_request_reused'};
     if(claim.status==='inflight'){
       if((claim.ageMs??0)>=this.uncertainAfterMs)return {ok:false,reason:'execution_outcome_unknown_no_retry',fingerprint:fp,storageKey,started_at:claim.startedAt,age_ms:claim.ageMs};
