@@ -10,11 +10,26 @@ const REQUEST_ID=/^[A-Za-z0-9][A-Za-z0-9._-]{2,95}$/;
 
 export function createArenaHandler({store,ledger,room,payee,signing,publicBaseUrl,runService=runPaidService}){
   const prices=Object.fromEntries(Object.entries(catalog.services).map(([k,v])=>[k,v.price])),gate=new PaymentGate({ledger,store,prices,payee});
+  const safeRequestId=req=>typeof req?.request_id==='string'&&REQUEST_ID.test(req.request_id)?req.request_id:null;
+  const safeService=req=>typeof req?.service==='string'&&req.service.length<=128?req.service:null;
+  const signedFailure=(req,buyerSeat,reason,extra={})=>signReceipt({
+    type:'sledgewire.service.response.v1',
+    request_id:safeRequestId(req),
+    service:safeService(req),
+    state:'FAILED',
+    reason,
+    room_id:room,
+    buyer_seat:buyerSeat,
+    ...(typeof req?.payment_txn_id==='string'&&req.payment_txn_id.length<=160?{payment_txn_id:req.payment_txn_id}:{}),
+    ...extra,
+    issued_at:new Date().toISOString(),
+    response_version:'sledgewire.room-response.v1'
+  },signing.privateKeyPem);
   async function serve(req,buyerSeat){
-    if(typeof req.request_id!=='string'||!REQUEST_ID.test(req.request_id)){store.incrementCounter('arena.reject.invalid_request_id');return failure(req,'invalid_request_id');}
-    if(!catalog.services[req.service]||catalog.services[req.service].price<=0){store.incrementCounter('arena.reject.unknown_or_free_service');return failure(req,'unknown_or_free_service');}
+    if(typeof req.request_id!=='string'||!REQUEST_ID.test(req.request_id)){store.incrementCounter('arena.reject.invalid_request_id');return signedFailure(req,buyerSeat,'invalid_request_id');}
+    if(!catalog.services[req.service]||catalog.services[req.service].price<=0){store.incrementCounter('arena.reject.unknown_or_free_service');return signedFailure(req,buyerSeat,'unknown_or_free_service');}
     const validation=validateServiceInput(req.service,req.input);
-    if(!validation.ok){store.incrementCounter('arena.reject.invalid_input');return failure(req,'invalid_input',{detail:validation.reason});}
+    if(!validation.ok){store.incrementCounter('arena.reject.invalid_input');return signedFailure(req,buyerSeat,'invalid_input',{detail:validation.reason});}
 
     if(!req.payment_txn_id){
       const price=prices[req.service],memo=paymentMemo(req.request_id,req.service);
@@ -22,7 +37,7 @@ export function createArenaHandler({store,ledger,room,payee,signing,publicBaseUr
     }
 
     const auth=await gate.authorize({roomId:room,buyerSeat,requestId:req.request_id,service:req.service,input:req.input,txnId:req.payment_txn_id});
-    if(!auth.ok){store.incrementCounter(`arena.reject.${String(auth.reason).replace(/[^a-z0-9_.-]/gi,'_').slice(0,80)}`);if(auth.reason==='previous_attempt_failed'&&auth.error?.response)return auth.error.response;return failure(req,auth.reason,auth);}
+    if(!auth.ok){store.incrementCounter(`arena.reject.${String(auth.reason).replace(/[^a-z0-9_.-]/gi,'_').slice(0,80)}`);if(auth.reason==='previous_attempt_failed'&&auth.error?.response)return auth.error.response;return signedFailure(req,buyerSeat,auth.reason,auth);}
     if(auth.replay)return auth.cached;
 
     try{
@@ -48,7 +63,10 @@ export function createArenaHandler({store,ledger,room,payee,signing,publicBaseUr
 
     let req=null;try{req=JSON.parse(message.content);}catch{}
     if(req?.type==='sledgewire.service.request.v1')return serve(req,buyerSeat);
-    if(req?.type==='sledgewire.quote.request.v1')return {type:'sledgewire.quote.response.v1',request_id:req.request_id??null,...quote(req)};
+    if(req?.type==='sledgewire.quote.request.v1'){
+      try{return signReceipt({type:'sledgewire.quote.response.v1',request_id:safeRequestId(req),room_id:room,buyer_seat:buyerSeat,...quote(req),issued_at:new Date().toISOString(),response_version:'sledgewire.room-response.v1'},signing.privateKeyPem);}
+      catch(e){return signedFailure({request_id:req?.request_id,service:'sledgewire.quote'},buyerSeat,'invalid_quote_request',{detail:String(e.message||e).slice(0,500)});}
+    }
 
     const text=String(message.content??'').trim();
     if(!/(^|\s)@?sledgewire\b/i.test(text))return null;
@@ -57,4 +75,3 @@ export function createArenaHandler({store,ledger,room,payee,signing,publicBaseUr
     return {type:'sledgewire.info.v1',message:'Sledgewire adversarially tests MCP services, repairs only evidence-backed structural mismatches, executes paid work through SharedOS, and returns signed receipts. Start with free sledgewire.quote or selfcheck.',quickstart:`${publicBaseUrl.replace(/\/$/,'')}/arena.md`};
   };
 }
-function failure(req,reason,extra={}){return {type:'sledgewire.service.response.v1',request_id:req?.request_id??null,service:req?.service??null,state:'FAILED',reason,...extra};}
