@@ -132,7 +132,7 @@ For platforms where a persistent volume belongs to one service, run the public s
 
     npm run arena:all
 
-Both child processes still use the same durable database; if either child dies, the whole service exits so the platform can restart a complete seller. See `docs/RAILWAY_DEPLOYMENT.md` for the Railway path. The two-container Compose topology remains the stronger isolation model when a normal Docker host is available.
+Both child processes still use the same durable database; if either child dies, the whole service exits so the platform can restart a complete seller. Railway deployment is config-as-code through the checked-in `railway.json`; see `docs/RAILWAY_DEPLOYMENT.md`. The two-container Compose topology remains the stronger isolation model when a normal Docker host is available.
 
 ## Run the autonomous provider
 
@@ -185,6 +185,8 @@ Large signed deliveries are uploaded as Room-addressed SharedNet artifacts and r
     npm run economy
     npm run sharedos:check
     npm run preflight
+    # prove the public deployment from outside the host without spending credits:
+    npm run public:probe -- https://your-host.example --arena
     # after deployment with a distinct buyer seat:
     npm run arena:rehearse
     # restart the Arena daemon, then:
@@ -201,7 +203,7 @@ Before autonomous competition:
 
     npm run preflight -- --live
 
-Live preflight intentionally remains red until real event facts exist. It now proves the deployed `/health`, `/ready`, `/arena.md` and modern `/mcp` surface; verifies the deployed signing key, signed free selfcheck and signed paid routing response; checks the Arena seller identity/payee; and validates cryptographic second-seat rehearsal plus restart-replay evidence. Run `npm run arena:rehearse`, restart the Arena daemon, run `npm run arena:replay-after-restart`, then use `npm run preflight -- --live` as the final no-human handoff gate.
+Live preflight intentionally remains red until real event facts exist. Before spending credits, `npm run public:probe -- https://your-host.example --arena` provides a no-secret external proof of the live seller. Live preflight then proves the deployed `/health`, `/ready`, `/arena.md` and modern `/mcp` surface; verifies the deployed signing key, signed free selfcheck and signed paid routing response; checks the Arena seller identity/payee; and validates cryptographic second-seat rehearsal plus restart-replay evidence. Run `npm run arena:rehearse`, restart the Arena daemon, run `npm run arena:replay-after-restart`, then use `npm run preflight -- --live` as the final no-human handoff gate.
 
 ## Competition docs
 

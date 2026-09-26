@@ -50,6 +50,8 @@
 - [x] Daemon readiness exposes a non-secret per-process `boot_id`; `npm run arena:replay-after-restart` refuses same-boot runs and verifies the original receipt + trace survive a real daemon restart without a second payment.
 - [x] `package-lock.json` pins the full npm graph; CI/Docker use `npm ci`; CI rejects high-severity production dependency advisories.
 - [x] CI builds and boots the real non-root production Docker image, verifies `/health`, and performs a signed modern MCP selfcheck.
+- [x] Railway config-as-code pins the Dockerfile, fail-fast `arena:all` start command, `/ready` healthcheck, startup timeout, On Failure restart policy and drain window.
+- [x] No-secret `npm run public:probe -- https://HOST --arena` verifies external health/readiness, arena card, signing key, modern MCP, signed selfcheck and signed paid routing before any credits are spent.
 - [x] Production/runtime origin and numeric configuration fail closed on credentialed/pathful public bases, NaN/fractional/out-of-range concurrency/timer/cursor settings, and malformed persisted cursors.
 - [x] Room `PAYMENT_REQUIRED` responses are Ed25519-signed and buyer-bound.
 - [x] Paid execution failures are signed, durably cached and replayed exactly without duplicate execution or another ledger read.
@@ -70,6 +72,7 @@
 - [ ] Organizer Arena Room configured separately from build Room.
 - [ ] Competition seat joined; invite token removed afterward.
 - [ ] Payee verified against current SharedNet identity; purse/ledger readable.
+- [ ] `npm run public:probe -- https://PUBLIC-HOST --arena` green from an unrelated network.
 - [ ] Run `npm run arena:rehearse` with a real second seat; preserve `.sledgewire/live-rehearsal.json` as evidence.
 - [ ] Another seat completes request -> payment -> SharedOS -> signed reply.
 - [ ] Another seat independently calls `sledgewire.trace` on that paid receipt and verifies the returned proof.

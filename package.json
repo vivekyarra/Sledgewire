@@ -27,7 +27,8 @@
     "arena:stats": "node scripts/arena-stats.mjs",
     "arena:replay-after-restart": "node scripts/restart-replay.mjs",
     "arena:all": "node scripts/arena-all.mjs",
-    "stress:handler": "node scripts/handler-execution-stress.mjs"
+    "stress:handler": "node scripts/handler-execution-stress.mjs",
+    "public:probe": "node scripts/public-probe.mjs"
   },
   "engines": {
     "node": ">=22.18.0"
