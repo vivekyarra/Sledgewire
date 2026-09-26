@@ -15,7 +15,7 @@ function signedTraceOk(trace,traceId,publicKeyPem){
 }
 
 export function validateLiveRehearsalEvidence(evidence,{roomId,payee,publicBaseUrl,publicKeyPem}={}){
-  if(evidence?.type!=='sledgewire.live-rehearsal.v2'||evidence?.verified!==true)return fail('invalid_live_rehearsal_type');
+  if(evidence?.type!=='sledgewire.live-rehearsal.v3'||evidence?.verified!==true)return fail('invalid_live_rehearsal_type');
   if(evidence.room_id!==roomId)return fail('live_rehearsal_room_mismatch');
   if(evidence.public_base_url!==publicBaseUrl)return fail('live_rehearsal_public_base_mismatch');
   if(evidence.service!=='sledgewire.smoke'||Number(evidence.price_credits)!==3)return fail('live_rehearsal_service_or_price_mismatch');
@@ -40,7 +40,7 @@ export function validateLiveRehearsalEvidence(evidence,{roomId,payee,publicBaseU
 }
 
 export function validateRestartReplayEvidence(evidence,{roomId,rehearsal,publicKeyPem,currentBootId=null}={}){
-  if(evidence?.type!=='sledgewire.restart-replay-proof.v1'||evidence?.verified!==true)return fail('invalid_restart_replay_type');
+  if(evidence?.type!=='sledgewire.restart-replay-proof.v2'||evidence?.verified!==true)return fail('invalid_restart_replay_type');
   if(evidence.room_id!==roomId||evidence.room_id!==rehearsal?.room_id)return fail('restart_replay_room_mismatch');
   if(evidence.request_id!==rehearsal?.request_id||evidence.buyer_seat!==rehearsal?.buyer_seat||evidence.payment_txn_id!==rehearsal?.payment_txn_id||evidence.trace_id!==rehearsal?.trace_id)return fail('restart_replay_scope_mismatch');
   if(evidence.previous_boot_id!==rehearsal?.provider_boot_id||!UUID.test(String(evidence.previous_boot_id??''))||!UUID.test(String(evidence.current_boot_id??''))||evidence.current_boot_id===evidence.previous_boot_id)return fail('restart_replay_boot_mismatch');
