@@ -5,15 +5,22 @@ import {PaymentGate,paymentMemo,requestFingerprint,requestStorageKey} from '../s
 
 const base={roomId:'rom_ABCDEFGHIJ',buyerSeat:'i_ABCDEFGHIJ',requestId:'req-1',service:'sledgewire.smoke',input:{endpoint:'https://example.com/mcp'},txnId:'txn_ABCDEFGHIJ'};
 const payee='p_ABCDEFGHIJ',prices={'sledgewire.smoke':3};
-function ledger(overrides={}){return {async get(){return {id:base.txnId,buyer_instance_id:base.buyerSeat,payee_ok:true,addressed_to:payee,amount:3,room_id:base.roomId,memo:paymentMemo(base.requestId,base.service),...overrides};}};}
+function ledger(overrides={}){return {async get(){return {id:base.txnId,buyer_instance_id:base.buyerSeat,payee_ok:true,addressed_to:payee,amount:3,room_id:base.roomId,memo:paymentMemo(base),...overrides};}};}
 
 test('payment required returns exact memo',async()=>{
   const g=new PaymentGate({ledger:ledger(),store:new ArenaStore(),prices,payee}),r=await g.authorize({...base,txnId:null});
-  assert.equal(r.reason,'payment_required');assert.equal(r.memo,paymentMemo(base.requestId,base.service));
+  assert.equal(r.reason,'payment_required');assert.equal(r.memo,paymentMemo(base));assert.equal(r.fingerprint,requestFingerprint(base));
 });
 test('valid payment claims once and returns buyer-scoped storage key',async()=>{
   const s=new ArenaStore(),g=new PaymentGate({ledger:ledger(),store:s,prices,payee}),r=await g.authorize(base);
   assert.equal(r.ok,true);assert.equal(r.replay,false);assert.equal(r.storageKey,requestStorageKey(base));
+});
+test('payment v2 memo binds the exact quoted input before the first paid claim',async()=>{
+  const originalMemo=paymentMemo(base);
+  const changed={...base,input:{endpoint:'https://changed.example/mcp'}};
+  const g=new PaymentGate({ledger:ledger({memo:originalMemo}),store:new ArenaStore(),prices,payee});
+  const r=await g.authorize(changed);
+  assert.equal(r.ok,false);assert.equal(r.reason,'wrong_memo');assert.notEqual(paymentMemo(changed),originalMemo);
 });
 for(const [name,over,reason] of [
   ['buyer',{buyer_instance_id:'i_ZYXWVUTSRQ'},'wrong_buyer'],
@@ -71,7 +78,7 @@ test('same external request id is isolated by buyer seat',async()=>{
     txn_BUYERAAAA:{buyer_instance_id:'i_BUYERAAAA',id:'txn_BUYERAAAA'},
     txn_BUYERBBBB:{buyer_instance_id:'i_BUYERBBBB',id:'txn_BUYERBBBB'}
   };
-  const l={async get(id){const t=txs[id];return t?{...t,addressed_to:payee,payee_ok:true,amount:3,room_id:base.roomId,memo:paymentMemo('same-id',base.service)}:null;}};
+  const l={async get(id){const t=txs[id];return t?{...t,addressed_to:payee,payee_ok:true,amount:3,room_id:base.roomId,memo:paymentMemo({...base,buyerSeat:t.buyer_instance_id,requestId:'same-id',txnId:id})}:null;}};
   const g=new PaymentGate({ledger:l,store:s,prices,payee});
   const a=await g.authorize({...base,buyerSeat:'i_BUYERAAAA',requestId:'same-id',txnId:'txn_BUYERAAAA'});
   const b=await g.authorize({...base,buyerSeat:'i_BUYERBBBB',requestId:'same-id',txnId:'txn_BUYERBBBB'});
@@ -98,7 +105,7 @@ test('buyer request storage key is also scoped by Arena room',()=>{
   assert.notEqual(a,b);
 });
 test('duplicate authorization wave coalesces ledger lookups',async()=>{
-  let reads=0;const s=new ArenaStore(),l={async get(){reads++;await new Promise(r=>setTimeout(r,5));return {id:base.txnId,buyer_instance_id:base.buyerSeat,addressed_to:payee,payee_ok:true,amount:3,room_id:base.roomId,memo:paymentMemo(base.requestId,base.service)};}};
+  let reads=0;const s=new ArenaStore(),l={async get(){reads++;await new Promise(r=>setTimeout(r,5));return {id:base.txnId,buyer_instance_id:base.buyerSeat,addressed_to:payee,payee_ok:true,amount:3,room_id:base.roomId,memo:paymentMemo(base)};}};
   const g=new PaymentGate({ledger:l,store:s,prices,payee});
   const wave=await Promise.all(Array.from({length:25},()=>g.authorize(base)));
   assert.equal(reads,1);assert.equal(wave.filter(x=>x.ok&&!x.replay).length,1);assert.equal(wave.filter(x=>x.reason==='request_already_inflight').length,24);
