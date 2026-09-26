@@ -17,7 +17,7 @@ jobs:
           node-version: '22.18.0'
           package-manager-cache: false
       - run: npm ci --ignore-scripts
-      - run: npm audit --omit=dev --audit-level=high
+      - run: npm audit --audit-level=high
       - name: syntax check all modules
         run: find bin fixtures scripts src test -type f -name '*.mjs' -print0 | xargs -0 -n1 node --check
       - run: npm test
