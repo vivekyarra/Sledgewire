@@ -13,14 +13,16 @@ export async function assay(endpoint,opts={}){
   try{tools=(await s.listTools()).tools;const scan=scanUntrusted(tools);checks.discovery={status:scan.suspicious?'warn':'pass',tool_count:tools.length,untrusted_content:scan.suspicious,injection_markers:scan.hits};}
   catch(e){checks.discovery={status:'fail',reason:String(e.message||e)};return finish();}
 
-  try{
-    await s.callTool('__sledgewire_nonexistent__',{});
-    checks.unknown_tool={status:'fail',reason:'server_accepted_unknown_tool'};
-  }catch(e){
-    checks.unknown_tool=expectedProtocolRejection(e,[-32601,-32602])
-      ?{status:'pass',reason:String(e.message||e)}
-      :{status:'unknown',reason:`non_conclusive_error:${String(e.message||e)}`};
-  }
+  if(opts.probe?.authorizeUnknownToolProbe===true){
+    try{
+      await s.callTool('__sledgewire_nonexistent__',{});
+      checks.unknown_tool={status:'fail',reason:'server_accepted_unknown_tool'};
+    }catch(e){
+      checks.unknown_tool=expectedProtocolRejection(e,[-32601,-32602])
+        ?{status:'pass',reason:String(e.message||e)}
+        :{status:'unknown',reason:`non_conclusive_error:${String(e.message||e)}`};
+    }
+  }else checks.unknown_tool={status:'unknown',reason:'unknown_tool_probe_not_authorized'};
 
   const candidate=opts.probe?.name?tools.find(t=>t.name===opts.probe.name):null;
   if(candidate){
