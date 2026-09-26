@@ -16,6 +16,7 @@ export const MODERN_PROTOCOL_VERSION='2026-07-28';
 export const LEGACY_PROTOCOL_VERSION='2025-11-25';
 export const SUPPORTED_PROTOCOL_VERSIONS=[MODERN_PROTOCOL_VERSION,LEGACY_PROTOCOL_VERSION,'2025-06-18'];
 const META_VERSION='io.modelcontextprotocol/protocolVersion';
+const META_CLIENT_CAPABILITIES='io.modelcontextprotocol/clientCapabilities';
 const META_SERVER='io.modelcontextprotocol/serverInfo';
 const SERVER_INFO={name:'sledgewire',version:'0.3.9'};
 
@@ -67,6 +68,12 @@ export async function handleTool(name,args={},internalOpts={}){
 function modernResult(result,{cacheable=false}={}){return {...result,resultType:result?.resultType??'complete',...(cacheable?{ttlMs:result?.ttlMs??0,cacheScope:result?.cacheScope??'private'}:{}),_meta:{...(result?._meta??{}),[META_SERVER]:SERVER_INFO}};}
 function rpcError(id,code,message,data){return {jsonrpc:'2.0',id:id??null,error:{code,message,...(data===undefined?{}:{data})}};}
 function requestVersion(msg){return msg?.params?._meta?.[META_VERSION]??null;}
+function validateModernEnvelope(msg){
+  if(requestVersion(msg)!==MODERN_PROTOCOL_VERSION)return null;
+  const caps=msg?.params?._meta?.[META_CLIENT_CAPABILITIES];
+  if(!caps||typeof caps!=='object'||Array.isArray(caps))return rpcError(msg?.id,-32602,'Invalid params',{missing_or_invalid:[META_CLIENT_CAPABILITIES]});
+  return null;
+}
 function headerValue(headers,name){const v=headers[name]??headers[name.toLowerCase()]??null;return Array.isArray(v)?v[0]:v;}
 function requestPrincipalName(msg){
   if(msg?.method==='tools/call'||msg?.method==='prompts/get')return msg?.params?.name??null;
@@ -80,6 +87,7 @@ export function validateHttpMcp(msg,headers={}){
   if(modern&&bodyVersion!==headerVersion)return {ok:false,status:400,body:rpcError(msg?.id,-32020,'HeaderMismatch',{header:'Mcp-Protocol-Version',wire:headerVersion??null,body:bodyVersion??null})};
   const requested=bodyVersion??headerVersion;
   if(requested&&!SUPPORTED_PROTOCOL_VERSIONS.includes(requested))return {ok:false,status:400,body:rpcError(msg?.id,-32022,'UnsupportedProtocolVersion',{requested,supported:SUPPORTED_PROTOCOL_VERSIONS})};
+  const envelopeError=validateModernEnvelope(msg);if(envelopeError)return {ok:false,status:400,body:envelopeError};
   if(modern){
     const session=headerValue(headers,'mcp-session-id');
     if(session)return {ok:false,status:400,body:rpcError(msg?.id,-32020,'HeaderMismatch',{header:'Mcp-Session-Id',reason:'removed_in_2026_07_28'})};
@@ -105,6 +113,7 @@ export async function handleRpc(msg,internalOpts={}){
   if(msg?.jsonrpc!=='2.0')return rpcError(msg?.id,-32600,'Invalid Request');
   const version=requestVersion(msg),modern=version===MODERN_PROTOCOL_VERSION;
   if(version&&!SUPPORTED_PROTOCOL_VERSIONS.includes(version))return rpcError(msg.id,-32022,'UnsupportedProtocolVersion',{requested:version,supported:SUPPORTED_PROTOCOL_VERSIONS});
+  const envelopeError=validateModernEnvelope(msg);if(envelopeError)return envelopeError;
   try{
     if(msg.method==='server/discover'){
       if(!modern)return rpcError(msg.id,-32602,'server/discover requires 2026-07-28 request metadata');
