@@ -35,7 +35,7 @@ const ledger={
       payee_ok:true,
       amount:price,
       room_id:room,
-      memo:paymentMemo(`exec-${i}`,service)
+      memo:paymentMemo({roomId:room,buyerSeat:buyer,requestId:`exec-${i}`,service,input:{endpoint:`https://example.com/mcp?case=${i}`}})
     };
   }
 };
