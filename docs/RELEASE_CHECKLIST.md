@@ -36,7 +36,8 @@
 - [x] **248 / 248** automated tests green on v0.3.10 main merge `a35387a2ba7849fc0b2f81e0424fd87175f0ea1b` (Actions run `36239394230`).
 - [x] **10,000 / 10,000** MCP Smoke workflows at concurrency **128**, 0 failures.
 - [x] **10,000** payment claims + 10,000 cached retries + 500 wrong-buyer rejections with one durable authorization per transaction.
-- [x] Duplicate authorization storm: **33,000 authorization attempts**, 1,000 unique claims, 15,000 in-flight duplicates refused, 16,000 cached replays, 1,000 transaction-reuse attempts refused and **1,000 ledger reads**. Service invocation count is covered separately at handler level.
+- [x] Duplicate authorization storm: **33,000 authorization attempts**, 1,000 unique claims, 15,000 in-flight duplicates refused, 16,000 cached replays, 1,000 transaction-reuse attempts refused and **1,000 ledger reads**.
+- [x] Handler-level execution storm on file-backed SQLite/WAL: **33,000 handler requests**, **1,000 paid purchases**, **1,000 actual service executions**, **0 duplicate service executions**, **0 missing executions**, 16,000 exact cached signed replays and 1,000 ledger reads (Actions run `36249277132`).
 - [x] SharedOS deny / allow / maxUses / durable-audit check green.
 - [x] Static preflight green; hardened live preflight additionally requires production mode, disabled paid bypass, public modern MCP negotiation, signed selfcheck/payment route, authenticated seller identity/payee, cryptographically validated second-seat rehearsal evidence, and restart-replay evidence matching the current daemon boot.
 - [x] Production MCP Host/authority guard rejects unlisted Host headers.
