@@ -1,11 +1,11 @@
 import {idempotencyUuid,MESSAGE} from './api.mjs';
+import {publicBaseOrigin} from '../ops/config.mjs';
 
 export const ANNOUNCEMENT_VERSION='sledgewire.available.v1';
 function resultMessageId(result){return result?.message?.id??result?.id??null;}
 
 export function arenaAnnouncement(publicBaseUrl){
-  const base=String(publicBaseUrl??'').replace(/\/$/,'');
-  if(!base.startsWith('https://'))throw new Error('arena_announcement_public_https_required');
+  const base=publicBaseOrigin(String(publicBaseUrl??''),{production:true});
   return {
     type:ANNOUNCEMENT_VERSION,
     product:'Sledgewire',
