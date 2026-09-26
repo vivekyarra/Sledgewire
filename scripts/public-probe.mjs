@@ -56,6 +56,10 @@ try{
   const card=await boundedText(`${base}/arena.md`,128_000,'text/markdown,text/plain;q=0.9');
   add('arena_card',card.response.ok&&card.text.includes(`${base}/mcp`)&&card.text.includes('sledgewire.selfcheck'),`status=${card.response.status};bytes=${Buffer.byteLength(card.text)}`);
 
+  const machineCard=await boundedJson(`${base}/arena.json`,128_000);
+  const authority=machineCard.json?.sharedos_authority;
+  add('sharedos_authority_card',machineCard.response.ok&&authority?.purpose==='sledgewire.test-repair-and-invoke-agent-services'&&String(authority?.roles?.dispatcher??'').includes('no target execution grant')&&authority?.proof?.tool==='sledgewire.trace',`status=${machineCard.response.status};purpose=${authority?.purpose??'missing'};trace=${authority?.proof?.tool??'missing'}`);
+
   const pub=await boundedText(`${base}/public-key`,16_384,'text/plain');
   publicKeyPem=pub.text;
   let kid=null;try{kid=keyId(publicKeyPem);}catch{}
