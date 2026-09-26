@@ -23,3 +23,15 @@ test('x-mcp-header outside properties-only reachability is rejected',()=>{
   assert.equal(scanXMcpHeaderDeclarations(s).valid,false);
 });
 test('malformed base64 sentinel fails closed',()=>assert.equal(decodeMcpHeaderValue('=?base64?%%%?='),undefined));
+
+test('x-mcp-header scan rejects pathological schema depth before stack exhaustion',()=>{
+  let s={type:'string','x-mcp-header':'Leaf'};
+  for(let i=0;i<80;i++)s={type:'object',properties:{x:s}};
+  const r=scanXMcpHeaderDeclarations(s);assert.equal(r.valid,false);assert.equal(r.reason,'schema_depth_limit');
+});
+test('x-mcp-header scan rejects pathological schema node count',()=>{
+  const properties={};
+  for(let i=0;i<10_001;i++)properties['p'+i]={type:'string'};
+  const r=scanXMcpHeaderDeclarations({type:'object',properties});
+  assert.equal(r.valid,false);assert.equal(r.reason,'schema_node_limit');
+});

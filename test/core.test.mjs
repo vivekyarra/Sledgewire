@@ -30,6 +30,15 @@ for(const [name,value,s,ok] of [
  ['schema-valued additionalProperties accepted',{a:1,b:2},{type:'object',additionalProperties:{type:'integer'}},true],
  ['schema-valued additionalProperties rejects',{a:'x'},{type:'object',additionalProperties:{type:'integer'}},false]
 ])test(`schema ${name}`,()=>assert.equal(validateSchemaValue(value,s).ok,ok));
+test('schema validator rejects pathological depth before stack exhaustion',()=>{
+  let schema={type:'string'},value='ok';
+  for(let i=0;i<80;i++){schema={type:'object',required:['x'],properties:{x:schema},additionalProperties:false};value={x:value};}
+  const r=validateSchemaValue(value,schema);assert.equal(r.ok,false);assert.equal(r.reason,'schema_depth_limit');
+});
+test('schema validator rejects pathological node count before unbounded work',()=>{
+  const value=Array.from({length:10_001},()=>1),schema={type:'array',items:{type:'integer'}};
+  const r=validateSchemaValue(value,schema);assert.equal(r.ok,false);assert.equal(r.reason,'schema_node_limit');
+});
 test('assay detects server accepting unknown tool',async()=>{const f=await startFixture({mode:'accepts_unknown'});try{const r=await assay(f.url,{targetPolicy:tp,probe});assert.equal(r.checks.unknown_tool.status,'fail');}finally{await f.close();}});
 test('assay detects server accepting schema-forbidden field',async()=>{const f=await startFixture({mode:'accepts_extra'});try{const r=await assay(f.url,{targetPolicy:tp,probe});assert.equal(r.checks.invalid_arguments.status,'warn');}finally{await f.close();}});
 test('assay warns on divergent replay for declared idempotent tool',async()=>{const f=await startFixture({mode:'divergent_replay'});try{const r=await assay(f.url,{targetPolicy:tp,probe});assert.equal(r.checks.replay.status,'warn');}finally{await f.close();}});
