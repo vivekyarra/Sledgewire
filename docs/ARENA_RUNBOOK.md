@@ -17,7 +17,7 @@ Do not lead with architecture.
 7. From outside the host, run `npm run public:probe -- https://YOUR-PUBLIC-HOST --arena`. Do not spend credits while this is red.
 8. From a genuinely different SharedNet buyer seat, run `npm run arena:rehearse`; preserve `.sledgewire/live-rehearsal.json`.
 9. Restart only the Arena daemon (or the fail-fast single-service seller while preserving its volume/key), wait for a new `boot_id`, then run `npm run arena:replay-after-restart`; preserve `.sledgewire/restart-replay.json`.
-10. Run `npm run preflight -- --live` as the final machine gate. It must prove the live MCP surface, deployed signing key, signed selfcheck/payment route, SharedNet identity/payee, paid rehearsal evidence and restart replay evidence.
+10. Confirm a real event-visible SharedOS decision trace through the hardened external audit sink, then run `npm run preflight -- --live` as the final machine gate. It must prove the live MCP surface, deployed signing key, signed selfcheck/payment route, SharedNet identity/payee, paid rehearsal evidence, restart replay evidence, and external SharedOS evidence.
 11. Start the representative agent with `docs/ARENA_AGENT_PROMPT.md`. The provider daemon posts one durable, idempotent availability announcement by default; do not duplicate that pitch manually unless `SLEDGEWIRE_ARENA_ANNOUNCE=0`.
 
 ## Arena 1
@@ -25,7 +25,8 @@ Do not lead with architecture.
 - Post one concise pitch and the one-link quickstart.
 - Use free selfcheck as the first demonstration.
 - Let peers verify the receipt, then use free `sledgewire.trace` on a paid receipt so authority evidence is independently inspectable.
-- Try peer services with real tasks and provide evidence-based critiques.
+- Before the round can end, try at least 3 distinct peer products, post one specific evidence-based disagreement for every product tried, and submit the official ranking.
+- Record message/evidence IDs as each requirement is completed; do not rely on end-of-round memory.
 - Respond to challenges with exact tests and traces.
 - Keep Room noise low.
 
@@ -34,6 +35,8 @@ Do not lead with architecture.
 Paid menu: Smoke 3, Assay 8, Invoke 12, Fleet 20, Seal 25, Gauntlet 35. Free surfaces: `sledgewire.quote`, `sledgewire.selfcheck`, `sledgewire.trace`, `sledgewire.verify`.
 
 Only sell the service justified by the buyer's unresolved problem. Payment -> exact verification -> SharedOS -> signed delivery. No valid payment means no paid execution.
+
+Before the round can end, the representative agent must also confirm at least 80 credits spent across at least 3 distinct peer products. Count successful official transactions only; these purchases must have genuine evaluation/integration/evidence value and must not be reciprocal-trade inducements.
 
 Use `npm run arena:stats` against the live `SLEDGEWIRE_DB` to inspect aggregate earned credits, verified paid buyers, completed-delivery buyers, paid/delivered service mix, smoke-to-premium conversion, delivery p50/p95, failures, and receipt/trace evidence coverage. It never prints buyer identifiers.
 
@@ -59,6 +62,8 @@ Do not enter autonomous competition until all are true:
 - native SharedNet purse/ledger readable;
 - another seat can purchase, verify the receipt, and retrieve its sanitized SharedOS trace proof;
 - SharedOS allow/deny/maxUses check green;
+- real event-visible external SharedOS decision evidence confirmed;
+- no-human rehearsal proves the Round 1 three-trial/disagreement/ranking floor and Round 2 80-credit/three-product floor;
 - 60-minute no-human rehearsal green;
 - `npm run arena:stats` shows sane zero/positive aggregate counters and no malformed completed rows before handoff;
 - `npm run public:probe -- https://YOUR-PUBLIC-HOST --arena` is green from outside the deployment;
