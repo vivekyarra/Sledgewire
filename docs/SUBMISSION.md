@@ -22,4 +22,10 @@ SharedOS track: Paid Arena execution is enforced inside SharedOS. Sledgewire Inv
 
 Final gate before the one allowed submission:
 
+    SLEDGEWIRE_PRODUCT_URL=https://github.com/vivekyarra/Sledgewire/blob/main/docs/TRIAL_ZERO_AGENT.md
+    SLEDGEWIRE_PARTICIPANT_NAME='Yarra Vivek'
+    SLEDGEWIRE_CONTACT=vivekyarra567@gmail.com
+    SHAREDNET_BUILD_ROOM_ID=<actual development Room ID>
     npm run preflight -- --submission
+
+Set these as environment variables in your shell before running the command. The preflight validates their shape; independently open the product link and inspect the actual SharedNet Room history before submitting.
