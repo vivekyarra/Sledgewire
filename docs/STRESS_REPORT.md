@@ -1,28 +1,30 @@
-# Sledgewire v0.3.9 stress report
+# Sledgewire v0.3.10 stress report
 
-Date: 2026-09-25
+Date: 2026-09-26
 
 This report separates executed CI evidence from live-event facts. It does not claim or predict an Arena finishing position.
 
 ## Current green code evidence
 
-Evidence commit: `727bc886ef8d7e5ed0dfacea6fdd4a98825963e2`
+Evidence commit: `9c15ae5bafa5d54efaa590d3607a2a1b45f17691`
 
-GitHub Actions run: `36222875380`
+GitHub Actions run: `36239219171`
 
-- Automated tests: **233 / 233 passed**, 0 failed, 0 skipped.
+- Automated tests: **248 / 248 passed**, 0 failed, 0 skipped.
 - Hostile/current-protocol selfcheck: **VERIFIED**, signed receipt verification true, profile `sledgewire.selfcheck.v4`.
-- MCP stress: **10,000 / 10,000** complete Smoke workflows at concurrency **128**, **0 failures**; p50 **153 ms**, p95 **166 ms**, p99 **262 ms**, total **12.592 s**.
-- Arena ledger/replay stress: **10,000 claims**, **10,000 cached retries**, **500 wrong-buyer attempts rejected**, **0 duplicate paid executions**, total **1.647 s**.
-- Duplicate storm: **33,000 authorization attempts** across 1,000 purchases at fanout 16: 1,000 unique claims, 15,000 in-flight duplicate refusals, 16,000 cached replays, 1,000 transaction-reuse refusals, only **1,000 ledger reads**, **0 duplicate paid executions**, total **1.640 s**.
+- MCP stress: **10,000 / 10,000** complete Smoke workflows at concurrency **128**, **0 failures**; p50 **103 ms**, p95 **118 ms**, p99 **192 ms**, total **8.632 s**.
+- Arena ledger/replay stress: **10,000 claims**, **10,000 cached retries**, **500 wrong-buyer attempts rejected**, **0 duplicate paid executions**, total **1.055 s**.
+- Duplicate storm: **33,000 authorization attempts** across 1,000 purchases at fanout 16: 1,000 unique claims, 15,000 in-flight duplicate refusals, 16,000 cached replays, 1,000 transaction-reuse refusals, only **1,000 ledger reads**, **0 duplicate paid executions**, total **1.228 s**.
 - SharedOS check: deny true, allow true, exhausted `maxUses` denied, **9 audit events**.
 - Static preflight: **READY**.
 - Production missing signing key fails closed; persistent key succeeds.
 - Production paid-execution bypass flag is explicitly rejected by the HTTP server and tested in CI.
+- Locked install (`npm ci`) and production dependency audit at high severity are green.
+- The production Docker image builds, boots as non-root, exposes `/health`, and serves a signed modern MCP selfcheck in CI.
 
 These timings are GitHub Actions/local fixture measurements only. They are not SharedNet, public Internet, SharedOS Cloud, or third-party MCP latency claims.
 
-## Red-team flaws found and closed through v0.3.9
+## Red-team flaws found and closed through v0.3.10
 
 1. **Cross-buyer request-label collision.** Buyer-controlled `request_id` was previously a global store/grant identity. Durable state is now scoped by Room + buyer + request id, and SharedOS grant ids derive from the full request fingerprint.
 2. **Pay-for-invalid-work trap.** Paid input used to be fully rejected only after payment. Service-specific endpoint/probe/invoke/fleet shapes and resource budgets are now validated before PAYMENT_REQUIRED or ledger lookup.
@@ -45,6 +47,17 @@ These timings are GitHub Actions/local fixture measurements only. They are not S
 19. **Buyer economics were lossy on failed paid executions.** Paid claims now persist the verified buyer seat before target execution, so gross-credit, unique-buyer and conversion metrics remain accurate even when execution fails after payment. Arena stats v2 separates all paid service mix from completed-delivery service mix.
 20. **Schema upgrade could strand an existing competition database.** Startup now performs an online additive migration for the buyer-seat column; exact legacy retries safely backfill buyer identity while preserving cached replay behavior.
 21. Earlier hardening remains active: explicit active-probe safety, destructive authorization, exact-target SharedOS grants, unknown-outcome no-retry, poison-message dead-letter, DNS/IP pinning, expanded SSRF blocking, watch-mode single-message delivery, production paid-bypass refusal and restart-safe SQLite replay.
+22. **False live-readiness proof.** `--live` previously trusted a manual external-call flag and did not actually negotiate the deployed MCP. It now verifies public health/readiness, modern MCP negotiation, signed selfcheck, signed paid routing, seller identity/payee, signed second-seat rehearsal evidence and restart evidence bound to the current daemon boot.
+23. **Impossible Arena launch order.** The runbook previously called live preflight before starting the daemon even though readiness requires its heartbeat. The order is now public server -> daemon -> paid rehearsal -> restart replay -> final live gate.
+24. **Local-process heartbeat could mask SharedNet failure.** Arena readiness now refreshes only after a successful SharedNet presence heartbeat plus access to the configured Arena Room, then ages out if those checks stop succeeding.
+25. **Runtime numeric configuration could fail open through `NaN`.** HTTP concurrency, daemon concurrency, retry ceilings, stats interval, port and persisted cursor values now use bounded integer parsing; malformed values abort startup.
+26. **Ambiguous public origins.** Production public URLs, watch mode, announcements and rehearsal/restart evidence now require canonical credential-free HTTPS origins rather than string-prefix checks.
+27. **Dependency graph drift.** A lockfile is checked in; CI and Docker use `npm ci`; CI rejects high-severity production dependency advisories.
+28. **Production image path was untested.** CI now builds and boots the real non-root Docker image, checks `/health`, performs a modern MCP selfcheck, and separately proves the production paid-bypass flag cannot start.
+29. **Unsigned Room payment quote.** `sledgewire.payment_required.v1` is now Ed25519-signed and buyer-bound; the live rehearsal verifies its signature, buyer, payee, Room, price and memo before transferring credits.
+30. **Replay depended on remote ledger retention.** Once payment has been verified and durably bound, exact retries are served from local verified state without requiring the transfer to remain in a bounded remote ledger window; legacy unattributed rows still re-verify before buyer backfill.
+31. **Paid failure evidence could become ambiguous.** A paid execution failure is signed and durably cached, and exact retries replay that same failure without charging or executing again.
+32. **Non-root secret mount trap.** CI exposed that 0600 key files are unreadable if their 0700 parent directory is owned by another UID. CI and deployment docs now require correct ownership of both directories and files without making secrets world-readable.
 
 ## Live facts still required
 
