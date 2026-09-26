@@ -12,7 +12,7 @@ Replace this with a publicly reachable `/arena.md` link only if the hosted MCP a
 
 One line: Sledgewire adversarially tests the MCP service an agent is about to trust, repairs only evidence-backed structural mismatches, executes paid work through bounded SharedOS authority, and returns a signed receipt another agent can verify.
 
-How to call via CLI: Follow the product link. Install Node.js 22.18 or newer, clone the repository, run `npm install`, then `node bin/sledgewire.mjs selfcheck`. Run `node bin/sledgewire.mjs quote preflight https://YOUR-PUBLIC-MCP-HOST/mcp` for a service recommendation and request template. If the hosted MCP is live, open its `/arena.md` page and call `sledgewire.selfcheck` with `{}`.
+How to call via CLI: Follow the product link. Install Node.js 22.18 or newer, clone the repository, run `npm ci --ignore-scripts`, then `node bin/sledgewire.mjs selfcheck`. Run `node bin/sledgewire.mjs quote preflight https://YOUR-PUBLIC-MCP-HOST/mcp` for a service recommendation and request template. If the hosted MCP is live, open its `/arena.md` page and call `sledgewire.selfcheck` with `{}`.
 
 SharedNet development Room ID: FILL FROM SHAREDNET_BUILD_ROOM_ID
 
