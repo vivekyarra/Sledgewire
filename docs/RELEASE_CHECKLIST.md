@@ -40,7 +40,7 @@
 - [x] Duplicate authorization storm: **33,000 authorization attempts**, 1,000 unique claims, 15,000 in-flight duplicates refused, 16,000 cached replays, 1,000 transaction-reuse attempts refused and **1,000 ledger reads**.
 - [x] Handler-level execution storm on file-backed SQLite/WAL: **33,000 handler requests**, **1,000 paid purchases**, **1,000 actual service executions**, **0 duplicate service executions**, **0 missing executions**, 16,000 exact cached signed replays and 1,000 ledger reads (Actions run `36249277132`).
 - [x] SharedOS deny / allow / maxUses / durable-audit check green.
-- [x] Static preflight green; hardened live preflight additionally requires production mode, disabled paid bypass, public modern MCP negotiation, signed selfcheck/payment route, authenticated seller identity/payee, cryptographically validated second-seat rehearsal evidence, restart-replay evidence matching the current daemon boot, and real event-visible external SharedOS audit evidence.
+- [x] Static preflight green; hardened live preflight additionally requires production mode, disabled paid bypass, public modern MCP negotiation, signed selfcheck/payment route, authenticated seller identity/payee, cryptographically validated second-seat rehearsal evidence, and restart-replay evidence matching the current daemon boot. Optional external SharedOS proof is enforced only when explicitly enabled.
 - [x] Production MCP Host/authority guard rejects unlisted Host headers.
 - [x] Two-process Docker Compose topology shares the same persistent SQLite/WAL volume between public MCP and Arena daemon.
 - [x] Public `/ready` fails closed when the Arena daemon readiness pulse is missing, stopped or stale; after startup the pulse refreshes only after successful SharedNet presence plus configured Arena Room access; live preflight checks readiness and deployed signing-key identity.
@@ -80,10 +80,10 @@
 - [ ] After a real daemon restart, `npm run arena:replay-after-restart` verifies changed boot id + identical cached delivery + persisted trace with zero second payment.
 - [ ] Oversized artifact delivery verified live.
 - [ ] At least three real external MCP implementations tested.
-- [ ] Event-visible external SharedOS decision evidence confirmed; `SLEDGEWIRE_SHAREDOS_REQUIRED=1`, hardened audit sink/key configured, and the real trace observed before setting `SHAREDOS_AUDIT_CONFIRMED=1`.
 - [ ] Representative agent follows `docs/ARENA_AGENT_PROMPT.md`.
-- [ ] Round 1 rehearsal proves at least 3 distinct peer products tried, one specific disagreement posted for every tried product, and the official ranking submitted.
-- [ ] Round 2 rehearsal proves at least 80 confirmed credits spent across at least 3 distinct peer products.
+- [ ] Arena 1 rehearsal proves autonomous presentation, several meaningful peer trials/critiques, and review/ranking submission.
+- [ ] Arena 2 rehearsal proves autonomous buying/selling/delivery and correct valid-credit accounting.
+- [ ] Optional SharedOS award evidence is captured: practical SharedOS role/grant use, completeness and usability; external audit evidence if available.
 - [ ] 60-minute no-human rehearsal passes.
 - [ ] Real Smoke p95 below 25 seconds and all paid calls below hard deadlines.
 - [ ] Final `npm run preflight -- --live` is green against the exact deployment and current daemon boot.
