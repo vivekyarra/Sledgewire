@@ -1,4 +1,4 @@
-# Sledgewire v0.3.10 stress report
+# Sledgewire v0.3.11 stress report
 
 Date: 2026-09-26
 
@@ -6,26 +6,23 @@ This report separates executed CI evidence from live-event facts. It does not cl
 
 ## Current green code evidence
 
-Evidence commit: `a35387a2ba7849fc0b2f81e0424fd87175f0ea1b`
+Evidence branch: `hardening/arena-top-score`
 
-GitHub Actions run: `36239394230`
+Raised-load code run: `36262746902`
 
-- Automated tests: **248 / 248 passed**, 0 failed, 0 skipped.
-- Hostile/current-protocol selfcheck: **VERIFIED**, signed receipt verification true, profile `sledgewire.selfcheck.v4`.
-- MCP stress: **10,000 / 10,000** complete Smoke workflows at concurrency **128**, **0 failures**; p50 **54 ms**, p95 **79 ms**, p99 **162 ms**, total **4.903 s**.
-- Arena payment authorization/replay stress: **10,000 claims**, **10,000 cached retries**, **500 wrong-buyer attempts rejected**, with one durable authorization per transaction, total **0.898 s**.
-- Duplicate authorization storm: **33,000 authorization attempts** across 1,000 purchases at fanout 16: 1,000 unique claims, 15,000 in-flight duplicate refusals, 16,000 cached replays, 1,000 transaction-reuse refusals and only **1,000 ledger reads**, total **1.199 s**. This measures payment authorization/replay, not service invocation count.
-- Handler execution storm (post-release main CI): **33,000 real Arena-handler requests** across 1,000 paid purchases at fanout 16 using file-backed SQLite/WAL: **1,000 actual service executions**, **0 duplicate service executions**, **0 missing executions**, 15,000 in-flight refusals, 16,000 exact signed cached replays, 1,000 transaction-reuse refusals and **1,000 ledger reads**, total **7.759 s** (Actions run `36249277132`).
-- SharedOS check: deny true, allow true, exhausted `maxUses` denied, **9 audit events**.
-- Static preflight: **READY**.
-- Production missing signing key fails closed; persistent key succeeds.
-- Production paid-execution bypass flag is explicitly rejected by the HTTP server and tested in CI.
-- Locked install (`npm ci`) and production dependency audit at high severity are green.
-- The production Docker image builds, boots as non-root, exposes `/health`, and serves a signed modern MCP selfcheck in CI.
+- Automated tests: **272 / 272 passed**, 0 failed.
+- Hostile/current-protocol selfcheck: **VERIFIED**, signed receipt verification true.
+- MCP stress: **25,000 / 25,000** complete workflows at concurrency **192**, **0 failures**; p50 **225 ms**, p95 **243 ms**, p99 **258 ms**.
+- Arena payment authorization/replay stress: **25,000** requests with **0 duplicate paid authorizations**.
+- Duplicate authorization storm: **122,500 authorization attempts** across 2,500 purchases at fanout 24: 2,500 unique claims, 57,500 in-flight duplicate refusals, 60,000 cached replays, 2,500 transaction-reuse refusals and only **2,500 ledger reads**.
+- Handler execution storm on file-backed SQLite/WAL: **122,500 real Arena-handler requests**, **2,500 actual service executions**, **0 duplicate service executions**, **0 missing executions**, 60,000 cached replays and 2,500 ledger reads.
+- Mixed Arena UX storm: **50,000 requests at concurrency 256**, **0 failures**. It produced 20,833 deterministic info answers, 16,667 quote responses, 4,167 signed payment quotes, 4,167 rejected invalid requests and 4,166 ignored unrelated messages, while causing **0 ledger reads and 0 paid service executions** on all pre-payment paths.
+- Payment-v2 regression: a signed quote/payment for one target input cannot authorize a changed endpoint/input; the altered request is rejected before execution because its request-bound memo differs.
+- SharedOS check, static preflight, Compose/Railway contract validation, production key fail-closed/success checks, real production Docker build/boot/signed MCP selfcheck, and production paid-bypass rejection all passed.
 
 These timings are GitHub Actions/local fixture measurements only. They are not SharedNet, public Internet, SharedOS Cloud, or third-party MCP latency claims.
 
-## Red-team flaws found and closed through v0.3.10
+## Red-team flaws found and closed through v0.3.11
 
 1. **Cross-buyer request-label collision.** Buyer-controlled `request_id` was previously a global store/grant identity. Durable state is now scoped by Room + buyer + request id, and SharedOS grant ids derive from the full request fingerprint.
 2. **Pay-for-invalid-work trap.** Paid input used to be fully rejected only after payment. Service-specific endpoint/probe/invoke/fleet shapes and resource budgets are now validated before PAYMENT_REQUIRED or ledger lookup.
@@ -59,6 +56,10 @@ These timings are GitHub Actions/local fixture measurements only. They are not S
 30. **Replay depended on remote ledger retention.** Once payment has been verified and durably bound, exact retries are served from local verified state without requiring the transfer to remain in a bounded remote ledger window; legacy unattributed rows still re-verify before buyer backfill.
 31. **Paid failure evidence could become ambiguous.** A paid execution failure is signed and durably cached, and exact retries replay that same failure without charging or executing again.
 32. **Non-root secret mount trap.** CI exposed that 0600 key files are unreadable if their 0700 parent directory is owned by another UID. CI and deployment docs now require correct ownership of both directories and files without making secrets world-readable.
+33. **First-payment input substitution gap.** The prior native payment memo bound request id + service but not the exact target input before the first durable claim. Payment v2 now signs and transfers against a canonical fingerprint of Room + buyer + request id + service + input, so changing an endpoint or payload after quote is rejected before execution.
+34. **Judge/buyer intent friction.** The Room surface previously understood only a narrow set of product questions and quote intents. It now answers demo/value/pricing/SharedOS/verification/scope/quickstart deterministically and maps bounded buyer-language aliases or URL shorthand to non-executing quotes.
+35. **Stale hosted competition surface.** A host could be healthy while serving an older Arena card. Public probe/live preflight now require the exact runtime version plus current judge/buyer proof fields.
+36. **Pre-payment interaction paths lacked mixed-load proof.** A new 50,000-request concurrency-256 Arena UX storm covers information queries, natural/typed quotes, signed payment quotes, malformed requests and irrelevant traffic while asserting zero pre-payment ledger reads/executions.
 
 ## Live facts still required
 
