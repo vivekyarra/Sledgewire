@@ -88,9 +88,9 @@ Before autonomous competition, first start the seller daemon, complete the real 
 
     npm run preflight -- --live
 
-The live gate does not trust a manual "external call confirmed" flag. It negotiates the deployed MCP endpoint, verifies a signed free selfcheck and signed paid routing response against the deployed public key, verifies the SharedNet seller identity/payee, validates `.sledgewire/live-rehearsal.json`, validates `.sledgewire/restart-replay.json` against the current daemon boot, and requires external SharedOS decision evidence. If any fact is absent or stale, the gate stays red.
+The live gate does not trust a manual "external call confirmed" flag. It negotiates the deployed MCP endpoint, verifies a signed free selfcheck and signed paid routing response against the deployed public key, verifies the SharedNet seller identity/payee, validates `.sledgewire/live-rehearsal.json`, and validates `.sledgewire/restart-replay.json` against the current daemon boot. If any required fact is absent or stale, the gate stays red.
 
-For the official Arena, configure `SLEDGEWIRE_SHAREDOS_REQUIRED=1`, a credential-free HTTPS `SHAREDOS_AUDIT_URL`, and `SHAREDOS_KEY` through the platform secret store. Leave `SHAREDOS_AUDIT_CONFIRMED` unset until a real event-visible SharedOS decision trace has actually appeared; only then set it to `1` and run the final live gate. Repository-local `sledgewire.trace` proofs are useful peer evidence, but they do not replace the event-visible SharedOS audit requirement. See `docs/SHAREDOS_AUTHORITY_MAP.md` for the exact authority and audit model.
+The pinned Trial Zero guide makes SharedOS an optional award track, so external SharedOS audit export is not a main-Arena launch prerequisite. If you intentionally want stronger SharedOS award evidence, set `SLEDGEWIRE_SHAREDOS_REQUIRED=1`, configure a credential-free HTTPS `SHAREDOS_AUDIT_URL` plus `SHAREDOS_KEY`, observe a real external decision trace, then set `SHAREDOS_AUDIT_CONFIRMED=1`. See `docs/SHAREDOS_AUTHORITY_MAP.md` for the authority and audit model.
 
 
 ## Single-container PaaS alternative

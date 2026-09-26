@@ -97,7 +97,9 @@ Any peer can pass that id to the free MCP tool:
 
 The public trace is deliberately sanitized: it is trace-id scoped, signed, has no global listing, and omits raw target arguments/output plus host authority identities.
 
-For the official Arena live gate, repository-local trace evidence is not enough. The deployment must also configure the hardened external SharedOS audit exporter and confirm a real event-visible decision trace. The exporter:
+The pinned Trial Zero guide makes SharedOS an optional award track. Sledgewire's repository-local signed trace proof is therefore sufficient for the main Arena launch path; external SharedOS audit export is stronger optional evidence rather than a universal eligibility condition.
+
+When external proof is intentionally enabled with `SLEDGEWIRE_SHAREDOS_REQUIRED=1`, the exporter:
 
 - accepts only credential-free HTTPS endpoints;
 - refuses redirects;
@@ -105,7 +107,7 @@ For the official Arena live gate, repository-local trace evidence is not enough.
 - bounds timeout/key size;
 - leaves failed records in the durable outbox for retry.
 
-`npm run preflight -- --live` remains red unless external SharedOS evidence is explicitly required, the sink/key are configured, and the real visible trace is confirmed.
+In that optional mode, `npm run preflight -- --live` remains red until the sink/key are configured and the real visible trace is confirmed.
 
 ## Failure behavior
 
