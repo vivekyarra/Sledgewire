@@ -49,6 +49,9 @@ jobs:
           docker build -t sledgewire-ci .
           mkdir -p /tmp/swdata
           chmod 777 /tmp/swdata
+          # Official node images run the app as uid/gid 1000. File-backed Docker
+          # secrets are bind mounts, so preserve 0600 while making ownership explicit.
+          sudo chown 1000:1000 /tmp/swkeys/ed25519-private.pem /tmp/swkeys/ed25519-public.pem
           docker run -d --name sledgewire-ci-run -p 18787:8787 \
             -e NODE_ENV=production \
             -e PUBLIC_BASE_URL=https://sledgewire.example \
