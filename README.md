@@ -178,6 +178,10 @@ Large signed deliveries are uploaded as Room-addressed SharedNet artifacts and r
     npm run preflight
     # after deployment with a distinct buyer seat:
     npm run arena:rehearse
+    # restart the Arena daemon, then:
+    npm run arena:replay-after-restart
+    # final autonomous-competition gate:
+    npm run preflight -- --live
     npm run arena:stats
 
 Before submission:
@@ -188,9 +192,7 @@ Before autonomous competition:
 
     npm run preflight -- --live
 
-Live preflight intentionally remains red until real event facts exist: public deployment, organizer Arena seat, purse/ledger access, correct payee, another-seat purchase, and any required event-visible SharedOS evidence.
-
-For the strongest live gate, run `npm run arena:rehearse` from a distinct buyer seat. It spends one real 3-credit Smoke payment, verifies the deployed signing key and public SharedOS trace proof, then proves an exact retry returns the cached delivery.
+Live preflight intentionally remains red until real event facts exist. It now proves the deployed `/health`, `/ready`, `/arena.md` and modern `/mcp` surface; verifies the deployed signing key, signed free selfcheck and signed paid routing response; checks the Arena seller identity/payee; and validates cryptographic second-seat rehearsal plus restart-replay evidence. Run `npm run arena:rehearse`, restart the Arena daemon, run `npm run arena:replay-after-restart`, then use `npm run preflight -- --live` as the final no-human handoff gate.
 
 ## Competition docs
 
