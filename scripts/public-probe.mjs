@@ -2,6 +2,7 @@ import {McpSession,MODERN_PROTOCOL_VERSION} from '../src/mcp/client.mjs';
 import {keyId,verifyReceipt} from '../src/receipts/receipt.mjs';
 import {publicBaseOrigin} from '../src/ops/config.mjs';
 import {ROOM} from '../src/sharednet/api.mjs';
+import {VERSION} from '../src/version.mjs';
 
 const args=process.argv.slice(2),arena=args.includes('--arena'),raw=args.find(x=>!x.startsWith('--'));
 if(!raw){
@@ -42,7 +43,7 @@ async function boundedJson(url,maxBytes){
 let publicKeyPem=null;
 try{
   const health=await boundedJson(`${base}/health`,64_000);
-  add('health',health.response.ok&&health.json?.ok===true,`status=${health.response.status};version=${health.json?.version??'unknown'}`);
+  add('health',health.response.ok&&health.json?.ok===true&&health.json?.version===VERSION,`status=${health.response.status};version=${health.json?.version??'unknown'};expected=${VERSION}`);
 
   const ready=await boundedJson(`${base}/ready`,64_000);
   const daemon=ready.json?.arena_daemon;
@@ -54,10 +55,11 @@ try{
   }
 
   const card=await boundedText(`${base}/arena.md`,128_000,'text/markdown,text/plain;q=0.9');
-  add('arena_card',card.response.ok&&card.text.includes(`${base}/mcp`)&&card.text.includes('sledgewire.selfcheck'),`status=${card.response.status};bytes=${Buffer.byteLength(card.text)}`);
+  add('arena_card',card.response.ok&&card.text.includes(`${base}/mcp`)&&card.text.includes('sledgewire.selfcheck')&&card.text.includes('30-second judge path')&&card.text.includes('Fast buyer path'),`status=${card.response.status};bytes=${Buffer.byteLength(card.text)}`);
 
   const machineCard=await boundedJson(`${base}/arena.json`,128_000);
   const authority=machineCard.json?.sharedos_authority;
+  add('competition_card',machineCard.response.ok&&machineCard.json?.version===VERSION&&machineCard.json?.arena1_judge_path?.[1]?.tool==='sledgewire.selfcheck'&&Number(machineCard.json?.arena2_buyer_path?.best_first_paid?.price_credits)===3&&machineCard.json?.proofs?.paid_trace?.includes('sledgewire.trace'),`status=${machineCard.response.status};version=${machineCard.json?.version??'missing'}`);
   add('sharedos_authority_card',machineCard.response.ok&&authority?.purpose==='sledgewire.test-repair-and-invoke-agent-services'&&String(authority?.roles?.dispatcher??'').includes('no target execution grant')&&authority?.proof?.tool==='sledgewire.trace',`status=${machineCard.response.status};purpose=${authority?.purpose??'missing'};trace=${authority?.proof?.tool??'missing'}`);
 
   const pub=await boundedText(`${base}/public-key`,16_384,'text/plain');
@@ -76,7 +78,7 @@ try{
   if(arena){
     const route=(await session.callTool('sledgewire.smoke',{endpoint:'https://example.com/mcp'}))?.structuredContent;
     const routeSig=publicKeyPem?verifyReceipt(route,publicKeyPem):{ok:false,reason:'missing_public_key'};
-    const routeOk=route?.state==='PAYMENT_REQUIRED'&&Number(route?.price_credits)===3&&ROOM.test(route?.arena_room_id??'')&&routeSig.ok;
+    const routeOk=route?.state==='PAYMENT_REQUIRED'&&Number(route?.price_credits)===3&&typeof route?.deliverable==='string'&&route.deliverable.length>0&&route?.verification?.exact_retry_no_reexecution===true&&ROOM.test(route?.arena_room_id??'')&&routeSig.ok;
     add('signed_paid_route',routeOk,`state=${route?.state??'missing'};price=${route?.price_credits??'missing'};room=${route?.arena_room_id??'missing'};signature=${routeSig.ok?'ok':routeSig.reason}`);
   }
 }catch(e){
