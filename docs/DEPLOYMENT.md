@@ -84,11 +84,13 @@ Before submission:
 
     npm run preflight -- --submission
 
-Before autonomous competition:
+Before autonomous competition, first start the seller daemon, complete the real second-seat rehearsal, restart the daemon, and complete the restart replay proof. Then run the final gate:
 
     npm run preflight -- --live
 
-Never set SHAREDNET_EXTERNAL_CALL_CONFIRMED or SHAREDOS_AUDIT_CONFIRMED until those live facts have actually happened. Repository trace proofs do not replace any event-required external/visible SharedOS evidence.
+The live gate does not trust a manual "external call confirmed" flag. It negotiates the deployed MCP endpoint, verifies a signed free selfcheck and signed paid routing response against the deployed public key, verifies the SharedNet seller identity/payee, validates `.sledgewire/live-rehearsal.json`, and validates `.sledgewire/restart-replay.json` against the current daemon boot. If any of those facts are absent or stale, the gate stays red.
+
+If event-visible external SharedOS evidence is required, do not set `SHAREDOS_AUDIT_CONFIRMED=1` until that external fact has actually happened. Repository trace proofs do not replace an event-required external/visible SharedOS sink.
 
 
 ## Recommended two-process Docker Compose topology
@@ -134,7 +136,7 @@ The redacted evidence packet is written mode 0600 to `.sledgewire/live-rehearsal
 
 `GET /health` is process liveness and remains 200 while the public HTTP process itself is alive. `GET /ready` is stricter: when an Arena Room is configured it requires a fresh heartbeat written by the separate Arena daemon into the shared SQLite database. The daemon updates that heartbeat every 10 seconds; readiness fails closed after 45 seconds.
 
-This catches the dangerous split-brain case where the product link looks healthy but no seller process is actually consuming paid SharedNet requests. `npm run preflight -- --live` now checks the public `/ready` surface and verifies that the deployed Ed25519 public key matches the local production signing key.
+This catches the dangerous split-brain case where the product link looks healthy but no seller process is actually consuming paid SharedNet requests. The final live preflight additionally negotiates `/mcp`, verifies a signed selfcheck and signed paid routing response, and validates the paid rehearsal/restart evidence against the deployed key and current daemon boot.
 
 
 ## Prove restart-safe replay with zero additional credits
