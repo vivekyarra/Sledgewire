@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {SharedNetApi,ROOM} from '../src/sharednet/api.mjs';
-import {eventBudgetStatus,planArenaSpend} from '../src/sharednet/spend-plan.mjs';
+import {eventBudgetStatus,planArenaSpend,resolveArenaBudgetState} from '../src/sharednet/spend-plan.mjs';
 
 function arg(name){const i=process.argv.indexOf(name);return i>=0?process.argv[i+1]:null;}
 const init=process.argv.includes('--init');
@@ -14,16 +14,12 @@ if(!Number.isInteger(eventBudget)||eventBudget<1||eventBudget>1000)throw new Err
 const api=new SharedNetApi(),credits=await api.credits(),purse=credits?.credits??{};
 for(const k of ['balance','sent','received','granted'])if(!Number.isFinite(Number(purse[k])))throw new Error(`credits_${k}_missing`);
 fs.mkdirSync(path.dirname(statePath),{recursive:true,mode:0o700});
-let state=null;try{state=JSON.parse(fs.readFileSync(statePath,'utf8'));}catch{}
-let initialization='loaded';
-if(!state){
-  if(!init)throw new Error('arena_budget_not_initialized_use_--init_after_event_grant');
-  state={version:2,room_id:room,event_budget:eventBudget,baseline_sent:Number(purse.sent),baseline_received:Number(purse.received),baseline_balance:Number(purse.balance),baseline_granted:Number(purse.granted),initialized_at:new Date().toISOString()};
-  fs.writeFileSync(statePath,JSON.stringify(state,null,2)+'\n',{mode:0o600});fs.chmodSync(statePath,0o600);initialization='initialized';
-}else if(init){
-  initialization='already_initialized';
+let existing=null;try{existing=JSON.parse(fs.readFileSync(statePath,'utf8'));}catch{}
+const resolved=resolveArenaBudgetState({existing,init,room,eventBudget,purse});
+const state=resolved.state,initialization=resolved.initialization;
+if(initialization==='initialized'){
+  fs.writeFileSync(statePath,JSON.stringify(state,null,2)+'\n',{mode:0o600});fs.chmodSync(statePath,0o600);
 }
-if(state.room_id!==room||Number(state.event_budget)!==eventBudget)throw new Error('arena_budget_state_scope_mismatch');
 const budget=eventBudgetStatus({event_budget:eventBudget,baseline_sent:state.baseline_sent,current_sent:Number(purse.sent)});
 let plan=null;
 if(offersPath){
