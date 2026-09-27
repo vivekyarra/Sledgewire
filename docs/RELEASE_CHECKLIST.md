@@ -40,7 +40,7 @@
 - [x] Raw slow-header and incomplete-body sockets are forcibly reclaimed while concurrent signed MCP selfchecks remain responsive.
 - [x] Long-run file-backed state churn proves 50,000 terminal Room messages stay bounded behind the cursor, acknowledged audit outbox state returns to zero, canonical audit evidence survives reopen, and SQLite integrity remains `ok`.
 - [x] **303 / 303** automated tests passed on the v0.3.15 code/evidence run, 0 failures.
-- [x] **25,000 / 25,000** MCP Smoke workflows at concurrency **192**, 0 failures; CI-fixture p50 **80 ms**, p95 **98 ms**, p99 **123 ms**.
+- [x] **25,000 / 25,000** MCP Smoke workflows at concurrency **192**, 0 failures; latest exact-main CI p50 **81 ms**, p95 **99 ms**, p99 **115 ms**.
 - [x] **25,000** Arena paid claims + **25,000** cached retries with **0 duplicate paid authorizations**; 500 wrong-buyer attempts and 5,000 altered post-quote inputs rejected before ledger work.
 - [x] Duplicate authorization storm: **122,500 authorization attempts**, 2,500 unique claims, 57,500 in-flight duplicates refused, 60,000 cached replays, 2,500 transaction-reuse attempts refused and only **2,500 ledger reads**.
 - [x] Handler-level execution storm on file-backed SQLite/WAL: **125,000 handler requests**, **2,500 actual service executions**, **0 duplicate service executions**, **0 missing executions**, 60,000 cached replays and 2,500 ledger reads.
@@ -48,7 +48,7 @@
 - [x] Monster sender fairness: **20,000** tasks with **18,000** from one dominant sender and 2,000 from 200 other senders held global concurrency at 8 and per-sender concurrency at **1**; **994** of the first 1,000 completions were non-dominant-sender work.
 - [x] Monster payment fairness: after an abusive buyer exhausted the shared miss budget, **100 / 100** fresh legitimate buyers still verified successfully.
 - [x] Monster crash boundary: **500 / 500** stale pre-execution paid claims recovered after reopen with **0** recovery ledger reads, while **500 / 500** execution-may-have-started claims were refused automatic re-execution.
-- [x] Six-process shared-WAL stress: **9,000** mixed operations preserved exact counters and exact one-use grant consumption; 9,000 Room rows pruned to 1,000, 900 quote rows and 180 audit events matched expectation, acknowledged outbox rows fell to 0, and `PRAGMA integrity_check` returned **ok**.
+- [x] Repeated eight-process shared-WAL contention: each of **3** passes ran **12,000** mixed operations (8 workers × 1,500), preserved exact counters and exact one-use grant consumption, pruned 12,000 Room rows to 1,000, retained 1,200 quote rows and 240 audit events, returned the acknowledged outbox to 0, and reported `PRAGMA integrity_check` **ok**.
 - [x] SharedOS deny / allow / maxUses / durable-audit check green.
 - [x] Static preflight green; hardened live preflight additionally requires production mode, disabled paid bypass, public modern MCP negotiation, signed selfcheck/payment route, authenticated seller identity/payee, cryptographically validated second-seat rehearsal evidence, and restart-replay evidence matching the current daemon boot. Optional external SharedOS proof is enforced only when explicitly enabled.
 - [x] Production MCP Host/authority guard rejects unlisted Host headers.
@@ -78,17 +78,19 @@
 - [x] Mandatory `stress:http`: real production process handled 64 concurrent signed selfchecks in **127 ms** + 32 signed paid routes in **34 ms**; Host/Origin guards, malformed JSON, oversized early rejection and post-stress health all passed.
 - [x] Mandatory `stress:slow-http`: **64 partial-header + 64 incomplete-body sockets** coexisted with **32 signed selfchecks in 99 ms**; all 128 stalled sockets were reclaimed, 64 body readers were observed, stalled bodies consumed **0 RPC slots**, and the process stayed healthy.
 - [x] Mandatory `stress:state-churn`: **50,000** terminal Room messages retained only **2,000** dedupe rows; **5,000** canonical audit events survived reopen, transient audit outbox returned to **0**, SQLite integrity was **ok**, and checkpointed state was **1,912,832 bytes**.
-- [x] Exact v0.3.15 code/evidence run: GitHub Actions **36299753997** on head `60e12115df6dd8572965937b35dcb97cdac36c62` — **SUCCESS**.
+- [x] Exact v0.3.15 code/evidence run: GitHub Actions **36301918931** on head `fb0f173eb1b47e2b8a06f144a278951bab979638` — **SUCCESS**.
 
 ## Submission P0
 
-- [ ] Actual SharedNet development Room used by multiple build agents.
-- [ ] `SHAREDNET_BUILD_ROOM_ID` recorded and real collaboration message IDs preserved.
-- [ ] Participant/team name and contact final.
-- [ ] Public HTTPS `/arena.md` product link final and accessible to an unrelated agent.
+- [x] Public Trial Zero listing records the development Room as `rom_dbAOS6Ws4F`.
+- [x] Concrete collaboration message IDs are preserved: architect `msg_r5TyNbgWlY`, Breaker `msg_IVJxowuyMR`, builder correction `msg_qyzG5hblOW`, independent verification `msg_YG9BDrZAOJ`.
+- [x] Participant/contact are final and mirrored in `docs/SUBMISSION.md`.
+- [x] Current submitted HTTPS `/arena.md` guide is publicly reachable.
+- [ ] Authenticated `npm run collab:report` independently confirms the submitted Room history and multiple build-agent senders.
+- [ ] Replace the docs-only public guide with the full live seller only after the deployed service is externally verified.
 - [ ] Public MCP and Arena daemon use the same persistent `SLEDGEWIRE_DB`.
-- [ ] `npm run preflight -- --submission` green.
-- [ ] Submit only once.
+- [ ] Re-run `npm run preflight -- --submission` with the final submission environment.
+- [ ] Confirm the existing project entry is updated rather than creating a second submission.
 
 ## Arena P0
 

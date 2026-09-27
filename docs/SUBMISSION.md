@@ -1,31 +1,68 @@
-# Trial Zero submission draft
+# Trial Zero submission record
 
 Project: Sledgewire
 
 Participant: Yarra Vivek
 
-Contact: vivekyarra567@gmail.com
+Contact: https://github.com/vivekyarra
 
-Product link (working CLI): https://github.com/vivekyarra/Sledgewire/blob/main/docs/TRIAL_ZERO_AGENT.md
+Current submitted product and call guide: https://sledgewire-trial-zero-public.vercel.app/arena.md
 
-Replace this with a publicly reachable `/arena.md` link only if the hosted MCP and Arena daemon are independently verified. The current Vercel shell is useful as a public guide, but it is not an Arena service while `/health` and `/mcp` are absent. Do not describe a docs-only shell as the live seller; keep the working CLI link unless the full deployment passes the evidence-backed live gate.
+Source: https://github.com/vivekyarra/Sledgewire
+
+The current submitted Vercel URL is a public CLI/stdio-MCP quickstart only. As of 2026-09-27, hosted `/health`, `/ready`, `/mcp`, `/arena.json`, `/catalog.json`, `/public-key`, and `/.well-known/agent.json` are not live there. Do not describe that static shell as the live Arena seller. Replace the submitted product URL with a deployed `/arena.md` only after the full service passes `public:probe` and the live gate.
 
 One line: Sledgewire adversarially tests the MCP service an agent is about to trust, repairs only evidence-backed structural mismatches, executes paid work through bounded SharedOS authority, and returns a signed receipt another agent can verify.
 
-How to call via CLI: Follow the product link. Install Node.js 22.18 or newer, clone the repository, run `npm ci --ignore-scripts`, then `node bin/sledgewire.mjs selfcheck`. Run `node bin/sledgewire.mjs quote preflight https://YOUR-PUBLIC-MCP-HOST/mcp` for a service recommendation and request template. If the hosted MCP is live, open its `/arena.md` page and call `sledgewire.selfcheck` with `{}`.
+How another agent calls it now:
 
-SharedNet development Room ID: FILL FROM SHAREDNET_BUILD_ROOM_ID
+```sh
+git clone https://github.com/vivekyarra/Sledgewire.git
+cd Sledgewire
+npm ci --ignore-scripts
+node bin/sledgewire.mjs selfcheck
+node bin/sledgewire.mjs quote preflight https://TARGET-HOST/mcp
+```
 
-Collaboration description: Fill from real Room evidence. Cite concrete message IDs showing agent-to-agent requirements analysis, implementation handoff, red-team failure, patch and independent verification. Do not fabricate or substitute the separate Arena Room.
+Local stdio MCP is available with:
 
-SharedOS track: Paid Arena execution is enforced inside SharedOS. Sledgewire Invoke separates Scout discovery, Mechanic candidate repair, Inspector acceptance and Breaker exact target invocation. Bounded-use authority and audit records are backed by durable SQLite state.
+```sh
+npm run mcp
+```
 
-Final gate before the one allowed submission:
+When the full hosted seller is live, the single-link path becomes the deployed `/arena.md`; another agent can check `/ready`, call free `sledgewire.selfcheck {}`, verify the returned signature, and use free `sledgewire.quote` before any paid request.
 
-    SLEDGEWIRE_PRODUCT_URL=https://github.com/vivekyarra/Sledgewire/blob/main/docs/TRIAL_ZERO_AGENT.md
-    SLEDGEWIRE_PARTICIPANT_NAME='Yarra Vivek'
-    SLEDGEWIRE_CONTACT=vivekyarra567@gmail.com
-    SHAREDNET_BUILD_ROOM_ID=<actual development Room ID>
-    npm run preflight -- --submission
+SharedNet development Room ID: `rom_dbAOS6Ws4F`
 
-Set these as environment variables in your shell before running the command. The preflight validates their shape; independently open the product link and inspect the actual SharedNet Room history before submitting.
+Collaboration evidence recorded in the public Trial Zero listing:
+
+- Architect request: `msg_r5TyNbgWlY`
+- Independent Breaker finding: `msg_IVJxowuyMR`
+- Builder correction: `msg_qyzG5hblOW`
+- Independent verification: `msg_YG9BDrZAOJ`
+
+Collaboration description: Two Codex seats collaborated in the development Room. The architect handed off the requirement, the independent Breaker found that the public guide worked while the draft still claimed a login redirect and could be mistaken for a hosted MCP service, the builder corrected the submission wording, and the other seat independently checked the public routes, Room history, and submission preflight. The development Room is intentionally separate from the organizer Arena Room.
+
+SharedOS track: Paid Arena execution uses deny-by-default, bounded-use SharedOS authority for discovery, candidate repair, independent acceptance, and exact target invocation. The dispatcher receives no target execution authority. Durable SQLite audit state backs the grants, and paid receipts expose a `sharedos_trace_id` that can be inspected through free `sledgewire.trace`. Event-visible SharedOS Cloud evidence and live Arena selling still require live verification.
+
+Final submission-shape gate for the currently submitted guide:
+
+```sh
+export SLEDGEWIRE_PRODUCT_URL=https://sledgewire-trial-zero-public.vercel.app/arena.md
+export SLEDGEWIRE_PARTICIPANT_NAME='Yarra Vivek'
+export SLEDGEWIRE_CONTACT=https://github.com/vivekyarra
+export SHAREDNET_BUILD_ROOM_ID=rom_dbAOS6Ws4F
+npm run preflight -- --submission
+```
+
+Before changing the product URL to a live seller, run:
+
+```sh
+npm run public:probe -- https://YOUR-LIVE-HOST --arena
+npm run arena:rehearse
+# restart the real Arena daemon while preserving DB and signing key
+npm run arena:replay-after-restart
+npm run preflight -- --live
+```
+
+Only after the relevant live checks are green should the product URL be switched to `https://YOUR-LIVE-HOST/arena.md`. Do not create a second project submission; update the existing project entry if the event site permits editing.
