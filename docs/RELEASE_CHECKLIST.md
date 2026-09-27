@@ -1,6 +1,6 @@
 # Trial Zero release checklist
 
-## Static code gates — v0.3.11
+## Static code gates — v0.3.12
 
 - [x] CLI and MCP with current 2026-07-28 stateless `server/discover` plus bounded legacy fallback.
 - [x] Official `@modelcontextprotocol/client` v2 Streamable HTTP integration test negotiates 2026-07-28 and calls Sledgewire.
@@ -22,7 +22,7 @@
 - [x] SharedOS bounded-use state and durable audit/outbox.
 - [x] External SharedOS audit export requires credential-free HTTPS, refuses redirects, bounds its bearer key, and live preflight validates the sink before handoff.
 - [x] Paid receipts carry a SharedOS trace id; free `sledgewire.trace` returns a sanitized signed trace proof with no global listing.
-- [x] Native SharedNet credit verification binds buyer, exact/fallback-safe payee evidence, integer amount, Arena Room, memo and one-use transaction.
+- [x] Native SharedNet credit verification requires buyer, exact/fallback-safe payee evidence, integer amount, Arena Room, organizer memo `Sledgewire`, and a one-use transaction; exact request identity is separately locked by the signed quote + durable fingerprint.
 - [x] Request storage/grant identity is scoped by Room + buyer + request fingerprint, preventing cross-buyer request-label collisions.
 - [x] Concurrent duplicate ledger checks are coalesced; positive/negative lookups are bounded in-memory cached.
 - [x] Exact completed retries are cached from the previously verified durable payment binding without requiring the transfer to remain in remote ledger history; legacy unattributed rows re-verify before buyer backfill; stale uncertain paid executions never blindly re-execute.
@@ -34,7 +34,7 @@
 - [x] Unused legacy child-process SharedNet adapter removed from production tree.
 - [x] SharedNet secrets excluded from git and Docker context.
 - [x] SQLite close/reopen replay and two-connection one-use tests green.
-- [x] **273 / 273** automated tests green on the v0.3.11 Arena hardening branch.
+- [x] Automated test suite is enforced by the PR CI on the exact competition branch head.
 - [x] **25,000 / 25,000** MCP Smoke workflows at concurrency **192**, 0 failures; CI-fixture p95 **245 ms**, p99 **265 ms**.
 - [x] **25,000** Arena payment authorization/replay flows with **0 duplicate paid authorizations**.
 - [x] Duplicate authorization storm: **122,500 authorization attempts**, 2,500 unique claims, 57,500 in-flight duplicates refused, 60,000 cached replays, 2,500 transaction-reuse attempts refused and only **2,500 ledger reads**.
@@ -56,10 +56,13 @@
 - [x] No-secret `npm run public:probe -- https://HOST --arena` verifies external health/readiness, arena card, signing key, modern MCP, signed selfcheck and signed paid routing before any credits are spent.
 - [x] Production/runtime origin and numeric configuration fail closed on credentialed/pathful public bases, NaN/fractional/out-of-range concurrency/timer/cursor settings, and malformed persisted cursors.
 - [x] Room `PAYMENT_REQUIRED` responses are Ed25519-signed and buyer-bound.
-- [x] Payment v2 binds the native SharedNet memo + signed quote to the exact Room, buyer, request id, service and canonical input fingerprint; changing target input after quote is rejected as `wrong_memo` before execution.
+- [x] Trial Zero memo compatibility: native memo is exactly `Sledgewire`; the Ed25519-signed pre-payment quote and durable quote record bind Room + buyer + request id + service + canonical input fingerprint. A changed first paid resend is rejected before any ledger lookup.
 - [x] Arena Room assistant deterministically answers demo/value/price/SharedOS/verification/scope/quickstart questions and converts safe shorthand target requests into non-executing quotes.
 - [x] `/arena.md`, `/arena.json` and `/.well-known/agent.json` expose explicit judge-first proof and buyer-first purchase paths.
 - [x] Public probe/live preflight reject stale deployments by checking exact runtime version plus current competition-card fields.
+- [x] One-seat invariant: `arena:join` records the exact joined Instance; production daemon and live preflight reject any authenticated Arena Instance that does not match that binding.
+- [x] Arena 2 budget controller snapshots live SharedNet sent totals and computes remaining spend against the organizer's 100-credit obligation; exact-spend planner prefers seller diversity and utility.
+- [x] Arena stats separate gross locally verified incoming claims from the live SharedNet purse and do not mislabel either as the hidden organizer ranking.
 - [x] Paid execution failures are signed, durably cached and replayed exactly without duplicate execution or another ledger read.
 
 ## Submission P0
@@ -76,7 +79,7 @@
 
 - [ ] Exact green competition commit frozen.
 - [ ] Organizer Arena Room configured separately from build Room.
-- [ ] Competition seat joined; invite token removed afterward.
+- [ ] Organizer join command received (~10 minutes before start); exactly one competition seat joined/bound; invite token removed afterward.
 - [ ] Payee verified against current SharedNet identity; purse/ledger readable.
 - [ ] `npm run public:probe -- https://PUBLIC-HOST --arena` green from an unrelated network.
 - [ ] Run `npm run arena:rehearse` with a real second seat; preserve `.sledgewire/live-rehearsal.json` as evidence.
@@ -87,7 +90,7 @@
 - [ ] At least three real external MCP implementations tested.
 - [ ] Representative agent follows `docs/ARENA_AGENT_PROMPT.md`.
 - [ ] Arena 1 rehearsal proves autonomous presentation, several meaningful peer trials/critiques, and review/ranking submission.
-- [ ] Arena 2 rehearsal proves autonomous buying/selling/delivery and correct valid-credit accounting.
+- [ ] Arena 2 budget baseline initialized after the 100-credit grant; autonomous rehearsal drives `remaining_to_spend` to 0 while buying genuine peer services and simultaneously selling/delivering Sledgewire.
 - [ ] Optional SharedOS award evidence is captured: practical SharedOS role/grant use, completeness and usability; external audit evidence if available.
 - [ ] 60-minute no-human rehearsal passes.
 - [ ] Real Smoke p95 below 25 seconds and all paid calls below hard deadlines.
