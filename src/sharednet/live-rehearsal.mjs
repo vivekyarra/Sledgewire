@@ -36,7 +36,7 @@ function assertPaymentQuote(body,{requestId,roomId,payee,service,price,buyerSeat
   if(body.buyer_seat!==buyerSeat)throw new Error('rehearsal_quote_buyer_mismatch');
   if(Number(body.price_credits)!==price)throw new Error('rehearsal_quote_price_mismatch');
   const bound={roomId,buyerSeat,requestId,service,input},fingerprint=requestFingerprint(bound);
-  if(body.request_fingerprint!==fingerprint||body.memo_version!=='sledgewire.payment.v2'||body.memo!==paymentMemo(bound))throw new Error('rehearsal_quote_request_binding_mismatch');
+  if(body.request_fingerprint!==fingerprint||body.memo_version!=='trial-zero-product-name.v1'||body.request_binding!=='signed_quote+durable_fingerprint.v1'||body.memo!==paymentMemo())throw new Error('rehearsal_quote_request_binding_mismatch');
   if(body.next_action?.memo!==body.memo||body.next_action?.payee!==payee||Number(body.next_action?.amount_credits)!==price)throw new Error('rehearsal_quote_next_action_mismatch');
   const verified=verifyReceipt(body,publicKeyPem);if(!verified.ok)throw new Error(`rehearsal_quote_signature_invalid:${verified.reason}`);
 }
