@@ -20,3 +20,9 @@ test('stopped or malformed daemon heartbeat is not ready',()=>{
   assert.equal(readArenaDaemonReadiness(s,room,{now}).status,'stopped');
   s.setMeta('arena_daemon_heartbeat:'+room,'{bad');assert.equal(readArenaDaemonReadiness(s,room,{now}).status,'malformed');
 });
+
+test('future daemon heartbeat cannot create false readiness',()=>{
+  const s=new ArenaStore(':memory:'),now=Date.now();
+  writeArenaDaemonHeartbeat(s,room,{status:'running',at:new Date(now+60_000).toISOString()});
+  const x=readArenaDaemonReadiness(s,room,{now});assert.equal(x.ready,false);assert.equal(x.status,'future_time');
+});
