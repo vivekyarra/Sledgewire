@@ -24,6 +24,25 @@ export class ArenaStore{
     // accepted only after the column is visible on this connection.
     ensureColumn(this.db,'requests','buyer_seat','buyer_seat TEXT');
   }
+  bindPaymentQuote({requestId,fingerprint,service,buyerSeat,price,memo}){
+    const key=`payment_quote:${requestId}`;
+    const value={version:1,request_id:requestId,fingerprint,service,buyer_seat:buyerSeat,price_credits:Number(price),memo,issued_at:new Date().toISOString()};
+    this.db.exec('BEGIN IMMEDIATE');try{
+      const existing=this.db.prepare('SELECT value FROM metadata WHERE key=?').get(key)?.value??null;
+      if(existing!==null){
+        let parsed;try{parsed=JSON.parse(existing);}catch{this.db.exec('COMMIT');return {status:'corrupt'};}
+        const exact=parsed?.fingerprint===fingerprint&&parsed?.service===service&&parsed?.buyer_seat===buyerSeat&&Number(parsed?.price_credits)===Number(price)&&parsed?.memo===memo;
+        this.db.exec('COMMIT');
+        return exact?{status:'replay',quote:parsed}:{status:'conflict',quote:parsed};
+      }
+      this.db.prepare('INSERT INTO metadata(key,value) VALUES(?,?)').run(key,JSON.stringify(value));
+      this.db.exec('COMMIT');return {status:'bound',quote:value};
+    }catch(e){this.db.exec('ROLLBACK');throw e;}
+  }
+  getPaymentQuote(requestId){
+    const raw=this.getMeta(`payment_quote:${requestId}`);if(raw===null)return null;
+    try{return JSON.parse(raw);}catch{return {corrupt:true};}
+  }
   inspectClaim({requestId,txnId,fingerprint,service,buyerSeat=null}){
     const byReq=this.db.prepare('SELECT * FROM requests WHERE request_id=?').get(requestId),byTxn=this.db.prepare('SELECT * FROM requests WHERE txn_id=?').get(txnId),existing=byReq??byTxn;
     if(!existing)return {status:'missing'};
