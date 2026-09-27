@@ -133,8 +133,10 @@ export class ArenaStore{
   }
   markExecutionStarted(requestId,fingerprint){
     const at=new Date().toISOString(),r=this.db.prepare("UPDATE requests SET execution_started_at=? WHERE request_id=? AND fingerprint=? AND status='inflight' AND execution_started_at IS NULL").run(at,requestId,fingerprint);
-    if(r.changes!==1)throw new Error('request_execution_start_conflict');
-    return at;
+    if(r.changes===1)return {status:'started',at};
+    const row=this.db.prepare('SELECT status,execution_started_at FROM requests WHERE request_id=? AND fingerprint=?').get(requestId,fingerprint);
+    if(row?.status==='inflight'&&row.execution_started_at)return {status:'already_started',at:row.execution_started_at};
+    return {status:'not_inflight'};
   }
   complete(requestId,fingerprint,response){const r=this.db.prepare(`UPDATE requests SET status='completed',response_json=?,completed_at=? WHERE request_id=? AND fingerprint=? AND status='inflight'`).run(JSON.stringify(response),new Date().toISOString(),requestId,fingerprint);if(r.changes!==1)throw new Error('request_completion_conflict');this.db.prepare('DELETE FROM payment_quotes WHERE request_id=?').run(requestId);this.db.prepare('DELETE FROM metadata WHERE key=?').run(`payment_quote:${requestId}`);}
   fail(requestId,fingerprint,error){const r=this.db.prepare(`UPDATE requests SET status='failed',error_json=?,completed_at=? WHERE request_id=? AND fingerprint=? AND status='inflight'`).run(JSON.stringify(error),new Date().toISOString(),requestId,fingerprint);if(r.changes!==1)throw new Error('request_failure_conflict');this.db.prepare('DELETE FROM payment_quotes WHERE request_id=?').run(requestId);this.db.prepare('DELETE FROM metadata WHERE key=?').run(`payment_quote:${requestId}`);}
