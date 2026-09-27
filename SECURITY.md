@@ -28,7 +28,7 @@ Sledgewire processes hostile service descriptions, schemas, URLs, tool outputs, 
 - Receipt canonicalization rejects excessive depth, node counts, cycles and oversized canonical bodies.
 - Production refuses to start without persistent Ed25519 signing material. Production service origins must be credential-free HTTPS origins and numeric runtime limits fail closed on malformed values.
 - Public readiness freshness is refreshed only after successful SharedNet presence and configured Arena Room access, not by a local timer alone.
-- Public selfcheck uses a short single-flight cache to absorb judge bursts; production HTTP caps sockets/active requests, rejects oversized declared bodies before reading them, and bounds header/request/keepalive lifetimes.
+- Public selfcheck uses a short single-flight cache to absorb judge bursts; production HTTP caps sockets/active requests, rejects oversized declared bodies from headers, drains/discards rejected payloads, and bounds header/request/keepalive lifetimes.
 
 ## Non-claims
 
