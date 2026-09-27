@@ -134,8 +134,13 @@ export function createArenaHandler({store,ledger,room,payee,signing,publicBaseUr
     if(req?.type==='sledgewire.service.request.v1')return serve(req,buyerSeat);
     if(req?.type==='sledgewire.quote.request.v1'){
       store.incrementCounter('arena.quote.typed');
-      try{return {type:'sledgewire.quote.response.v1',request_id:req.request_id??null,...quote(req)};}
-      catch(e){return {type:'sledgewire.quote.response.v1',request_id:req.request_id??null,state:'FAILED',reason:String(e.message||e)};}
+      const quoteRequestId=req.request_id===undefined||req.request_id===null?null:req.request_id;
+      if(quoteRequestId!==null&&(typeof quoteRequestId!=='string'||!REQUEST_ID.test(quoteRequestId))){
+        store.incrementCounter('arena.reject.invalid_quote_request_id');
+        return {type:'sledgewire.quote.response.v1',request_id:null,state:'FAILED',reason:'invalid_request_id'};
+      }
+      try{return {type:'sledgewire.quote.response.v1',request_id:quoteRequestId,...quote(req)};}
+      catch(e){return {type:'sledgewire.quote.response.v1',request_id:quoteRequestId,state:'FAILED',reason:String(e.message||e)};}
     }
 
     const text=content.trim();
