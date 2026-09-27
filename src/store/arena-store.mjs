@@ -25,6 +25,7 @@ export class ArenaStore{
       CREATE TABLE IF NOT EXISTS payment_quotes(request_id TEXT PRIMARY KEY,fingerprint TEXT NOT NULL,service TEXT NOT NULL,buyer_seat TEXT NOT NULL,price_credits INTEGER NOT NULL,memo TEXT NOT NULL,issued_at TEXT NOT NULL,last_seen_at TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS idx_payment_quotes_buyer_seen ON payment_quotes(buyer_seat,last_seen_at);
       CREATE INDEX IF NOT EXISTS idx_payment_quotes_seen ON payment_quotes(last_seen_at);
+      CREATE INDEX IF NOT EXISTS idx_payment_quotes_issued ON payment_quotes(issued_at);
       CREATE TABLE IF NOT EXISTS metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS counters(key TEXT PRIMARY KEY,value INTEGER NOT NULL DEFAULT 0);
     `);
@@ -59,7 +60,7 @@ export class ArenaStore{
       }
 
       const cutoff=new Date(now-PAYMENT_QUOTE_TTL_MS).toISOString();
-      this.db.prepare('DELETE FROM payment_quotes WHERE last_seen_at<?').run(cutoff);
+      this.db.prepare('DELETE FROM payment_quotes WHERE issued_at<?').run(cutoff);
       const buyerCount=Number(this.db.prepare('SELECT COUNT(*) n FROM payment_quotes WHERE buyer_seat=?').get(buyerSeat)?.n??0);
       if(buyerCount>=PAYMENT_QUOTE_MAX_PER_BUYER){
         this.db.prepare('DELETE FROM payment_quotes WHERE request_id IN (SELECT request_id FROM payment_quotes WHERE buyer_seat=? ORDER BY last_seen_at ASC LIMIT ?)').run(buyerSeat,buyerCount-PAYMENT_QUOTE_MAX_PER_BUYER+1);
@@ -78,8 +79,12 @@ export class ArenaStore{
       const expires=Date.parse(row.issued_at)+PAYMENT_QUOTE_TTL_MS;if(!Number.isFinite(expires)||Date.now()>expires){this.db.prepare('DELETE FROM payment_quotes WHERE request_id=?').run(requestId);return null;}
       return {version:2,...row,request_id:row.request_id,expires_at:new Date(expires).toISOString()};
     }
-    const raw=this.getMeta(`payment_quote:${requestId}`);if(raw===null)return null;
-    try{return JSON.parse(raw);}catch{return {corrupt:true};}
+    const legacyKey=`payment_quote:${requestId}`,raw=this.getMeta(legacyKey);if(raw===null)return null;
+    try{
+      const parsed=JSON.parse(raw),issued=Date.parse(parsed?.issued_at);
+      if(Number.isFinite(issued)&&Date.now()>issued+PAYMENT_QUOTE_TTL_MS){this.db.prepare('DELETE FROM metadata WHERE key=?').run(legacyKey);return null;}
+      return parsed;
+    }catch{return {corrupt:true};}
   }
   paymentQuoteStats(){
     const total=Number(this.db.prepare('SELECT COUNT(*) n FROM payment_quotes').get()?.n??0),maxPerBuyer=Number(this.db.prepare('SELECT COALESCE(MAX(n),0) n FROM (SELECT COUNT(*) n FROM payment_quotes GROUP BY buyer_seat)').get()?.n??0);
