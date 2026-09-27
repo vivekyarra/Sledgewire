@@ -116,7 +116,7 @@ export class SharedNetApi{
   async heartbeat(signal){return this.request('/api/v1/instances/current/heartbeat',{method:'POST',signal,retries:1});}
   async credits(signal){return this.request('/api/v1/credits',{signal});}
   async get(txnId,signal){
-    if(!TXN.test(txnId))return null;const identity=await this.current(signal,{fresh:true});let before=null;
+    if(!TXN.test(txnId))return null;const identity=await this.current(signal);let before=null;
     for(let page=0;page<10;page++){const qs=new URLSearchParams({limit:'100'});if(before)qs.set('before',before);const x=await this.request(`/api/v1/credits/transfers?${qs}`,{signal}),item=(x?.items??[]).find(t=>t?.id===txnId);if(item)return normalizeTransfer(item,identity);if(!x?.has_more||!x?.next_cursor)break;before=x.next_cursor;}return null;
   }
   async messages(roomId,{after=null,before=null,order='asc',limit=100,signal=null}={}){
