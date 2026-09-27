@@ -1,4 +1,4 @@
-# Sledgewire v0.3.11 stress report
+# Sledgewire v0.3.12 stress report
 
 Date: 2026-09-26
 
@@ -56,11 +56,15 @@ These timings are GitHub Actions/local fixture measurements only. They are not S
 30. **Replay depended on remote ledger retention.** Once payment has been verified and durably bound, exact retries are served from local verified state without requiring the transfer to remain in a bounded remote ledger window; legacy unattributed rows still re-verify before buyer backfill.
 31. **Paid failure evidence could become ambiguous.** A paid execution failure is signed and durably cached, and exact retries replay that same failure without charging or executing again.
 32. **Non-root secret mount trap.** CI exposed that 0600 key files are unreadable if their 0700 parent directory is owned by another UID. CI and deployment docs now require correct ownership of both directories and files without making secrets world-readable.
-33. **First-payment input substitution gap.** The prior native payment memo bound request id + service but not the exact target input before the first durable claim. Payment v2 now signs and transfers against a canonical fingerprint of Room + buyer + request id + service + input, so changing an endpoint or payload after quote is rejected before execution.
+33. **First-payment input substitution gap.** A previous design did not durably establish the exact target input before the first paid claim. The current signed quote and durable pre-payment quote record bind Room + buyer + request id + service + input fingerprint before payment; changed paid resends are rejected before ledger lookup.
 34. **Judge/buyer intent friction.** The Room surface previously understood only a narrow set of product questions and quote intents. It now answers demo/value/pricing/SharedOS/verification/scope/quickstart deterministically and maps bounded buyer-language aliases or URL shorthand to non-executing quotes.
 35. **Stale hosted competition surface.** A host could be healthy while serving an older Arena card. Public probe/live preflight now require the exact runtime version plus current judge/buyer proof fields.
 36. **Pre-payment interaction paths lacked mixed-load proof.** A new 50,000-request concurrency-256 Arena UX storm covers information queries, natural/typed quotes, signed payment quotes, malformed requests and irrelevant traffic while asserting zero pre-payment ledger reads/executions.
+37. **Organizer memo/protocol mismatch.** The latest Arena instruction requires the native transfer memo to be the product/team name. Sledgewire now requires exactly `Sledgewire`; request binding stays cryptographic/durable rather than being overloaded into the public memo.
+38. **Human-readable memo could have weakened first-payment binding.** The seller now persists the signed quote fingerprint before payment. An altered endpoint/input using the same product-name memo fails `payment_quote_request_mismatch` before a remote ledger read or service execution.
+39. **Multiple Arena-seat ambiguity.** `arena:join` records the exact joined Instance in an owner-only file; production daemon and live preflight fail closed on an identity mismatch.
+40. **Outgoing-credit deadline was not machine-tracked.** `arena:budget` snapshots the live SharedNet `sent` baseline after the 100-credit grant and computes remaining required spend independent of incoming sales; its exact-spend planner favors seller diversity and genuine utility.
 
 ## Live facts still required
 
-Repository-only tests cannot replace: a genuine development SharedNet collaboration Room, public deployment reachable by unrelated agents, organizer Arena seat/Room, real purse/ledger transaction from another seat, public and daemon processes sharing the real persistent DB, restart/replay on the live environment, independent `sledgewire.trace` use by another seat, real external MCP services, event-visible SharedOS evidence where applicable, and the 60-minute no-human rehearsal.
+Repository-only tests cannot replace: a genuine development SharedNet collaboration Room, public deployment reachable by unrelated agents, the organizer's last-minute Arena Room/join command, the real 100-credit grant, a real purse/ledger transaction from another seat, public and daemon processes sharing the real persistent DB, restart/replay on the live environment, independent `sledgewire.trace` use by another seat, real external MCP services, optional event-visible SharedOS evidence where applicable, and the 60-minute no-human rehearsal.
