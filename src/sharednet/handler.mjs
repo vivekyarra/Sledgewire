@@ -5,6 +5,7 @@ import {validateServiceInput} from '../core/service-input.mjs';
 import {runPaidService} from '../sharedos/host.mjs';
 import {signReceipt} from '../receipts/receipt.mjs';
 import {SEAT} from './api.mjs';
+import {PAYMENT_QUOTE_TTL_MS} from '../store/arena-store.mjs';
 
 const REQUEST_ID=/^[A-Za-z0-9][A-Za-z0-9._-]{2,95}$/;
 const ROOM_MESSAGE_MAX_BYTES=32_768;
@@ -73,7 +74,7 @@ export function createArenaHandler({store,ledger,room,payee,signing,publicBaseUr
         buyer_seat:buyerSeat,
         issued_at:q.quote_issued_at??new Date().toISOString(),
         expires_at:q.quote_expires_at??null,
-        quote_ttl_seconds:14_400,
+        quote_ttl_seconds:Math.floor(PAYMENT_QUOTE_TTL_MS/1000),
         quickstart_url:quickstart,
         next_action:{type:'sharednet.credit.transfer',amount_credits:q.price,payee,room_id:room,memo:q.memo,after_payment:'resend identical request with payment_txn_id'},
         verification:{receipt_tool:'sledgewire.verify',trace_tool:'sledgewire.trace',exact_retry_no_reexecution:true,request_fingerprint:q.fingerprint},
