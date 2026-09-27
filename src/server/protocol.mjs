@@ -22,6 +22,15 @@ const META_SERVER='io.modelcontextprotocol/serverInfo';
 const SERVER_INFO={name:'sledgewire',version:VERSION};
 
 const signing=loadSigningMaterial();
+const SELFCHECK_CACHE_MS=10_000;
+let selfcheckCache=null,selfcheckCacheAt=0,selfcheckInflight=null;
+async function cachedSelfcheck(){
+  const now=Date.now();
+  if(selfcheckCache&&now-selfcheckCacheAt<SELFCHECK_CACHE_MS)return selfcheckCache;
+  if(selfcheckInflight)return selfcheckInflight;
+  selfcheckInflight=selfcheck().then(result=>{selfcheckCache=result;selfcheckCacheAt=Date.now();return result;}).finally(()=>{selfcheckInflight=null;});
+  return selfcheckInflight;
+}
 export const PUBLIC=signing.publicKeyPem;
 export const PUBLIC_KEY_ID=signing.keyId;
 const schemaEndpoint={type:'string',minLength:8,maxLength:2048};
@@ -58,7 +67,7 @@ export async function handleTool(name,args={},internalOpts={}){
   const opts={...internalOpts,targetPolicy:internalOpts.targetPolicy??{allowHttp:false,allowPrivate:false}};
   let payload;
   if(name==='sledgewire.quote')payload=quote(args);
-  else if(name==='sledgewire.selfcheck')payload=await selfcheck();
+  else if(name==='sledgewire.selfcheck')payload=await cachedSelfcheck();
   else if(name==='sledgewire.smoke')payload=await smoke(args.endpoint,{...opts,probe:args.probe});
   else if(name==='sledgewire.assay')payload=await assay(args.endpoint,{...opts,probe:args.probe});
   else if(name==='sledgewire.invoke')payload=await invoke(args.endpoint,args.request,opts);
