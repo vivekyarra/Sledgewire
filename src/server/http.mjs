@@ -14,7 +14,7 @@ const port=boundedInteger(process.env.PORT,{name:'port',defaultValue:8787,min:1,
 const production=process.env.NODE_ENV==='production',paidBypass=process.env.SLEDGEWIRE_PUBLIC_PAID_EXECUTION==='1';
 const base=publicBaseOrigin(process.env.PUBLIC_BASE_URL||`http://127.0.0.1:${port}`,{production});
 if(production&&paidBypass)throw new Error('production_paid_execution_bypass_forbidden');
-let active=0;const maxActive=boundedInteger(process.env.SLEDGEWIRE_HTTP_CONCURRENCY,{name:'http_concurrency',defaultValue:64,min:4,max:256}),maxConnections=boundedInteger(process.env.SLEDGEWIRE_HTTP_MAX_CONNECTIONS,{name:'http_max_connections',defaultValue:512,min:32,max:4096});
+let active=0;const maxActive=boundedInteger(process.env.SLEDGEWIRE_HTTP_CONCURRENCY,{name:'http_concurrency',defaultValue:64,min:4,max:256}),maxConnections=boundedInteger(process.env.SLEDGEWIRE_HTTP_MAX_CONNECTIONS,{name:'http_max_connections',defaultValue:512,min:32,max:4096}),requestTimeoutMs=boundedInteger(process.env.SLEDGEWIRE_HTTP_REQUEST_TIMEOUT_MS,{name:'http_request_timeout_ms',defaultValue:10_000,min:1_000,max:60_000}),headersTimeoutMs=boundedInteger(process.env.SLEDGEWIRE_HTTP_HEADERS_TIMEOUT_MS,{name:'http_headers_timeout_ms',defaultValue:5_000,min:500,max:30_000}),socketIdleMs=boundedInteger(process.env.SLEDGEWIRE_HTTP_SOCKET_IDLE_MS,{name:'http_socket_idle_ms',defaultValue:12_000,min:500,max:60_000});
 const publicArena=!paidBypass;
 const arenaRoomId=process.env.SHAREDNET_ARENA_ROOM_ID??null;
 const dbPath=process.env.SLEDGEWIRE_DB??'.sledgewire/arena.db';fs.mkdirSync(path.dirname(path.resolve(dbPath)),{recursive:true});const traceStore=new ArenaStore(dbPath);
@@ -56,6 +56,6 @@ const server=http.createServer(async(req,res)=>{
     return json(res,200,out);
   }finally{active--;}
 });
-server.requestTimeout=15_000;server.headersTimeout=10_000;server.keepAliveTimeout=5_000;server.maxConnections=maxConnections;server.maxRequestsPerSocket=100;
+server.requestTimeout=requestTimeoutMs;server.headersTimeout=Math.min(headersTimeoutMs,requestTimeoutMs);server.keepAliveTimeout=3_000;server.maxConnections=maxConnections;server.maxRequestsPerSocket=100;server.maxHeadersCount=64;server.setTimeout(socketIdleMs,socket=>socket.destroy());
 server.listen(port,()=>console.error(`sledgewire http listening on ${port}`));
 function json(res,status,value){res.statusCode=status;res.setHeader('content-type','application/json');res.end(JSON.stringify(value));}
