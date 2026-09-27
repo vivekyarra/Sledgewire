@@ -2,7 +2,7 @@ import {ArenaStore} from '../src/store/arena-store.mjs';
 import {PaymentGate,paymentMemo} from '../src/core/payment-gate.mjs';
 
 const groups=Math.max(1,Number(process.argv[2]??500)),fanout=Math.max(2,Number(process.argv[3]??12));
-const room='rom_ABCDEFGHIJ',buyer='i_ABCDEFGHIJ',payee='p_ABCDEFGHIJ',service='sledgewire.smoke',price=3;
+const room='rom_ABCDEFGHIJ',buyer='i_ABCDEFGHIJ',payee='p_ABCDEFGHIJ',service='sledgewire.smoke',price=3,txn=i=>'txn_'+String(i).padStart(10,'0');
 const store=new ArenaStore(':memory:');
 let ledgerReads=0;
 const ledger={async get(txnId){ledgerReads++;await Promise.resolve();const i=Number(txnId.split('_').at(-1));const requestId=`storm-${i}`;return {id:txnId,buyer_instance_id:buyer,payee_ok:true,amount:price,room_id:room,memo:paymentMemo({roomId:room,buyerSeat:buyer,requestId,service,input:{endpoint:`https://example.com/${i}`}})};}};
@@ -11,7 +11,7 @@ let uniqueClaims=0,inflightRefusals=0,cachedReplays=0,conflictRefusals=0;
 const start=Date.now();
 
 for(let i=0;i<groups;i++){
-  const req={roomId:room,buyerSeat:buyer,requestId:`storm-${i}`,service,input:{endpoint:`https://example.com/${i}`},txnId:`txn_${i}`};
+  const req={roomId:room,buyerSeat:buyer,requestId:`storm-${i}`,service,input:{endpoint:`https://example.com/${i}`},txnId:txn(i)};
   const q=gate.issueQuote(req);if(q.reason!=='payment_required'||q.memo!=='Sledgewire')throw new Error(`quote_failed:${i}:${q.reason}`);
   const wave=await Promise.all(Array.from({length:fanout},()=>gate.authorize(req)));
   const claimed=wave.filter(x=>x.ok&&!x.replay);
