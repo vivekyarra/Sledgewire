@@ -12,6 +12,7 @@ const start=Date.now();
 
 for(let i=0;i<groups;i++){
   const req={roomId:room,buyerSeat:buyer,requestId:`storm-${i}`,service,input:{endpoint:`https://example.com/${i}`},txnId:`txn_${i}`};
+  const q=gate.issueQuote(req);if(q.reason!=='payment_required'||q.memo!=='Sledgewire')throw new Error(`quote_failed:${i}:${q.reason}`);
   const wave=await Promise.all(Array.from({length:fanout},()=>gate.authorize(req)));
   const claimed=wave.filter(x=>x.ok&&!x.replay);
   const inflight=wave.filter(x=>!x.ok&&x.reason==='request_already_inflight');
@@ -25,7 +26,7 @@ for(let i=0;i<groups;i++){
 
   const conflicting={...req,requestId:`other-${i}`};
   const bad=await gate.authorize(conflicting);
-  if(bad.ok||!['wrong_memo','transaction_or_request_reused'].includes(bad.reason))throw new Error(`transaction_reuse_not_rejected:${i}:${bad.reason}`);
+  if(bad.ok||bad.reason!=='transaction_or_request_reused')throw new Error(`transaction_reuse_not_rejected:${i}:${bad.reason}`);
   conflictRefusals++;
 }
 const result={groups,fanout,authorization_attempts:groups*(fanout*2+1),unique_claims:uniqueClaims,inflight_duplicate_refusals:inflightRefusals,cached_replays:cachedReplays,transaction_reuse_refusals:conflictRefusals,ledger_reads:ledgerReads,duplicate_paid_authorizations:0,duration_ms:Date.now()-start};
