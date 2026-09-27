@@ -47,6 +47,9 @@ export class ArenaStore{
           existing=this.db.prepare('SELECT * FROM payment_quotes WHERE request_id=?').get(requestId)??null;
         }
       }
+      if(existing&&(!Number.isFinite(Date.parse(existing.issued_at))||now>Date.parse(existing.issued_at)+PAYMENT_QUOTE_TTL_MS)){
+        this.db.prepare('DELETE FROM payment_quotes WHERE request_id=?').run(requestId);existing=null;
+      }
       if(existing){
         const exact=exactRow(existing);
         if(exact)this.db.prepare('UPDATE payment_quotes SET last_seen_at=? WHERE request_id=?').run(nowIso,requestId);
