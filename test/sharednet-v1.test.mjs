@@ -36,6 +36,17 @@ test('SharedNet API ledger lookup uses bearer token and caller identity',async()
   };
   const api=new SharedNetApi({token,fetchImpl});const tx=await api.get('txn_ABCDEFGHIJ');assert.equal(tx.payee_ok,true);assert.equal(tx.buyer_instance_id,'i_ZYXWVUTSRQ');assert.ok(calls.every(x=>x.auth===`Bearer ${token}`));
 });
+test('SharedNet payment scans reuse stable authenticated identity instead of refetching it per transaction',async()=>{
+  const token='sni_'+ 'A'.repeat(43);let identityCalls=0,transferCalls=0;
+  const fetchImpl=async(url)=>{
+    if(url.endsWith('/api/v1/instances/current')){identityCalls++;return new Response(JSON.stringify({principal:{id:'p_ABCDEFGHIJ'},instance:{id:'i_ABCDEFGHIJ'},agent:null}),{status:200});}
+    if(url.includes('/api/v1/credits/transfers')){transferCalls++;const id=transferCalls===1?'txn_ABCDEFGHIJ':'txn_ZYXWVUTSRQ';return new Response(JSON.stringify({items:[{id,sender_instance_id:'i_BUYERAAAA',recipient_principal_id:'p_ABCDEFGHIJ',amount:3,room_id:'rom_ABCDEFGHIJ',memo:'Sledgewire'}],has_more:false,next_cursor:null}),{status:200});}
+    throw new Error('unexpected_url');
+  };
+  const api=new SharedNetApi({token,fetchImpl});
+  assert.ok(await api.get('txn_ABCDEFGHIJ'));assert.ok(await api.get('txn_ZYXWVUTSRQ'));
+  assert.equal(identityCalls,1);assert.equal(transferCalls,2);
+});
 test('watch batch parses current SharedNet message fields',()=>{
   const raw=JSON.stringify({room_id:'rom_ABCDEFGHIJ',messages:[{id:'msg_ABCDEFGHIJ',room_id:'rom_ABCDEFGHIJ',sender_instance_id:'i_ZYXWVUTSRQ',content:'@sledgewire demo'}]});
   const b=parseWatchBatch(raw);assert.equal(b.messages.length,1);assert.equal(senderInstance(b.messages[0]),'i_ZYXWVUTSRQ');
