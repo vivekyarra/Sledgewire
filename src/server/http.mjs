@@ -40,7 +40,7 @@ const server=http.createServer(async(req,res)=>{
   if(production&&!hostHeaderAllowed(req.headers.host,allowedHosts))return json(res,403,{jsonrpc:'2.0',id:null,error:{code:-32000,message:'Host not allowed'}});
   const origin=String(req.headers.origin??'');if(origin&&!allowedOrigins.has(origin))return json(res,403,{jsonrpc:'2.0',id:null,error:{code:-32000,message:'Origin not allowed'}});
   if(active>=maxActive)return json(res,503,{error:'server_busy'});
-  const contentLength=req.headers['content-length'];if(contentLength!==undefined&&Number(contentLength)>1_000_000)return json(res,413,{error:'request_too_large'});
+  const contentLength=req.headers['content-length'];if(contentLength!==undefined&&Number(contentLength)>1_000_000){req.resume();return json(res,413,{error:'request_too_large'});}
   if(!isJsonContentType(req.headers['content-type']))return json(res,415,{error:'application_json_required'});
   active++;
   try{
