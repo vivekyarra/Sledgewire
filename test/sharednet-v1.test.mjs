@@ -72,7 +72,7 @@ test('arena typed quote accepts buyer-friendly aliases and malformed quote fails
 test('arena handler returns signed buyer-bound payment requirement before execution',async()=>{
   const store=new ArenaStore(':memory:');const kp=generateSigningKeypair();const handle=createArenaHandler({store,ledger:{get:async()=>null},room:'rom_ABCDEFGHIJ',payee:'p_ABCDEFGHIJ',signing:{privateKeyPem:kp.privateKeyPem},publicBaseUrl:'https://sledgewire.example'});
   const r=await handle({sender_instance_id:'i_ZYXWVUTSRQ',content:JSON.stringify({type:'sledgewire.service.request.v1',request_id:'req-abc',service:'sledgewire.smoke',input:{endpoint:'https://example.com/mcp'}})});
-  const bound={roomId:'rom_ABCDEFGHIJ',buyerSeat:'i_ZYXWVUTSRQ',requestId:'req-abc',service:'sledgewire.smoke',input:{endpoint:'https://example.com/mcp'}};assert.equal(r.type,'sledgewire.payment_required.v1');assert.equal(r.price_credits,3);assert.match(r.deliverable,/smoke test/i);assert.equal(r.verification.exact_retry_no_reexecution,true);assert.equal(r.room_id,'rom_ABCDEFGHIJ');assert.equal(r.memo,paymentMemo(bound));assert.equal(r.request_fingerprint,requestFingerprint(bound));assert.equal(r.memo_version,'sledgewire.payment.v2');assert.equal(r.next_action.memo,r.memo);assert.equal(r.buyer_seat,'i_ZYXWVUTSRQ');assert.equal(verifyReceipt(r,kp.publicKeyPem).ok,true);
+  const bound={roomId:'rom_ABCDEFGHIJ',buyerSeat:'i_ZYXWVUTSRQ',requestId:'req-abc',service:'sledgewire.smoke',input:{endpoint:'https://example.com/mcp'}};assert.equal(r.type,'sledgewire.payment_required.v1');assert.equal(r.price_credits,3);assert.match(r.deliverable,/smoke test/i);assert.equal(r.verification.exact_retry_no_reexecution,true);assert.equal(r.room_id,'rom_ABCDEFGHIJ');assert.equal(r.memo,paymentMemo(bound));assert.equal(r.request_fingerprint,requestFingerprint(bound));assert.equal(r.memo,'Sledgewire');assert.equal(r.memo_version,'trial-zero-product-name.v1');assert.equal(r.request_binding,'signed_quote+durable_fingerprint.v1');assert.equal(r.next_action.memo,r.memo);assert.equal(r.buyer_seat,'i_ZYXWVUTSRQ');assert.equal(verifyReceipt(r,kp.publicKeyPem).ok,true);
 });
 test('Room payment quote cannot authorize changed target input on first paid resend',async()=>{
   const store=new ArenaStore(':memory:'),kp=generateSigningKeypair();let executions=0,reads=0,quotedMemo=null;
@@ -82,12 +82,14 @@ test('Room payment quote cannot authorize changed target input on first paid res
   const quote=await handle({sender_instance_id:'i_ZYXWVUTSRQ',content:JSON.stringify(original)});quotedMemo=quote.memo;
   const altered={...original,input:{endpoint:'https://two.example/mcp'},payment_txn_id:'txn_ABCDEFGHIJ'};
   const r=await handle({sender_instance_id:'i_ZYXWVUTSRQ',content:JSON.stringify(altered)});
-  assert.equal(r.state,'FAILED');assert.equal(r.reason,'wrong_memo');assert.equal(reads,1);assert.equal(executions,0);
+  assert.equal(r.state,'FAILED');assert.equal(r.reason,'payment_quote_request_mismatch');assert.equal(reads,0);assert.equal(executions,0);
 });
 test('paid execution failure is signed and exact retries replay it without ledger read or reexecution',async()=>{
   const store=new ArenaStore(':memory:'),kp=generateSigningKeypair();let executions=0,reads=0;
   const bound={roomId:'rom_ABCDEFGHIJ',buyerSeat:'i_ZYXWVUTSRQ',requestId:'req-fail',service:'sledgewire.smoke',input:{endpoint:'https://example.com/mcp'}};const ledger={async get(){reads++;return {id:'txn_ABCDEFGHIJ',buyer_instance_id:'i_ZYXWVUTSRQ',addressed_to:'p_ABCDEFGHIJ',payee_ok:true,amount:3,room_id:'rom_ABCDEFGHIJ',memo:paymentMemo(bound)};}};
   const handle=createArenaHandler({store,ledger,room:'rom_ABCDEFGHIJ',payee:'p_ABCDEFGHIJ',signing:{privateKeyPem:kp.privateKeyPem},publicBaseUrl:'https://sledgewire.example',runService:async()=>{executions++;throw new Error('fixture_boom');}});
+  const unpaid={sender_instance_id:'i_ZYXWVUTSRQ',content:JSON.stringify({type:'sledgewire.service.request.v1',request_id:'req-fail',service:'sledgewire.smoke',input:{endpoint:'https://example.com/mcp'}})};
+  const quote=await handle(unpaid);assert.equal(quote.memo,'Sledgewire');
   const message={sender_instance_id:'i_ZYXWVUTSRQ',content:JSON.stringify({type:'sledgewire.service.request.v1',request_id:'req-fail',service:'sledgewire.smoke',input:{endpoint:'https://example.com/mcp'},payment_txn_id:'txn_ABCDEFGHIJ'})};
   const first=await handle(message);assert.equal(first.state,'FAILED');assert.equal(first.reason,'execution_failed');assert.equal(first.receipt.payment.txn_id,'txn_ABCDEFGHIJ');assert.equal(first.receipt.buyer_seat,'i_ZYXWVUTSRQ');assert.equal(verifyReceipt(first.receipt,kp.publicKeyPem).ok,true);
   const second=await handle(message);assert.equal(second.receipt.proof.signature,first.receipt.proof.signature);assert.equal(executions,1);assert.equal(reads,1);
