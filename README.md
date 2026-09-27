@@ -4,7 +4,7 @@
 
 Sledgewire is a permissioned adversarial execution rail for agent services. It discovers a real MCP surface, attacks bounded failure modes, repairs only evidence-backed structural mismatches, independently validates repair, executes paid work through SharedOS authority, and returns a signed receipt another agent can verify.
 
-Trial Zero v0.3.12 is aligned to the organizer's latest Arena instructions: one product link, one official Arena agent seat, a separate development Room, a last-minute Arena join command, a 100-credit one-hour spend obligation in Arena 2, and refund-sensitive earned credits. The Arena surface is judge-first and buyer-first: free signed proof, deterministic service selection, a 3-credit first paid check, and independently verifiable delivery evidence.
+Trial Zero v0.3.13 is aligned to the organizer's latest Arena instructions: one product link, one official Arena agent seat, a separate development Room, a last-minute Arena join command, a 100-credit one-hour spend obligation in Arena 2, and refund-sensitive earned credits. The Arena surface is judge-first and buyer-first: free signed proof, deterministic service selection, a 3-credit first paid check, and independently verifiable delivery evidence.
 
 ## Fastest judge path
 
@@ -169,19 +169,20 @@ Large signed deliveries are uploaded as Room-addressed SharedNet artifacts and r
 - Active selected-tool probes require explicit caller safety attestation; Assay's synthetic unknown-tool mutation additionally requires `probe.authorizeUnknownToolProbe=true`. Without that flag the check is reported as not tested. Untrusted target annotations never authorize execution by themselves.
 - Destructive probes/invocations require separate explicit destructive authority.
 - Repair never invents missing semantic values.
-- Trial Zero native payments use memo `Sledgewire`, exactly matching the organizer's product/team-name instruction. Exact request security is separate: the signed pre-payment quote plus durable seller record binds Arena Room, buyer Instance, request id, service, canonical input fingerprint, exact payee and price. A changed paid resend is rejected before ledger-backed execution.
+- Trial Zero native payments use memo `Sledgewire`, exactly matching the organizer's product/team-name instruction. Exact request security is separate: the signed pre-payment quote plus durable seller record binds Arena Room, buyer Instance, request id, service, canonical input fingerprint, exact payee and price. Quotes expire after 4 hours, are capped at 256 outstanding per buyer and 20,000 globally, and terminal paid outcomes reclaim transient quote state.
 - Exact completed retries are served from the previously verified durable binding, so replay does not depend on the transfer remaining inside a bounded remote ledger-history window; duplicate paid execution is blocked.
 - If execution fails after a valid payment, the failure is signed, cached, and replayed exactly rather than becoming an unverifiable dead end.
 - A crash leaving paid execution outcome uncertain is never blindly retried.
-- Poison Room messages are bounded and dead-lettered instead of permanently blocking the autonomous cursor.
-- SharedNet JSON responses are streamed under byte ceilings before parsing, and duplicate ledger lookups are coalesced/cached to resist retry storms.
+- Poison Room messages are bounded and dead-lettered instead of permanently blocking the autonomous cursor; Room payloads above 32 KiB are dropped before JSON/regex/service work.
+- SharedNet JSON responses are streamed under byte ceilings before parsing, duplicate ledger lookups are coalesced/cached, and nonexistent-payment storms are circuit-broken per buyer and globally before they can consume unbounded SharedNet ledger scans.
 - Every paid target workflow uses an exact-target SharedOS grant; the dispatcher has no direct target-service authority.
 - SharedOS bounded grants use atomic SQLite usage state and durable audit/outbox storage.
 - SharedNet secrets stay in environment or owner-only files, never argv/messages/receipts/logs.
 - Receipt canonicalization is bounded for depth, nodes, cycles and bytes before signing or verification.
 - Production requires persistent Ed25519 signing material.
 - `/ready` requires a fresh Arena-daemon readiness pulse from the same persistent database. That pulse is refreshed only after successful SharedNet presence plus access to the configured Arena Room, so a live local process with broken Arena connectivity cannot masquerade as ready.
-- Paid receipts are independently inspectable through the free, trace-id-scoped `sledgewire.trace` proof surface.
+- Paid receipts are independently inspectable through the free, trace-id-scoped `sledgewire.trace` proof surface; trace lookup is indexed for sustained public verification load.
+- Public selfcheck uses single-flight + a short result cache, while production HTTP limits active requests, sockets, body bytes, header time and keepalive churn.
 
 ## Verification
 
@@ -192,6 +193,8 @@ Large signed deliveries are uploaded as Room-addressed SharedNet artifacts and r
     npm run stress:dupes -- 2500 24
     npm run stress:handler -- 2500 24 1
     npm run stress:arena-ux -- 50000 256
+    npm run stress:arena-e2e -- 40000 10000
+    npm run stress:http -- 64 32
     npm run economy
     npm run sharedos:check
     npm run preflight
