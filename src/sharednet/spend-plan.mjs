@@ -1,5 +1,6 @@
 export function normalizeArenaOffers(offers){
   if(!Array.isArray(offers))throw new Error('arena_offers_must_be_array');
+  if(offers.length>5000)throw new Error('arena_offers_limit');
   return offers.map((x,i)=>{
     const id=String(x?.id??`offer-${i}`).trim();
     const seller=String(x?.seller??x?.product??'').trim();
@@ -7,7 +8,7 @@ export function normalizeArenaOffers(offers){
     const price=Number(x?.price_credits??x?.price);
     const utility=Number(x?.utility??1);
     const worthwhile=x?.worthwhile!==false;
-    if(!id||!seller||!service||!Number.isInteger(price)||price<1||price>1000||!Number.isFinite(utility))throw new Error(`invalid_arena_offer:${i}`);
+    if(!id||id.length>160||!seller||seller.length>160||!service||service.length>160||!Number.isInteger(price)||price<1||price>1000||!Number.isFinite(utility)||Math.abs(utility)>1_000_000)throw new Error(`invalid_arena_offer:${i}`);
     return {id,seller,service,price_credits:price,utility,worthwhile};
   }).filter(x=>x.worthwhile);
 }
@@ -44,6 +45,23 @@ export function planArenaSpend({remaining_credits,offers}){
 export function eventBudgetStatus({event_budget=100,baseline_sent,current_sent}){
   const budget=Number(event_budget),base=Number(baseline_sent),sent=Number(current_sent);
   if(!Number.isInteger(budget)||budget<1||!Number.isFinite(base)||!Number.isFinite(sent)||sent<base)throw new Error('invalid_arena_budget_state');
-  const spent=Math.max(0,Math.floor(sent-base)),remaining=Math.max(0,budget-spent);
-  return {event_budget:budget,arena_sent_delta:spent,remaining_to_spend:remaining,spent_all_event_credits:remaining===0};
+  const spent=Math.max(0,Math.floor(sent-base)),remaining=Math.max(0,budget-spent),overspent=Math.max(0,spent-budget);
+  return {event_budget:budget,arena_sent_delta:spent,remaining_to_spend:remaining,overspent_credits:overspent,spent_all_event_credits:remaining===0};
+}
+
+export function resolveArenaBudgetState({existing=null,init=false,room,eventBudget,purse,now=new Date().toISOString()}){
+  if(typeof room!=='string'||!room)throw new Error('invalid_arena_budget_room');
+  if(!Number.isInteger(Number(eventBudget))||Number(eventBudget)<1||Number(eventBudget)>1000)throw new Error('invalid_arena_event_budget');
+  for(const k of ['balance','sent','received','granted'])if(!Number.isFinite(Number(purse?.[k])))throw new Error(`credits_${k}_missing`);
+  if(existing){
+    if(existing.room_id!==room||Number(existing.event_budget)!==Number(eventBudget))throw new Error('arena_budget_state_scope_mismatch');
+    return {state:existing,initialization:init?'already_initialized':'loaded'};
+  }
+  if(!init)throw new Error('arena_budget_not_initialized_use_--init_after_event_grant');
+  return {initialization:'initialized',state:{
+    version:2,room_id:room,event_budget:Number(eventBudget),
+    baseline_sent:Number(purse.sent),baseline_received:Number(purse.received),
+    baseline_balance:Number(purse.balance),baseline_granted:Number(purse.granted),
+    initialized_at:now
+  }};
 }

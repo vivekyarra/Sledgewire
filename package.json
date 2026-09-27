@@ -1,6 +1,6 @@
 {
   "name": "sledgewire",
-  "version": "0.3.12",
+  "version": "0.3.13",
   "description": "Permissioned adversarial conformance, bounded repair, and signed execution receipts for MCP services.",
   "type": "module",
   "bin": {
@@ -31,7 +31,9 @@
     "public:probe": "node scripts/public-probe.mjs",
     "stress:arena-ux": "node scripts/arena-ux-stress.mjs",
     "arena:activate": "npm run arena:join && npm run arena:all",
-    "arena:budget": "node scripts/arena-budget.mjs"
+    "arena:budget": "node scripts/arena-budget.mjs",
+    "stress:arena-e2e": "node scripts/arena-e2e-chaos.mjs",
+    "stress:http": "node scripts/http-arena-stress.mjs"
   },
   "engines": {
     "node": ">=22.18.0"

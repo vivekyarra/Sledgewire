@@ -1,6 +1,6 @@
 # Trial Zero release checklist
 
-## Static code gates — v0.3.12
+## Static code gates — v0.3.13
 
 - [x] CLI and MCP with current 2026-07-28 stateless `server/discover` plus bounded legacy fallback.
 - [x] Official `@modelcontextprotocol/client` v2 Streamable HTTP integration test negotiates 2026-07-28 and calls Sledgewire.
@@ -22,23 +22,23 @@
 - [x] SharedOS bounded-use state and durable audit/outbox.
 - [x] External SharedOS audit export requires credential-free HTTPS, refuses redirects, bounds its bearer key, and live preflight validates the sink before handoff.
 - [x] Paid receipts carry a SharedOS trace id; free `sledgewire.trace` returns a sanitized signed trace proof with no global listing.
-- [x] Native SharedNet credit verification requires buyer, exact/fallback-safe payee evidence, integer amount, Arena Room, organizer memo `Sledgewire`, and a one-use transaction; exact request identity is separately locked by the signed quote + durable fingerprint.
+- [x] Native SharedNet credit verification requires buyer, exact/fallback-safe payee evidence, integer amount, Arena Room, organizer memo `Sledgewire`, and a one-use transaction; exact request identity is separately locked by the signed quote + durable fingerprint. Outstanding quotes expire after 4 hours, are capped at 256 per buyer / 20,000 globally, and are reclaimed after terminal paid outcomes.
 - [x] Request storage/grant identity is scoped by Room + buyer + request fingerprint, preventing cross-buyer request-label collisions.
-- [x] Concurrent duplicate ledger checks are coalesced; positive/negative lookups are bounded in-memory cached.
+- [x] Concurrent duplicate ledger checks are coalesced; positive/negative lookups are bounded in-memory cached; unique nonexistent transaction floods are circuit-broken at 16 misses per buyer / 64 globally per 60-second window.
 - [x] Exact completed retries are cached from the previously verified durable payment binding without requiring the transfer to remain in remote ledger history; legacy unattributed rows re-verify before buyer backfill; stale uncertain paid executions never blindly re-execute.
 - [x] Separate development and Arena Rooms.
-- [x] Arena cursor/message persistence, bounded retries, poison-message dead-letter.
+- [x] Arena cursor/message persistence, bounded retries, poison-message dead-letter, and 32-KiB Room-message rejection before parsing or service work.
 - [x] Watch compatibility validates active payee ownership, requires one reply event, and uses artifact fallback for oversized signed deliveries.
 - [x] SharedNet page bodies remain bounded while allowing legitimate Room pages above the generic API-response ceiling.
 - [x] SharedNet artifact URLs are required to remain HTTPS on the configured SharedNet origin.
 - [x] Unused legacy child-process SharedNet adapter removed from production tree.
 - [x] SharedNet secrets excluded from git and Docker context.
 - [x] SQLite close/reopen replay and two-connection one-use tests green.
-- [x] Automated test suite is enforced by the PR CI on the exact competition branch head.
-- [x] **25,000 / 25,000** MCP Smoke workflows at concurrency **192**, 0 failures; CI-fixture p95 **245 ms**, p99 **265 ms**.
-- [x] **25,000** Arena payment authorization/replay flows with **0 duplicate paid authorizations**.
+- [x] **287 / 287** automated tests passed on the v0.3.13 code/evidence run, 0 failures.
+- [x] **25,000 / 25,000** MCP Smoke workflows at concurrency **192**, 0 failures; CI-fixture p50 **225 ms**, p95 **240 ms**, p99 **249 ms**.
+- [x] **25,000** Arena paid claims + **25,000** cached retries with **0 duplicate paid authorizations**; 500 wrong-buyer attempts and 5,000 altered post-quote inputs rejected.
 - [x] Duplicate authorization storm: **122,500 authorization attempts**, 2,500 unique claims, 57,500 in-flight duplicates refused, 60,000 cached replays, 2,500 transaction-reuse attempts refused and only **2,500 ledger reads**.
-- [x] Handler-level execution storm on file-backed SQLite/WAL: **122,500 handler requests**, **2,500 actual service executions**, **0 duplicate service executions**, **0 missing executions**, 60,000 cached replays and 2,500 ledger reads.
+- [x] Handler-level execution storm on file-backed SQLite/WAL: **125,000 handler requests**, **2,500 actual service executions**, **0 duplicate service executions**, **0 missing executions**, 60,000 cached replays and 2,500 ledger reads.
 - [x] Mixed Arena judge/buyer UX storm: **50,000 requests** at concurrency **256**, **0 failures**, including 20,833 info answers, 16,667 quote responses, 4,167 signed payment quotes, 4,167 rejected invalid requests and 4,166 irrelevant messages; **0 ledger reads and 0 paid executions** on every pre-payment path.
 - [x] SharedOS deny / allow / maxUses / durable-audit check green.
 - [x] Static preflight green; hardened live preflight additionally requires production mode, disabled paid bypass, public modern MCP negotiation, signed selfcheck/payment route, authenticated seller identity/payee, cryptographically validated second-seat rehearsal evidence, and restart-replay evidence matching the current daemon boot. Optional external SharedOS proof is enforced only when explicitly enabled.
@@ -61,9 +61,12 @@
 - [x] `/arena.md`, `/arena.json` and `/.well-known/agent.json` expose explicit judge-first proof and buyer-first purchase paths.
 - [x] Public probe/live preflight reject stale deployments by checking exact runtime version plus current competition-card fields.
 - [x] One-seat invariant: `arena:join` records the exact joined Instance; production daemon and live preflight reject any authenticated Arena Instance that does not match that binding.
-- [x] Arena 2 budget controller snapshots live SharedNet sent totals and computes remaining spend against the organizer's 100-credit obligation; exact-spend planner prefers seller diversity and utility.
+- [x] Arena 2 budget controller snapshots live SharedNet sent totals exactly once, refuses silent rebasing, reports overspend, bounds offer files to 5,000 entries, and computes remaining spend against the organizer's 100-credit obligation; exact-spend planner prefers seller diversity and utility.
 - [x] Arena stats separate gross locally verified incoming claims from the live SharedNet purse and do not mislabel either as the hidden organizer ranking.
 - [x] Paid execution failures are signed, durably cached and replayed exactly without duplicate execution or another ledger read.
+- [x] Public selfcheck uses single-flight + a short result cache; public trace lookups are indexed; production HTTP caps active requests/connections and rejects declared bodies over 1 MiB from headers, drains/discards the payload, and preserves socket/process health.
+- [x] Mandatory `stress:arena-e2e`: 40,000 quote flood held at 20,000 global cap; 10,000 oversized Room messages caused 0 ledger reads/executions; 100 bogus txns caused 16 ledger scans + 84 circuit breaks; durable restart replay passed; 5,000-offer planner found exact 100-credit spend.
+- [x] Mandatory `stress:http`: real production process handled 64 concurrent signed selfchecks in 216 ms + 32 signed paid routes in 50 ms; Host/Origin guards, malformed JSON, correctly framed 1,000,001-byte rejection and post-stress health all passed.
 
 ## Submission P0
 

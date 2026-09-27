@@ -9,7 +9,7 @@ function boundedArg(raw,{name,min,max,defaultValue}){
 }
 const n=boundedArg(process.argv[2],{name:'requests',min:100,max:500_000,defaultValue:50_000});
 const concurrency=boundedArg(process.argv[3],{name:'concurrency',min:1,max:512,defaultValue:256});
-const store=new ArenaStore(':memory:'),kp=generateSigningKeypair();
+const store=new ArenaStore(':memory:'),kp=generateSigningKeypair(),seat=i=>'i_'+String(i%64).padStart(10,'0');
 let executions=0,ledgerReads=0,failures=0,handled=0,info=0,quotes=0,paymentQuotes=0,nulls=0,invalids=0;
 const ledger={async get(){ledgerReads++;return null;}};
 const handle=createArenaHandler({
@@ -34,7 +34,7 @@ async function one(i){
     case 10:content='@sledgewire verify a receipt trace';check=r=>r?.type==='sledgewire.info.v1'&&r.kind==='verification';break;
     default:content='@sledgewire compare https://a.example/mcp https://b.example/mcp';check=r=>r?.type==='sledgewire.quote.response.v1'&&r.recommended_service==='sledgewire.fleet'&&r.request_ready===true;break;
   }
-  const r=await handle({sender_instance_id:'i_ZYXWVUTSRQ',content});
+  const r=await handle({sender_instance_id:seat(Math.floor(i/12)),content});
   handled++;
   if(!check(r))failures++;
   if(r?.type==='sledgewire.info.v1')info++;

@@ -1,5 +1,6 @@
 import catalog from '../../catalog.json' with {type:'json'};
 import {VERSION} from '../version.mjs';
+import {PAYMENT_QUOTE_TTL_MS} from '../store/arena-store.mjs';
 
 export function arenaCard(baseUrl){
   const base=String(baseUrl).replace(/\/$/,'');
@@ -38,6 +39,7 @@ export function arenaCard(baseUrl){
     payment:{
       native_sharednet_memo:'Sledgewire',
       memo_policy:'Trial Zero organizer product/team-name memo',
+      quote_ttl_seconds:Math.floor(PAYMENT_QUOTE_TTL_MS/1000),
       request_binding:'signed buyer-bound quote + durable exact request fingerprint',
       note:'The public memo is intentionally not the request fingerprint; altered paid resends are rejected against the stored signed-quote binding before ledger execution.'
     },

@@ -11,9 +11,9 @@ const started=Date.now();let claimed=0,cached=0,rejected=0;
 for(let i=0;i<n;i++){const req={roomId:room,buyerSeat:buyer,requestId:`req-${i}`,service,input:{endpoint:`https://example.com/${i}`},txnId:`txn_${i}`};const q=gate.issueQuote(req);if(q.reason!=='payment_required'||q.memo!=='Sledgewire')throw new Error(`quote_failed_${i}:${q.reason}`);const a=await gate.authorize(req);if(!a.ok||a.replay)throw new Error(`claim_failed_${i}:${a.reason}`);claimed++;store.complete(a.storageKey,a.fingerprint,{ok:true,i});}
 for(let i=0;i<n;i++){const req={roomId:room,buyerSeat:buyer,requestId:`req-${i}`,service,input:{endpoint:`https://example.com/${i}`},txnId:`txn_${i}`};const a=await gate.authorize(req);if(!a.ok||!a.replay||a.cached.i!==i)throw new Error(`replay_failed_${i}`);cached++;}
 for(let i=0;i<Math.min(n,500);i++){const req={roomId:room,buyerSeat:'i_ZYXWVUTSRQ',requestId:`req-${i}`,service,input:{endpoint:`https://example.com/${i}`},txnId:`txn_${i}`};const a=await gate.authorize(req);if(a.ok||a.reason!=='wrong_buyer')throw new Error(`wrong_buyer_not_rejected_${i}`);rejected++;}
-let substitutionRejected=0;const beforeSubstitutionReads=ledgerReads;
+let substitutionRejected=0;const beforeSubstitutionReads=ledgerReads,attackSeat=i=>'i_'+String(i%64).padStart(10,'0');
 for(let i=0;i<Math.min(n,5000);i++){
-  const original={roomId:room,buyerSeat:buyer,requestId:`bind-${i}`,service,input:{endpoint:`https://quoted.example.com/${i}`},txnId:`txn_bind_${i}`};
+  const original={roomId:room,buyerSeat:attackSeat(i),requestId:`bind-${i}`,service,input:{endpoint:`https://quoted.example.com/${i}`},txnId:`txn_bind_${i}`};
   const q=gate.issueQuote(original);if(q.reason!=='payment_required'||q.memo!=='Sledgewire')throw new Error(`binding_quote_failed_${i}`);
   const altered={...original,input:{endpoint:`https://altered.example.com/${i}`}};
   const bad=await gate.authorize(altered);

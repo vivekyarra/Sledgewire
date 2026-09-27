@@ -43,7 +43,8 @@ which performs the same join and starts the public + daemon supervisor. Do not r
 4. `npm run public:probe -- https://PUBLIC-HOST --arena` is green.
 5. From a different buyer seat, `npm run arena:rehearse` completes one genuine Smoke purchase.
 6. Restart daemon with DB/key preserved; `npm run arena:replay-after-restart` proves identical replay with zero second payment.
-7. `npm run preflight -- --live` is green.
+7. `npm run stress:arena-e2e -- 40000 10000` and `npm run stress:http -- 64 32` are green on the exact deployed release branch.
+8. `npm run preflight -- --live` is green.
 
 ## Arena 1
 
@@ -65,15 +66,16 @@ The organizer requires all 100 event credits to be spent in the one-hour round. 
 
     npm run arena:budget -- --offers offers.json
 
-Do not infer progress from current wallet balance alone because sales increase the purse. The budget controller uses cumulative SharedNet `sent` relative to the Arena baseline.
+Do not infer progress from current wallet balance alone because sales increase the purse. The budget controller uses cumulative SharedNet `sent` relative to the Arena baseline. Re-running `--init` must report `already_initialized` rather than rebasing. Stop obligation-driven spending if `overspent_credits` is positive.
 
 Seller payment contract:
 
 - native memo: `Sledgewire`;
-- signed quote contains the exact request fingerprint;
+- signed quote contains the exact request fingerprint and a 4-hour expiry;
 - durable quote binding rejects post-quote request changes;
 - valid payment -> SharedOS -> signed delivery;
 - exact retry -> cached result, no second execution;
+- `payment_verification_rate_limited` -> wait `retry_after_ms`, then resend the same request/txn; never pay again;
 - no automatic refunds.
 
 No live scoreboard exists; optimize useful sales and finish the outgoing 100-credit obligation independently.

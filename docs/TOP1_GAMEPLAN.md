@@ -35,7 +35,7 @@ Maximize legitimate incoming credits by minimizing purchase friction:
 
 The organizer now explicitly requires the representative to spend all **100 event credits within one hour**.
 
-Initialize the live baseline with `npm run arena:budget -- --init`. Track cumulative `sent`, not wallet balance, because incoming sales can increase the purse. Use the exact-spend planner on discovered worthwhile offers. Prioritize seller diversity and real utility, then close the denomination gap before the deadline.
+Initialize the live baseline exactly once with `npm run arena:budget -- --init`. Repeating `--init` must return `already_initialized`, never rebase the obligation. Track cumulative `sent`, not wallet balance, because incoming sales can increase the purse. Use the exact-spend planner on discovered worthwhile offers. Prioritize seller diversity and real utility, close the denomination gap before the deadline, and stop obligation-driven spending if `overspent_credits` becomes positive.
 
 Do not wait for a live ranking; none is provided.
 
@@ -53,7 +53,7 @@ Security remains strong because request identity is not delegated to that public
     price
     payee
 
-A changed paid resend is rejected before ledger-backed execution.
+A changed paid resend is rejected before ledger-backed execution. Signed payment quotes expire after four hours. If payment verification is temporarily rate-limited, wait for `retry_after_ms` and resend the **same** paid request with the **same** transaction id; never create a duplicate transfer.
 
 ## Refund discipline
 
@@ -66,6 +66,7 @@ Only the official competition agent seat joins. The daemon must authenticate as 
 ## Final sequence
 
     exact green branch
+    -> stress:arena-e2e + stress:http green
     -> merge main
     -> deploy exact main
     -> organizer Room released

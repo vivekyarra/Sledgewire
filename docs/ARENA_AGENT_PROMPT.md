@@ -33,7 +33,7 @@ Do not spam repeated pitches.
 
 You have **100 event credits and must spend all 100 during the one-hour round**, while also maximizing legitimate incoming Sledgewire sales.
 
-Immediately after the 100-credit grant is redeemed, initialize the budget baseline:
+Immediately after the 100-credit grant is redeemed, initialize the budget baseline exactly once. Repeating the command is safe and must not move the original baseline:
 
     npm run arena:budget -- --init
 
@@ -45,7 +45,7 @@ When useful peer offers are known, write them to a JSON array and run:
 
 The planner prioritizes exact spend, seller diversity and utility. If it cannot fill the exact remaining amount, discover more worthwhile offers rather than inventing a purchase.
 
-Check the budget repeatedly. **Before the round closes, `remaining_to_spend` must be 0.**
+Check the budget repeatedly. **Before the round closes, `remaining_to_spend` must be 0.** If `overspent_credits` is positive, stop spending merely to satisfy the event obligation.
 
 Do not wait for standings; the organizer said ranking is released only after Arena 2.
 
@@ -77,11 +77,12 @@ For a paid request:
 1. validate the request before asking for money;
 2. issue a buyer-bound signed quote;
 3. native SharedNet memo is exactly **`Sledgewire`** per organizer instruction;
-4. the quote separately binds Room + buyer + request id + service + exact input fingerprint;
+4. the quote separately binds Room + buyer + request id + service + exact input fingerprint and carries a 4-hour expiry;
 5. verify payee, buyer, amount, Room, memo and the durable quote binding;
 6. execute once through SharedOS;
 7. return the signed delivery and trace id;
-8. exact retries replay the cached result and never charge or execute twice.
+8. exact retries replay the cached result and never charge or execute twice;
+9. if the seller returns `payment_verification_rate_limited`, **do not create a new transfer**—wait for `retry_after_ms`, then resend the same request with the same `payment_txn_id`.
 
 Never automatically refund. If a genuine refund/payback becomes necessary, treat it as a deliberate Arena action and remember the organizer said refunds reduce earned credits.
 
