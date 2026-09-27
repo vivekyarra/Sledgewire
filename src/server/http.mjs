@@ -22,6 +22,7 @@ const allowedOrigins=new Set([new URL(base).origin,...String(process.env.SLEDGEW
 const allowedHosts=allowedHostSet(base,process.env.SLEDGEWIRE_ALLOWED_HOSTS??'');
 
 const server=http.createServer(async(req,res)=>{
+  try{
   res.setHeader('x-content-type-options','nosniff');res.setHeader('referrer-policy','no-referrer');res.setHeader('cache-control','no-store');
   if(req.method==='GET'&&req.url==='/health'){
     const daemon=readArenaDaemonReadiness(traceStore,arenaRoomId);
@@ -60,7 +61,18 @@ const server=http.createServer(async(req,res)=>{
     const out=await handleRpc(msg,{publicArena,publicBaseUrl:base,arenaRoomId,traceStore});if(out===null){res.statusCode=202;return res.end();}
     return json(res,200,out);
   }finally{active--;}
+  }catch(e){
+    if(isClientDisconnect(e))return;
+    console.error(`http-request:${String(e?.message??e).slice(0,500)}`);
+    if(!res.headersSent&&!res.writableEnded&&!res.destroyed)return json(res,500,{error:'internal_error'});
+    try{res.destroy();}catch{}
+  }
 });
 server.requestTimeout=requestTimeoutMs;server.headersTimeout=Math.min(headersTimeoutMs,requestTimeoutMs);server.keepAliveTimeout=3_000;server.maxConnections=maxConnections;server.maxRequestsPerSocket=100;server.maxHeadersCount=64;server.setTimeout(socketIdleMs,socket=>socket.destroy());
 server.listen(port,()=>console.error(`sledgewire http listening on ${port}`));
+function isClientDisconnect(error){
+  const code=String(error?.code??'');
+  const message=String(error?.message??'').toLowerCase();
+  return code==='ECONNRESET'||code==='ECONNABORTED'||code==='ERR_STREAM_PREMATURE_CLOSE'||message==='aborted';
+}
 function json(res,status,value){res.statusCode=status;res.setHeader('content-type','application/json');res.end(JSON.stringify(value));}
