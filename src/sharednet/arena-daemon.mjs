@@ -10,6 +10,7 @@ import catalog from '../../catalog.json' with {type:'json'};
 import {announceArenaOnce} from './announcement.mjs';
 import {boundedInteger,publicBaseOrigin} from '../ops/config.mjs';
 import {VERSION} from '../version.mjs';
+import {readExpectedArenaSeat} from './seat-binding.mjs';
 
 const room=process.env.SHAREDNET_ARENA_ROOM_ID??'',payee=process.env.SHAREDNET_PAYEE_ADDRESS??'';
 if(!ROOM.test(room)||!ADDRESS.test(payee))throw new Error('arena_environment_incomplete');
@@ -17,6 +18,7 @@ const publicBaseUrl=publicBaseOrigin(process.env.PUBLIC_BASE_URL??'',{production
 const dbPath=process.env.SLEDGEWIRE_DB??'.sledgewire/arena.db';fs.mkdirSync(path.dirname(path.resolve(dbPath)),{recursive:true});
 const store=new ArenaStore(dbPath),api=new SharedNetApi(),signing=loadSigningMaterial({production:true}),identity=await api.current();
 const selfSeat=identity?.instance?.id??identity?.instance_id;if(!SEAT.test(selfSeat??''))throw new Error('sharednet_identity_missing_instance');
+const expectedSeat=readExpectedArenaSeat({required:process.env.NODE_ENV==='production'});if(expectedSeat&&expectedSeat!==selfSeat)throw new Error('arena_single_seat_identity_mismatch');
 if(!payeeBelongsToIdentity(payee,identity))throw new Error('configured_payee_not_owned_by_current_sharednet_identity');
 await api.join(room);
 const announceEnabled=process.env.SLEDGEWIRE_ARENA_ANNOUNCE!=='0';
