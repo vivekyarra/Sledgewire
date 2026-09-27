@@ -26,11 +26,17 @@ test('v0.3.13 inflight rows migrate conservatively as execution-may-have-started
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'sw-migrate-')),file=path.join(dir,'arena.db');
   try{
     const db=new DatabaseSync(file);
-    db.exec("CREATE TABLE requests(request_id TEXT PRIMARY KEY,txn_id TEXT NOT NULL UNIQUE,fingerprint TEXT NOT NULL,service TEXT NOT NULL,buyer_seat TEXT,status TEXT NOT NULL,response_json TEXT,error_json TEXT,started_at TEXT NOT NULL,completed_at TEXT)");
+    db.exec("CREATE TABLE requests(request_id TEXT PRIMARY KEY,txn_id TEXT NOT NULL UNIQUE,fingerprint TEXT NOT NULL,service TEXT NOT NULL,buyer_seat TEXT,status TEXT NOT NULL,response_json TEXT,error_json TEXT,started_at TEXT NOT NULL,completed_at TEXT); CREATE TABLE room_messages(message_id TEXT PRIMARY KEY,status TEXT NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,error TEXT,processed_at TEXT NOT NULL); CREATE TABLE audit_outbox(event_id TEXT PRIMARY KEY,event_json TEXT NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,sent_at TEXT)");
     db.prepare("INSERT INTO requests(request_id,txn_id,fingerprint,service,buyer_seat,status,started_at) VALUES(?,?,?,?,?,'inflight',?)").run('rqk_old','txn_OLD0000001','fp','sledgewire.smoke','i_OLD0000001','2026-09-27T00:00:00.000Z');
+    db.prepare("INSERT INTO room_messages(message_id,status,attempts,error,processed_at) VALUES('msg_OLD0000001','completed',1,NULL,'2026-09-27T00:00:00.000Z')").run();
+    db.prepare("INSERT INTO audit_outbox(event_id,event_json,attempts,sent_at) VALUES('evt-old','{}',0,'2026-09-27T00:00:01.000Z')").run();
     db.close();
     const store=new ArenaStore(file),row=store.db.prepare('SELECT started_at,execution_started_at FROM requests WHERE request_id=?').get('rqk_old');
-    assert.equal(row.execution_started_at,row.started_at);store.db.close();
+    assert.equal(row.execution_started_at,row.started_at);
+    assert.ok(store.db.prepare("PRAGMA table_info(room_messages)").all().some(x=>x.name==='sequence'));
+    assert.equal(store.db.prepare('SELECT COUNT(*) n FROM audit_outbox').get().n,0);
+    assert.equal(store.pruneRoomMessages({throughSequence:10,retainSequences:0}),1);
+    store.db.close();
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 
