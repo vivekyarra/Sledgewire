@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {ArenaStore,PAYMENT_QUOTE_MAX_GLOBAL,PAYMENT_QUOTE_MAX_PER_BUYER} from '../src/store/arena-store.mjs';
-import {PaymentGate} from '../src/core/payment-gate.mjs';
+import {PaymentGate,requestStorageKey} from '../src/core/payment-gate.mjs';
 import {createArenaHandler} from '../src/sharednet/handler.mjs';
 import {planArenaSpend,resolveArenaBudgetState,eventBudgetStatus} from '../src/sharednet/spend-plan.mjs';
 import {generateSigningKeypair} from '../src/receipts/receipt.mjs';
@@ -34,8 +34,8 @@ if(!store.getPaymentQuote(requestStorageKey({roomId:room,buyerSeat:paidBuyer,req
 
 let missingLedgerReads=0,rateLimited=0;
 const missGate=new PaymentGate({ledger:{async get(){missingLedgerReads++;return null;}},store,prices,payee,ledgerMissPerBuyer:16,ledgerMissGlobal:64,ledgerMissWindowMs:60_000});
-const missReq={roomId:room,buyerSeat:seat(999),requestId:'missing-ledger-storm',service,input:{endpoint:'https://missing.example/mcp'},txnId:null};
-const missQuote=missGate.issueQuote(missReq);if(missQuote.reason!=='payment_required')throw new Error('missing_storm_quote_failed');
+const missReq={roomId:room,buyerSeat:seat(1),requestId:'flood-1',service,input:{endpoint:'https://target.example/mcp?case=1'},txnId:null};
+if(!store.getPaymentQuote(requestStorageKey(missReq)))throw new Error('missing_storm_existing_quote_missing');
 for(let i=0;i<100;i++){
   const out=await missGate.authorize({...missReq,txnId:`txn_${String(i).padStart(10,'0')}`});
   if(out.reason==='payment_verification_rate_limited')rateLimited++;
