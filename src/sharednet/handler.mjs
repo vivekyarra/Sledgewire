@@ -7,6 +7,7 @@ import {signReceipt} from '../receipts/receipt.mjs';
 import {SEAT} from './api.mjs';
 
 const REQUEST_ID=/^[A-Za-z0-9][A-Za-z0-9._-]{2,95}$/;
+const ROOM_MESSAGE_MAX_BYTES=32_768;
 const TOOL_TOKEN=/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
 function extractHttpsUrls(text){
@@ -70,7 +71,9 @@ export function createArenaHandler({store,ledger,room,payee,signing,publicBaseUr
         request_binding:'signed_quote+durable_fingerprint.v1',
         room_id:room,
         buyer_seat:buyerSeat,
-        issued_at:new Date().toISOString(),
+        issued_at:q.quote_issued_at??new Date().toISOString(),
+        expires_at:q.quote_expires_at??null,
+        quote_ttl_seconds:14_400,
         quickstart_url:quickstart,
         next_action:{type:'sharednet.credit.transfer',amount_credits:q.price,payee,room_id:room,memo:q.memo,after_payment:'resend identical request with payment_txn_id'},
         verification:{receipt_tool:'sledgewire.verify',trace_tool:'sledgewire.trace',exact_retry_no_reexecution:true,request_fingerprint:q.fingerprint},
@@ -113,10 +116,12 @@ export function createArenaHandler({store,ledger,room,payee,signing,publicBaseUr
   }
 
   return async function handle(message){
+    const content=typeof message?.content==='string'?message.content:'';
+    if(Buffer.byteLength(content,'utf8')>ROOM_MESSAGE_MAX_BYTES){store.incrementCounter('arena.reject.message_too_large');return null;}
     const buyerSeat=message?.sender_instance_id??message?.sender?.instance_id??message?.sender?.member_id;
     if(!SEAT.test(buyerSeat??''))return null;
 
-    let req=null;try{req=JSON.parse(message.content);}catch{}
+    let req=null;try{req=JSON.parse(content);}catch{}
     if(req?.type==='sledgewire.service.request.v1')return serve(req,buyerSeat);
     if(req?.type==='sledgewire.quote.request.v1'){
       store.incrementCounter('arena.quote.typed');
@@ -124,7 +129,7 @@ export function createArenaHandler({store,ledger,room,payee,signing,publicBaseUr
       catch(e){return {type:'sledgewire.quote.response.v1',request_id:req.request_id??null,state:'FAILED',reason:String(e.message||e)};}
     }
 
-    const text=String(message.content??'').trim();
+    const text=content.trim();
     if(!/(^|\s)@?sledgewire\b/i.test(text))return null;
 
     const urls=extractHttpsUrls(text),naturalQuote=compactQuoteFromText(text,urls);
