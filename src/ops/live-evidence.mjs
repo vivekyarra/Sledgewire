@@ -31,7 +31,7 @@ export function validateLiveRehearsalEvidence(evidence,{roomId,payee,publicBaseU
   if(quote?.type!=='sledgewire.payment_required.v1'||quote.request_id!==evidence.request_id||quote.service!==evidence.service)return fail('live_rehearsal_quote_request_mismatch');
   if(quote.room_id!==roomId||quote.payee!==payee||quote.buyer_seat!==evidence.buyer_seat)return fail('live_rehearsal_quote_scope_mismatch');
   const bound={roomId,buyerSeat:evidence.buyer_seat,requestId:evidence.request_id,service:evidence.service,input:{endpoint:evidence.target_endpoint}},fingerprint=requestFingerprint(bound);
-  if(Number(quote.price_credits)!==Number(evidence.price_credits)||quote.request_fingerprint!==fingerprint||quote.memo_version!=='sledgewire.payment.v2'||quote.memo!==paymentMemo(bound))return fail('live_rehearsal_quote_payment_mismatch');
+  if(Number(quote.price_credits)!==Number(evidence.price_credits)||quote.request_fingerprint!==fingerprint||quote.memo_version!=='trial-zero-product-name.v1'||quote.request_binding!=='signed_quote+durable_fingerprint.v1'||quote.memo!==paymentMemo())return fail('live_rehearsal_quote_payment_mismatch');
   if(quote.next_action?.memo!==quote.memo||quote.next_action?.payee!==payee||Number(quote.next_action?.amount_credits)!==Number(evidence.price_credits))return fail('live_rehearsal_quote_next_action_mismatch');
   const receiptCheck=verifyReceipt(evidence.receipt,publicKeyPem);if(!receiptCheck.ok)return fail(`live_rehearsal_receipt_${receiptCheck.reason}`);
   if(evidence.receipt?.buyer_seat!==evidence.buyer_seat)return fail('live_rehearsal_receipt_buyer_mismatch');
