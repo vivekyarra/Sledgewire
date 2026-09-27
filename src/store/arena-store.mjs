@@ -62,13 +62,9 @@ export class ArenaStore{
       const cutoff=new Date(now-PAYMENT_QUOTE_TTL_MS).toISOString();
       this.db.prepare('DELETE FROM payment_quotes WHERE issued_at<?').run(cutoff);
       const buyerCount=Number(this.db.prepare('SELECT COUNT(*) n FROM payment_quotes WHERE buyer_seat=?').get(buyerSeat)?.n??0);
-      if(buyerCount>=PAYMENT_QUOTE_MAX_PER_BUYER){
-        this.db.prepare('DELETE FROM payment_quotes WHERE request_id IN (SELECT request_id FROM payment_quotes WHERE buyer_seat=? ORDER BY last_seen_at ASC LIMIT ?)').run(buyerSeat,buyerCount-PAYMENT_QUOTE_MAX_PER_BUYER+1);
-      }
+      if(buyerCount>=PAYMENT_QUOTE_MAX_PER_BUYER){this.db.exec('COMMIT');return {status:'capacity',scope:'buyer',retry_after_ms:PAYMENT_QUOTE_TTL_MS};}
       const globalCount=Number(this.db.prepare('SELECT COUNT(*) n FROM payment_quotes').get()?.n??0);
-      if(globalCount>=PAYMENT_QUOTE_MAX_GLOBAL){
-        this.db.prepare('DELETE FROM payment_quotes WHERE request_id IN (SELECT request_id FROM payment_quotes ORDER BY last_seen_at ASC LIMIT ?)').run(globalCount-PAYMENT_QUOTE_MAX_GLOBAL+1);
-      }
+      if(globalCount>=PAYMENT_QUOTE_MAX_GLOBAL){this.db.exec('COMMIT');return {status:'capacity',scope:'global',retry_after_ms:PAYMENT_QUOTE_TTL_MS};}
       this.db.prepare('INSERT INTO payment_quotes(request_id,fingerprint,service,buyer_seat,price_credits,memo,issued_at,last_seen_at) VALUES(?,?,?,?,?,?,?,?)').run(requestId,fingerprint,service,buyerSeat,Number(price),memo,nowIso,nowIso);
       this.db.exec('COMMIT');return {status:'bound',quote:{version:2,request_id:requestId,fingerprint,service,buyer_seat:buyerSeat,price_credits:Number(price),memo,issued_at:nowIso,expires_at:expiresAt}};
     }catch(e){this.db.exec('ROLLBACK');throw e;}
