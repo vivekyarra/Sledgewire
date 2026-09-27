@@ -57,6 +57,9 @@ try{
   await waitHealth(port,child);
   for(let i=0;i<partialHeaders;i++)slow.push(await openSlow(port,'headers'));
   for(let i=0;i<partialBodies;i++)slow.push(await openSlow(port,'body'));
+  await new Promise(r=>setTimeout(r,50));
+  const underAttack=JSON.parse((await request(port,{path:'/health'})).text);
+  if(Number(underAttack.body_readers)<partialBodies||Number(underAttack.active_requests)!==0)throw new Error(`slow_body_isolation_failed:readers=${underAttack.body_readers}:active=${underAttack.active_requests}`);
 
   const t=Date.now();
   const legit=await Promise.all(Array.from({length:legitN},async(_,i)=>{
@@ -73,7 +76,7 @@ try{
     new Promise((_,reject)=>setTimeout(()=>reject(new Error('slow_connections_not_reclaimed')),4000))
   ]);
   const final=await request(port,{path:'/health'});if(final.status!==200)throw new Error('health_failed_after_slow_client_attack');
-  console.log(JSON.stringify({type:'sledgewire.http.slow-client-stress.v1',partial_header_sockets:partialHeaders,partial_body_sockets:partialBodies,legitimate_selfchecks:legitN,legitimate_selfcheck_ms:legitMs,stalled_sockets_reclaimed:slow.length,healthy_after_attack:true,total_ms:Date.now()-started},null,2));
+  console.log(JSON.stringify({type:'sledgewire.http.slow-client-stress.v1',partial_header_sockets:partialHeaders,partial_body_sockets:partialBodies,legitimate_selfchecks:legitN,legitimate_selfcheck_ms:legitMs,stalled_sockets_reclaimed:slow.length,body_readers_observed_under_attack:Number(underAttack.body_readers),rpc_slots_occupied_by_stalled_bodies:Number(underAttack.active_requests),healthy_after_attack:true,total_ms:Date.now()-started},null,2));
 }finally{
   for(const x of slow)try{x.socket.destroy();}catch{}
   child.kill('SIGTERM');await new Promise(resolve=>{if(child.exitCode!==null)return resolve();child.once('exit',resolve);setTimeout(()=>{child.kill('SIGKILL');resolve();},3000).unref();});
