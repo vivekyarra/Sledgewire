@@ -27,9 +27,8 @@ export class PaymentGate{
     const now=Date.now(),windowMs=this.ledgerMissWindowMs;
     if(now-this.ledgerMissesGlobal.startedAt>=windowMs)this.ledgerMissesGlobal={startedAt:now,count:0};
     const buyer=this.ledgerMissesByBuyer.get(buyerSeat);
-    if(!buyer||now-buyer.startedAt>=windowMs){this.ledgerMissesByBuyer.set(buyerSeat,{startedAt:now,count:0});}
-    const current=this.ledgerMissesByBuyer.get(buyerSeat);
-    return current.count<this.ledgerMissPerBuyer&&this.ledgerMissesGlobal.count<this.ledgerMissGlobal;
+    const buyerCount=buyer&&now-buyer.startedAt<windowMs?buyer.count:0;
+    return buyerCount<this.ledgerMissPerBuyer&&this.ledgerMissesGlobal.count<this.ledgerMissGlobal;
   }
   recordLedgerMiss(buyerSeat){
     const now=Date.now(),windowMs=this.ledgerMissWindowMs;
