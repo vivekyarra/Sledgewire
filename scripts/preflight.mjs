@@ -9,6 +9,7 @@ import {validateLiveRehearsalEvidence,validateRestartReplayEvidence} from '../sr
 import {publicBaseOrigin} from '../src/ops/config.mjs';
 import {auditSinkUrl} from '../src/ops/audit-sink.mjs';
 import {VERSION} from '../src/version.mjs';
+import {readExpectedArenaSeat} from '../src/sharednet/seat-binding.mjs';
 
 const live=process.argv.includes('--live'),submission=process.argv.includes('--submission'),checks=[];
 const add=(name,ok,detail='')=>checks.push({name,ok,detail});
@@ -88,10 +89,12 @@ if(live){
   if(ROOM.test(buildRoom))add('build_and_arena_rooms_are_distinct',buildRoom!==room,`build=${buildRoom};arena=${room}`);
   add('sharednet_payee',ADDRESS.test(payee),payee||'missing');
   add('sharednet_member_or_instance_token',INSTANCE_TOKEN.test(token),'present-but-redacted');
+  let expectedSeat=null;try{expectedSeat=readExpectedArenaSeat({required:true});add('single_arena_agent_seat',true,expectedSeat);}catch(e){add('single_arena_agent_seat',false,String(e.message||e));}
   if(INSTANCE_TOKEN.test(token)&&ROOM.test(room)){
     try{
-      const api=new SharedNetApi({token}),identity=await api.current();
-      add('sharednet_authenticated',Boolean(identity?.instance?.id??identity?.instance_id),'current Instance resolved');
+      const api=new SharedNetApi({token}),identity=await api.current(),identitySeat=identity?.instance?.id??identity?.instance_id??null;
+      add('sharednet_authenticated',Boolean(identitySeat),'current Instance resolved');
+      add('arena_identity_matches_bound_seat',Boolean(expectedSeat)&&identitySeat===expectedSeat,`current=${identitySeat??'missing'};expected=${expectedSeat??'missing'}`);
       add('payee_owned_by_current_identity',payeeBelongsToIdentity(payee,identity),'must be current Principal/Agent/Instance');
       await api.join(room);
       const detail=await api.request(`/api/v1/rooms/${room}`);
