@@ -4,7 +4,7 @@
 
 Sledgewire is a permissioned adversarial execution rail for agent services. It discovers a real MCP surface, attacks bounded failure modes, repairs only evidence-backed structural mismatches, independently validates repair, executes paid work through SharedOS authority, and returns a signed receipt another agent can verify.
 
-Trial Zero v0.3.11 is built around the organizer's actual competition shape: one product link, agents operating both Arena rounds without human intervention, a required SharedNet development Room, a separate organizer Arena Room, and Arena 2 ranking by valid credits earned. The Arena surface is judge-first and buyer-first: free signed proof, deterministic service selection, a 3-credit first paid check, and independently verifiable delivery evidence.
+Trial Zero v0.3.12 is aligned to the organizer's latest Arena instructions: one product link, one official Arena agent seat, a separate development Room, a last-minute Arena join command, a 100-credit one-hour spend obligation in Arena 2, and refund-sensitive earned credits. The Arena surface is judge-first and buyer-first: free signed proof, deterministic service selection, a 3-credit first paid check, and independently verifiable delivery evidence.
 
 ## Fastest judge path
 
@@ -126,13 +126,19 @@ Current SharedNet supports an invite-only guest flow with no account/API key req
     export SHAREDNET_MEMBER_TOKEN_FILE=/run/secrets/sledgewire-sharednet-seat
     npm run arena:join
 
-The returned seat token is written mode 0600 and never printed. Remove the invite token from the environment afterward.
+The returned seat token and the exact joined Instance/seat id are written mode 0600 and never expose the token. Remove the invite token from the environment afterward. Production daemon startup and live preflight require that authenticated Instance to match the recorded seat binding.
 
 ## Single-container PaaS mode
 
 For platforms where a persistent volume belongs to one service, run the public server and Arena daemon under the fail-fast supervisor:
 
     npm run arena:all
+
+When the organizer releases a fresh Room/invite and the service is not already joined, the cold-start convenience path is:
+
+    npm run arena:activate
+
+This joins once, records the official seat, then launches the supervised seller. Do not retain the invite token for normal restarts.
 
 Both child processes still use the same durable database; if either child dies, the whole service exits so the platform can restart a complete seller. Railway deployment is config-as-code through the checked-in `railway.json`; see `docs/RAILWAY_DEPLOYMENT.md`. The two-container Compose topology remains the stronger isolation model when a normal Docker host is available.
 
@@ -163,7 +169,7 @@ Large signed deliveries are uploaded as Room-addressed SharedNet artifacts and r
 - Active selected-tool probes require explicit caller safety attestation; Assay's synthetic unknown-tool mutation additionally requires `probe.authorizeUnknownToolProbe=true`. Without that flag the check is reported as not tested. Untrusted target annotations never authorize execution by themselves.
 - Destructive probes/invocations require separate explicit destructive authority.
 - Repair never invents missing semantic values.
-- Payment v2 binds the native SharedNet memo and signed Room quote to the exact Arena Room, buyer Instance, request id, service, and canonical input fingerprint, plus exact payee and integer amount. Changing the endpoint/input after quote invalidates that payment for the altered request; request state is separately scoped by Room + buyer + request id.
+- Trial Zero native payments use memo `Sledgewire`, exactly matching the organizer's product/team-name instruction. Exact request security is separate: the signed pre-payment quote plus durable seller record binds Arena Room, buyer Instance, request id, service, canonical input fingerprint, exact payee and price. A changed paid resend is rejected before ledger-backed execution.
 - Exact completed retries are served from the previously verified durable binding, so replay does not depend on the transfer remaining inside a bounded remote ledger-history window; duplicate paid execution is blocked.
 - If execution fails after a valid payment, the failure is signed, cached, and replayed exactly rather than becoming an unverifiable dead end.
 - A crash leaving paid execution outcome uncertain is never blindly retried.
@@ -198,6 +204,10 @@ Large signed deliveries are uploaded as Room-addressed SharedNet artifacts and r
     # final autonomous-competition gate:
     npm run preflight -- --live
     npm run arena:stats
+    # after the 100-credit Arena grant is redeemed:
+    npm run arena:budget -- --init
+    # repeatedly plan/verify the required one-hour spend:
+    npm run arena:budget -- --offers offers.json
 
 Before submission:
 
