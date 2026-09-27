@@ -15,18 +15,22 @@ const seat=i=>'i_'+i.toString(36).toUpperCase().padStart(10,'0').slice(-10);
 const dir=fs.mkdtempSync(path.join(os.tmpdir(),'sledgewire-e2e-chaos-')),file=path.join(dir,'arena.db');
 const store=new ArenaStore(file),prices={[service]:price};
 let ledgerReads=0;
-const paidIndex=quoteFlood-1,paidBuyer=seat(paidIndex%256),paidRequestId=`flood-${paidIndex}`,paidTxn='txn_CHAOS00001';
+const paidIndex=0,paidBuyer=seat(0),paidRequestId='flood-0',paidTxn='txn_CHAOS00001';
 const ledger={async get(id){ledgerReads++;if(id!==paidTxn)return null;return {id,buyer_instance_id:paidBuyer,addressed_to:payee,payee_ok:true,amount:3,room_id:room,memo:'Sledgewire'};}};
 const gate=new PaymentGate({ledger,store,prices,payee});
 
-const t0=Date.now();
+const t0=Date.now();let issuedQuotes=0,quoteCapacityRejected=0;
 for(let i=0;i<quoteFlood;i++){
   const req={roomId:room,buyerSeat:seat(i%256),requestId:`flood-${i}`,service,input:{endpoint:`https://target.example/mcp?case=${i}`},txnId:null};
   const q=gate.issueQuote(req);
+  if(q.reason==='payment_quote_capacity_reached'){quoteCapacityRejected++;continue;}
   if(q.reason!=='payment_required'||q.memo!=='Sledgewire'||!q.quote_expires_at)throw new Error(`quote_failure:${i}:${q.reason}`);
+  issuedQuotes++;
 }
 const quoteMs=Date.now()-t0,quoteStats=store.paymentQuoteStats();
 if(quoteStats.total>PAYMENT_QUOTE_MAX_GLOBAL||quoteStats.max_per_buyer>PAYMENT_QUOTE_MAX_PER_BUYER)throw new Error(`quote_bounds_failed:${JSON.stringify(quoteStats)}`);
+if(issuedQuotes!==quoteStats.total||quoteCapacityRejected!==quoteFlood-issuedQuotes)throw new Error('quote_capacity_accounting_failed');
+if(!store.getPaymentQuote(requestStorageKey({roomId:room,buyerSeat:paidBuyer,requestId:paidRequestId,service,input:{endpoint:'https://target.example/mcp?case=0'}})))throw new Error('oldest_signed_quote_evicted');
 
 let missingLedgerReads=0,rateLimited=0;
 const missGate=new PaymentGate({ledger:{async get(){missingLedgerReads++;return null;}},store,prices,payee,ledgerMissPerBuyer:16,ledgerMissGlobal:64,ledgerMissWindowMs:60_000});
@@ -75,6 +79,8 @@ const result={
   type:'sledgewire.arena.e2e-chaos.v1',
   quote_flood:quoteFlood,
   quote_flood_ms:quoteMs,
+  quotes_issued:issuedQuotes,
+  quote_capacity_rejected:quoteCapacityRejected,
   bounded_quote_state:quoteStats,
   oversized_messages:oversizedFlood,
   oversized_message_ms:oversizedMs,
