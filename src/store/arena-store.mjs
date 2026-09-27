@@ -64,13 +64,13 @@ export class ArenaStore{
   bindPaymentQuote({requestId,fingerprint,service,buyerSeat,price,memo}){
     const key=`payment_quote:${requestId}`,now=Date.now(),nowIso=new Date(now).toISOString(),expiresAt=new Date(now+PAYMENT_QUOTE_TTL_MS).toISOString();
     const exactRow=row=>row&&row.fingerprint===fingerprint&&row.service===service&&row.buyer_seat===buyerSeat&&Number(row.price_credits)===Number(price)&&row.memo===memo;
-    this.db.exec('BEGIN IMMEDIATE');try{
+    retrySqliteBusySync(()=>this.db.exec('BEGIN IMMEDIATE'));try{
       let existing=this.db.prepare('SELECT * FROM payment_quotes WHERE request_id=?').get(requestId)??null;
       if(!existing){
         const legacy=this.db.prepare('SELECT value FROM metadata WHERE key=?').get(key)?.value??null;
         if(legacy!==null){
-          let parsed;try{parsed=JSON.parse(legacy);}catch{this.db.exec('COMMIT');return {status:'corrupt'};}
-          if(!exactRow(parsed)){this.db.exec('COMMIT');return {status:'conflict',quote:parsed};}
+          let parsed;try{parsed=JSON.parse(legacy);}catch{retrySqliteBusySync(()=>this.db.exec('COMMIT'));return {status:'corrupt'};}
+          if(!exactRow(parsed)){retrySqliteBusySync(()=>this.db.exec('COMMIT'));return {status:'conflict',quote:parsed};}
           const issued=Number.isFinite(Date.parse(parsed.issued_at))?parsed.issued_at:nowIso;
           this.db.prepare('INSERT OR IGNORE INTO payment_quotes(request_id,fingerprint,service,buyer_seat,price_credits,memo,issued_at,last_seen_at) VALUES(?,?,?,?,?,?,?,?)').run(requestId,fingerprint,service,buyerSeat,Number(price),memo,issued,nowIso);
           this.db.prepare('DELETE FROM metadata WHERE key=?').run(key);
@@ -83,18 +83,18 @@ export class ArenaStore{
       if(existing){
         const exact=exactRow(existing);
         if(exact)this.db.prepare('UPDATE payment_quotes SET last_seen_at=? WHERE request_id=?').run(nowIso,requestId);
-        this.db.exec('COMMIT');
+        retrySqliteBusySync(()=>this.db.exec('COMMIT'));
         return exact?{status:'replay',quote:{version:2,...existing,request_id:existing.request_id,expires_at:new Date(Date.parse(existing.issued_at)+PAYMENT_QUOTE_TTL_MS).toISOString()}}:{status:'conflict',quote:existing};
       }
 
       const cutoff=new Date(now-PAYMENT_QUOTE_TTL_MS).toISOString();
       this.db.prepare('DELETE FROM payment_quotes WHERE issued_at<?').run(cutoff);
       const buyerCount=Number(this.db.prepare('SELECT COUNT(*) n FROM payment_quotes WHERE buyer_seat=?').get(buyerSeat)?.n??0);
-      if(buyerCount>=PAYMENT_QUOTE_MAX_PER_BUYER){this.db.exec('COMMIT');return {status:'capacity',scope:'buyer',retry_after_ms:PAYMENT_QUOTE_TTL_MS};}
+      if(buyerCount>=PAYMENT_QUOTE_MAX_PER_BUYER){retrySqliteBusySync(()=>this.db.exec('COMMIT'));return {status:'capacity',scope:'buyer',retry_after_ms:PAYMENT_QUOTE_TTL_MS};}
       const globalCount=Number(this.db.prepare('SELECT COUNT(*) n FROM payment_quotes').get()?.n??0);
-      if(globalCount>=PAYMENT_QUOTE_MAX_GLOBAL){this.db.exec('COMMIT');return {status:'capacity',scope:'global',retry_after_ms:PAYMENT_QUOTE_TTL_MS};}
+      if(globalCount>=PAYMENT_QUOTE_MAX_GLOBAL){retrySqliteBusySync(()=>this.db.exec('COMMIT'));return {status:'capacity',scope:'global',retry_after_ms:PAYMENT_QUOTE_TTL_MS};}
       this.db.prepare('INSERT INTO payment_quotes(request_id,fingerprint,service,buyer_seat,price_credits,memo,issued_at,last_seen_at) VALUES(?,?,?,?,?,?,?,?)').run(requestId,fingerprint,service,buyerSeat,Number(price),memo,nowIso,nowIso);
-      this.db.exec('COMMIT');return {status:'bound',quote:{version:2,request_id:requestId,fingerprint,service,buyer_seat:buyerSeat,price_credits:Number(price),memo,issued_at:nowIso,expires_at:expiresAt}};
+      retrySqliteBusySync(()=>this.db.exec('COMMIT'));return {status:'bound',quote:{version:2,request_id:requestId,fingerprint,service,buyer_seat:buyerSeat,price_credits:Number(price),memo,issued_at:nowIso,expires_at:expiresAt}};
     }catch(e){this.db.exec('ROLLBACK');throw e;}
   }
   getPaymentQuote(requestId){
@@ -126,32 +126,32 @@ export class ArenaStore{
     return {status:'inflight',startedAt:existing.started_at,executionStartedAt:existing.execution_started_at??null,ageMs:Math.max(0,Date.now()-Date.parse(existing.started_at))};
   }
   claim({requestId,txnId,fingerprint,service,buyerSeat=null}){
-    this.db.exec('BEGIN IMMEDIATE');try{
+    retrySqliteBusySync(()=>this.db.exec('BEGIN IMMEDIATE'));try{
       const byReq=this.db.prepare('SELECT * FROM requests WHERE request_id=?').get(requestId),byTxn=this.db.prepare('SELECT * FROM requests WHERE txn_id=?').get(txnId),existing=byReq??byTxn;
       if(existing){
         const buyerExact=existing.buyer_seat===null||buyerSeat===null||existing.buyer_seat===buyerSeat;
         const exact=existing.request_id===requestId&&existing.txn_id===txnId&&existing.fingerprint===fingerprint&&existing.service===service&&buyerExact;
         if(exact&&existing.buyer_seat===null&&buyerSeat!==null)this.db.prepare('UPDATE requests SET buyer_seat=? WHERE request_id=? AND buyer_seat IS NULL').run(buyerSeat,existing.request_id);
-        this.db.exec('COMMIT');
+        retrySqliteBusySync(()=>this.db.exec('COMMIT'));
         if(!exact)return {status:'conflict'};
         if(existing.status==='completed')return {status:'replay',response:JSON.parse(existing.response_json)};
         if(existing.status==='failed')return {status:'failed',error:existing.error_json?JSON.parse(existing.error_json):null};
         return {status:'inflight',startedAt:existing.started_at,executionStartedAt:existing.execution_started_at??null,ageMs:Math.max(0,Date.now()-Date.parse(existing.started_at))};
       }
-      this.db.prepare(`INSERT INTO requests(request_id,txn_id,fingerprint,service,buyer_seat,status,started_at) VALUES(?,?,?,?,?, 'inflight',?)`).run(requestId,txnId,fingerprint,service,buyerSeat,new Date().toISOString());this.db.exec('COMMIT');return {status:'claimed'};
+      this.db.prepare(`INSERT INTO requests(request_id,txn_id,fingerprint,service,buyer_seat,status,started_at) VALUES(?,?,?,?,?, 'inflight',?)`).run(requestId,txnId,fingerprint,service,buyerSeat,new Date().toISOString());retrySqliteBusySync(()=>this.db.exec('COMMIT'));return {status:'claimed'};
     }catch(e){this.db.exec('ROLLBACK');throw e;}
   }
   recoverUnstartedClaim({requestId,txnId,fingerprint,service,buyerSeat,staleMs=30_000}){
     const cutoff=new Date(Date.now()-Math.max(1,Number(staleMs)||30_000)).toISOString(),now=new Date().toISOString();
-    this.db.exec('BEGIN IMMEDIATE');try{
+    retrySqliteBusySync(()=>this.db.exec('BEGIN IMMEDIATE'));try{
       const row=this.db.prepare('SELECT * FROM requests WHERE request_id=?').get(requestId);
-      if(!row){this.db.exec('COMMIT');return {status:'missing'};}
+      if(!row){retrySqliteBusySync(()=>this.db.exec('COMMIT'));return {status:'missing'};}
       const exact=row.request_id===requestId&&row.txn_id===txnId&&row.fingerprint===fingerprint&&row.service===service&&row.buyer_seat===buyerSeat;
-      if(!exact){this.db.exec('COMMIT');return {status:'conflict'};}
-      if(row.status!=='inflight'){this.db.exec('COMMIT');return {status:row.status};}
-      if(row.execution_started_at){this.db.exec('COMMIT');return {status:'started',executionStartedAt:row.execution_started_at};}
+      if(!exact){retrySqliteBusySync(()=>this.db.exec('COMMIT'));return {status:'conflict'};}
+      if(row.status!=='inflight'){retrySqliteBusySync(()=>this.db.exec('COMMIT'));return {status:row.status};}
+      if(row.execution_started_at){retrySqliteBusySync(()=>this.db.exec('COMMIT'));return {status:'started',executionStartedAt:row.execution_started_at};}
       const r=this.db.prepare("UPDATE requests SET started_at=? WHERE request_id=? AND status='inflight' AND execution_started_at IS NULL AND started_at<=?").run(now,requestId,cutoff);
-      this.db.exec('COMMIT');return r.changes===1?{status:'reclaimed',startedAt:now}:{status:'not_stale'};
+      retrySqliteBusySync(()=>this.db.exec('COMMIT'));return r.changes===1?{status:'reclaimed',startedAt:now}:{status:'not_stale'};
     }catch(e){this.db.exec('ROLLBACK');throw e;}
   }
   markExecutionStarted(requestId,fingerprint){
@@ -168,7 +168,7 @@ export class ArenaStore{
   async load(context,signal){signal?.throwIfAborted?.();const rows=this.db.prepare('SELECT grant_json FROM grants WHERE namespace_id=? AND revoked_at IS NULL').all(context.namespaceId),actor=JSON.stringify(context.actor),authority=JSON.stringify(context.authority);return rows.map(r=>JSON.parse(r.grant_json)).filter(g=>JSON.stringify(g.subject)===actor&&JSON.stringify(g.issuer)===authority);}
   async getUsage(namespaceId,grantId){return this.db.prepare('SELECT used FROM grant_usage WHERE namespace_id=? AND grant_id=?').get(namespaceId,grantId)?.used??0;}
   async tryConsume(namespaceId,grantId,maximumUses){const r=retrySqliteBusySync(()=>this.db.prepare(`INSERT INTO grant_usage(namespace_id,grant_id,used) VALUES(?,?,1) ON CONFLICT(namespace_id,grant_id) DO UPDATE SET used=used+1 WHERE grant_usage.used < ?`).run(namespaceId,grantId,maximumUses));return r.changes>0;}
-  async record(event){this.db.exec('BEGIN IMMEDIATE');try{this.db.prepare('INSERT OR IGNORE INTO audit(event_id,at,trace_id,event_json) VALUES(?,?,?,?)').run(event.id,event.at,event.traceId??null,JSON.stringify(event));this.db.prepare('INSERT OR IGNORE INTO audit_outbox(event_id,event_json,attempts,sent_at) VALUES(?,?,0,NULL)').run(event.id,JSON.stringify(event));this.db.exec('COMMIT');}catch(e){this.db.exec('ROLLBACK');throw e;}}
+  async record(event){retrySqliteBusySync(()=>this.db.exec('BEGIN IMMEDIATE'));try{this.db.prepare('INSERT OR IGNORE INTO audit(event_id,at,trace_id,event_json) VALUES(?,?,?,?)').run(event.id,event.at,event.traceId??null,JSON.stringify(event));this.db.prepare('INSERT OR IGNORE INTO audit_outbox(event_id,event_json,attempts,sent_at) VALUES(?,?,0,NULL)').run(event.id,JSON.stringify(event));retrySqliteBusySync(()=>this.db.exec('COMMIT'));}catch(e){this.db.exec('ROLLBACK');throw e;}}
   pendingAudit(limit=100){return this.db.prepare('SELECT event_id,event_json,attempts FROM audit_outbox WHERE sent_at IS NULL ORDER BY rowid ASC LIMIT ?').all(limit).map(r=>({...r,event:JSON.parse(r.event_json)}));}
   markAuditSent(id){retrySqliteBusySync(()=>this.db.prepare('DELETE FROM audit_outbox WHERE event_id=?').run(id));}
   bumpAuditAttempt(id){retrySqliteBusySync(()=>this.db.prepare('UPDATE audit_outbox SET attempts=attempts+1 WHERE event_id=?').run(id));}
@@ -177,12 +177,12 @@ export class ArenaStore{
   roomMessageSeen(id){if(!id)return false;return this.db.prepare(`SELECT status FROM room_messages WHERE message_id=? AND status='completed'`).get(id)?.status==='completed';}
   roomMessageTerminal(id){if(!id)return false;const status=this.db.prepare('SELECT status FROM room_messages WHERE message_id=?').get(id)?.status;return status==='completed'||status==='dead_letter';}
   claimRoomMessage(id,{sequence=null,maxAttempts=5,staleMs=120_000}={}){
-    if(!id)return true;this.db.exec('BEGIN IMMEDIATE');try{
+    if(!id)return true;retrySqliteBusySync(()=>this.db.exec('BEGIN IMMEDIATE'));try{
       const row=this.db.prepare('SELECT status,attempts,processed_at FROM room_messages WHERE message_id=?').get(id),now=new Date();let ok=false;
       if(!row){this.db.prepare(`INSERT INTO room_messages(message_id,sequence,status,attempts,error,processed_at) VALUES(?,?,'inflight',1,NULL,?)`).run(id,Number.isSafeInteger(Number(sequence))?Number(sequence):null,now.toISOString());ok=true;}
       else if(row.status==='failed'&&row.attempts<maxAttempts){this.db.prepare(`UPDATE room_messages SET status='inflight',attempts=attempts+1,error=NULL,processed_at=? WHERE message_id=?`).run(now.toISOString(),id);ok=true;}
       else if(row.status==='inflight'&&row.attempts<maxAttempts&&now-Date.parse(row.processed_at)>staleMs){this.db.prepare(`UPDATE room_messages SET status='inflight',attempts=attempts+1,error=NULL,processed_at=? WHERE message_id=?`).run(now.toISOString(),id);ok=true;}
-      this.db.exec('COMMIT');return ok;
+      retrySqliteBusySync(()=>this.db.exec('COMMIT'));return ok;
     }catch(e){this.db.exec('ROLLBACK');throw e;}
   }
   pruneRoomMessages({throughSequence,retainSequences=2000}={}){
