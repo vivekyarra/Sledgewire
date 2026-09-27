@@ -12,11 +12,13 @@ const selfcheckN=Math.max(1,Math.min(64,Number(process.argv[2]??64)));
 const paidRouteN=Math.max(1,Math.min(64,Number(process.argv[3]??32)));
 const room='rom_ABCDEFGHIJ',host='sledgewire.example';
 function freePort(){return new Promise((resolve,reject)=>{const s=net.createServer();s.once('error',reject);s.listen(0,'127.0.0.1',()=>{const p=s.address().port;s.close(e=>e?reject(e):resolve(p));});});}
-function req(port,{path='/',method='GET',headers={},body=null}={}){
+function req(port,{path='/',method='GET',headers={},body=null,label='request'}={}){
   return new Promise((resolve,reject)=>{
     const r=http.request({host:'127.0.0.1',port,path,method,headers:{Host:host,...headers}},res=>{
       const chunks=[];res.on('data',c=>chunks.push(c));res.on('end',()=>resolve({status:res.statusCode,headers:res.headers,text:Buffer.concat(chunks).toString('utf8')}));
-    });r.once('error',reject);if(body!==null)r.write(body);r.end();
+    });
+    r.once('error',e=>{e.message=`${label}:${e.message}`;reject(e);});
+    if(body!==null)r.write(body);r.end();
   });
 }
 async function waitReady(port,child){
@@ -46,21 +48,21 @@ try{
   const card=JSON.parse((await req(port,{path:'/arena.json'})).text);if(card.version!=='0.3.13'||card.payment?.native_sharednet_memo!=='Sledgewire')throw new Error('arena_card_failed');
 
   const sc=modernCall('sledgewire.selfcheck',{},1),t1=Date.now();
-  const selfchecks=await Promise.all(Array.from({length:selfcheckN},(_,i)=>{const call=modernCall('sledgewire.selfcheck',{},i+1);return req(port,{path:'/mcp',method:'POST',headers:call.headers,body:call.body});}));
+  const selfchecks=await Promise.all(Array.from({length:selfcheckN},(_,i)=>{const call=modernCall('sledgewire.selfcheck',{},i+1);return req(port,{path:'/mcp',method:'POST',headers:call.headers,body:call.body,label:`selfcheck-${i}`});}));
   const selfcheckMs=Date.now()-t1;
   for(const r of selfchecks){if(r.status!==200)throw new Error(`selfcheck_http_${r.status}`);const j=JSON.parse(r.text),receipt=j.result?.structuredContent;if(receipt?.verified!==true||verifyReceipt(receipt,kp.publicKeyPem).ok!==true)throw new Error('selfcheck_receipt_invalid');}
 
   const paid=modernCall('sledgewire.smoke',{endpoint:'https://target.example/mcp'},1000),t2=Date.now();
-  const routes=await Promise.all(Array.from({length:paidRouteN},(_,i)=>{const call=modernCall('sledgewire.smoke',{endpoint:'https://target.example/mcp'},1000+i);return req(port,{path:'/mcp',method:'POST',headers:call.headers,body:call.body});}));
+  const routes=await Promise.all(Array.from({length:paidRouteN},(_,i)=>{const call=modernCall('sledgewire.smoke',{endpoint:'https://target.example/mcp'},1000+i);return req(port,{path:'/mcp',method:'POST',headers:call.headers,body:call.body,label:`paid-route-${i}`});}));
   const routeMs=Date.now()-t2;
   for(const r of routes){if(r.status!==200)throw new Error(`paid_route_http_${r.status}`);const x=JSON.parse(r.text).result?.structuredContent;if(x?.state!=='PAYMENT_REQUIRED'||x?.price_credits!==3||x?.arena_room_id!==room||verifyReceipt(x,kp.publicKeyPem).ok!==true)throw new Error('paid_route_invalid');}
 
-  const badHost=await req(port,{path:'/mcp',method:'POST',headers:{...sc.headers,Host:'evil.example'},body:sc.body});if(badHost.status!==403)throw new Error('host_guard_failed');
-  const badOrigin=await req(port,{path:'/mcp',method:'POST',headers:{...sc.headers,Origin:'https://evil.example'},body:sc.body});if(badOrigin.status!==403)throw new Error('origin_guard_failed');
-  const malformed=await req(port,{path:'/mcp',method:'POST',headers:{'Content-Type':'application/json','Content-Length':'1'},body:'{'});if(malformed.status!==400)throw new Error(`malformed_json_expected_400_got_${malformed.status}`);
-  const oversized=await req(port,{path:'/mcp',method:'POST',headers:{'Content-Type':'application/json','Content-Length':'1000001'}});if(oversized.status!==413)throw new Error(`oversized_expected_413_got_${oversized.status}`);
+  const badHost=await req(port,{path:'/mcp',method:'POST',headers:{...sc.headers,Host:'evil.example'},body:sc.body,label:'bad-host'});if(badHost.status!==403)throw new Error('host_guard_failed');
+  const badOrigin=await req(port,{path:'/mcp',method:'POST',headers:{...sc.headers,Origin:'https://evil.example'},body:sc.body,label:'bad-origin'});if(badOrigin.status!==403)throw new Error('origin_guard_failed');
+  const malformed=await req(port,{path:'/mcp',method:'POST',headers:{'Content-Type':'application/json','Content-Length':'1'},body:'{',label:'malformed-json'});if(malformed.status!==400)throw new Error(`malformed_json_expected_400_got_${malformed.status}`);
+  const oversizedBody='x'.repeat(1_000_001);const oversized=await req(port,{path:'/mcp',method:'POST',headers:{'Content-Type':'application/json','Content-Length':String(Buffer.byteLength(oversizedBody))},body:oversizedBody,label:'oversized-body'});if(oversized.status!==413)throw new Error(`oversized_expected_413_got_${oversized.status}`);
 
-  const finalHealth=await req(port,{path:'/health'});if(finalHealth.status!==200)throw new Error('server_not_healthy_after_stress');
+  const finalHealth=await req(port,{path:'/health',label:'final-health'});if(finalHealth.status!==200)throw new Error('server_not_healthy_after_stress');
   console.log(JSON.stringify({type:'sledgewire.http.arena-stress.v1',version:'0.3.13',selfchecks:selfcheckN,selfcheck_ms:selfcheckMs,paid_routes:paidRouteN,paid_route_ms:routeMs,host_guard:true,origin_guard:true,oversized_early_reject:true,healthy_after_stress:true,total_ms:Date.now()-started},null,2));
 }finally{
   child.kill('SIGTERM');await new Promise(resolve=>{if(child.exitCode!==null)return resolve();child.once('exit',resolve);setTimeout(()=>{child.kill('SIGKILL');resolve();},3000).unref();});
