@@ -9,16 +9,19 @@ import {generateSigningKeypair} from '../src/receipts/receipt.mjs';
 const room='rom_ABCDEFGHIJ',buyer='i_ABCDEFGHIJ',payee='p_ABCDEFGHIJ',service='sledgewire.smoke',prices={[service]:3};
 const base={roomId:room,buyerSeat:buyer,requestId:'resilience-1',service,input:{endpoint:'https://example.com/mcp'},txnId:'txn_ABCDEFGHIJ'};
 
-test('unpaid quote flood is bounded per buyer and newest quote remains usable',()=>{
+test('unpaid quote flood is bounded without evicting an already signed quote',()=>{
   const s=new ArenaStore(':memory:'),g=new PaymentGate({ledger:{get:async()=>null},store:s,prices,payee});
-  for(let i=0;i<PAYMENT_QUOTE_MAX_PER_BUYER+200;i++){
+  const firstReq={...base,requestId:'flood-0',txnId:null},first=g.issueQuote(firstReq);assert.equal(first.reason,'payment_required');
+  let limited=0;
+  for(let i=1;i<PAYMENT_QUOTE_MAX_PER_BUYER+200;i++){
     const r=g.issueQuote({...base,requestId:`flood-${i}`,txnId:null});
-    assert.equal(r.reason,'payment_required');
+    if(r.reason==='payment_quote_capacity_reached')limited++;else assert.equal(r.reason,'payment_required');
   }
   const stats=s.paymentQuoteStats();
-  assert.equal(stats.max_per_buyer<=PAYMENT_QUOTE_MAX_PER_BUYER,true);
-  assert.equal(stats.total<=PAYMENT_QUOTE_MAX_PER_BUYER,true);
-  assert.ok(s.getPaymentQuote(requestStorageKey({...base,requestId:`flood-${PAYMENT_QUOTE_MAX_PER_BUYER+199}`})));
+  assert.equal(stats.max_per_buyer,PAYMENT_QUOTE_MAX_PER_BUYER);
+  assert.equal(stats.total,PAYMENT_QUOTE_MAX_PER_BUYER);
+  assert.equal(limited,200);
+  assert.ok(s.getPaymentQuote(requestStorageKey(firstReq)));
   assert.equal(PAYMENT_QUOTE_MAX_GLOBAL>=PAYMENT_QUOTE_MAX_PER_BUYER,true);
 });
 
