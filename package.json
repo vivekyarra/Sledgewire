@@ -32,7 +32,8 @@
     "stress:arena-ux": "node scripts/arena-ux-stress.mjs",
     "arena:activate": "npm run arena:join && npm run arena:all",
     "arena:budget": "node scripts/arena-budget.mjs",
-    "stress:arena-e2e": "node scripts/arena-e2e-chaos.mjs"
+    "stress:arena-e2e": "node scripts/arena-e2e-chaos.mjs",
+    "stress:http": "node scripts/http-arena-stress.mjs"
   },
   "engines": {
     "node": ">=22.18.0"
