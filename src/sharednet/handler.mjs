@@ -86,6 +86,11 @@ export function createArenaHandler({store,ledger,room,payee,signing,publicBaseUr
     if(!auth.ok){store.incrementCounter(`arena.reject.${String(auth.reason).replace(/[^a-z0-9_.-]/gi,'_').slice(0,80)}`);if(auth.reason==='previous_attempt_failed'&&auth.error?.response)return auth.error.response;return failure(req,auth.reason,auth);}
     if(auth.replay){store.incrementCounter('arena.delivery.replay');return auth.cached;}
 
+    const executionStart=store.markExecutionStarted?.(auth.storageKey,auth.fingerprint);
+    if(executionStart&&executionStart.status!=='started'){
+      store.incrementCounter('arena.reject.execution_start_race');
+      return failure(req,'request_already_inflight',{execution_started_at:executionStart.at??null});
+    }
     try{
       // SharedOS grant ids are derived from the request fingerprint, not the buyer-supplied
       // request_id, so two different buyers can safely choose the same request label.
