@@ -1,6 +1,6 @@
 # Deployment
 
-v0.3.14 uses a two-process Docker Compose topology plus cryptographically verified second-seat and restart rehearsals, a single bound Arena seat, organizer product-name payment memo, and live 100-credit budget accounting. The public server and Arena daemon share one persistent volume so paid outcomes and SharedOS traces survive daemon restarts and remain resolvable through the public `sledgewire.trace` tool.
+v0.3.15 uses a two-process Docker Compose topology plus cryptographically verified second-seat and restart rehearsals, a single bound Arena seat, organizer product-name payment memo, and live 100-credit budget accounting. The public server and Arena daemon share one persistent volume so paid outcomes and SharedOS traces survive daemon restarts and remain resolvable through the public `sledgewire.trace` tool.
 
 ## Public HTTPS MCP
 
@@ -61,7 +61,7 @@ If an authenticated sni_ or compatible rmt_ seat token already exists, mount it 
     export SLEDGEWIRE_PUBLIC_KEY_FILE=/run/secrets/sledgewire-ed25519-public.pem
     npm run arena:daemon
 
-The daemon resolves the active identity, requires it to match the single recorded Arena seat, requires the payee to belong to that same Principal/Agent/Instance, joins only the explicit Arena Room, keeps presence alive, long-polls the ordered log, verifies native credit transfers, executes paid work through SharedOS, and persists quote/request/payment/message state. v0.3.14 keeps the v0.3.13 quote/message bounds and adds sender-fair scheduling, protected fresh-buyer payment verification, explicit payment-claim vs execution-start crash boundaries, terminal Room-state pruning behind the durable cursor, and shared-WAL multi-process contention coverage.
+The daemon resolves the active identity, requires it to match the single recorded Arena seat, requires the payee to belong to that same Principal/Agent/Instance, joins only the explicit Arena Room, keeps presence alive, long-polls the ordered log, verifies native credit transfers, executes paid work through SharedOS, and persists quote/request/payment/message state. v0.3.15 keeps the v0.3.14 sender/payment/crash/WAL guarantees and adds atomic fail-closed Arena-budget state, duplicate/self-offer protection, free quote reflection bounds, and explicit slow-client HTTP reclamation deadlines.
 
 The Room wait request follows the current SharedNet contract exactly: after + timeout, with no undocumented query parameters. Large signed dossiers automatically become Room-addressed SharedNet artifacts with a compact SHA-256 pointer.
 
