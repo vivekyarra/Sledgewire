@@ -23,7 +23,6 @@ export class ArenaStore{
       CREATE INDEX IF NOT EXISTS idx_audit_trace ON audit(trace_id);
       CREATE TABLE IF NOT EXISTS audit_outbox(event_id TEXT PRIMARY KEY,event_json TEXT NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,sent_at TEXT);
       CREATE TABLE IF NOT EXISTS room_messages(message_id TEXT PRIMARY KEY,sequence INTEGER,status TEXT NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,error TEXT,processed_at TEXT NOT NULL);
-      CREATE INDEX IF NOT EXISTS idx_room_messages_sequence ON room_messages(sequence);
       CREATE TABLE IF NOT EXISTS payment_quotes(request_id TEXT PRIMARY KEY,fingerprint TEXT NOT NULL,service TEXT NOT NULL,buyer_seat TEXT NOT NULL,price_credits INTEGER NOT NULL,memo TEXT NOT NULL,issued_at TEXT NOT NULL,last_seen_at TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS idx_payment_quotes_buyer_seen ON payment_quotes(buyer_seat,last_seen_at);
       CREATE INDEX IF NOT EXISTS idx_payment_quotes_seen ON payment_quotes(last_seen_at);
@@ -37,6 +36,8 @@ export class ArenaStore{
     const executionBoundaryAdded=ensureColumn(this.db,'requests','execution_started_at','execution_started_at TEXT');
     if(executionBoundaryAdded)this.db.prepare("UPDATE requests SET execution_started_at=started_at WHERE status='inflight' AND execution_started_at IS NULL").run();
     ensureColumn(this.db,'room_messages','sequence','sequence INTEGER');
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_room_messages_sequence ON room_messages(sequence)');
+    this.db.prepare('DELETE FROM audit_outbox WHERE sent_at IS NOT NULL').run();
   }
   bindPaymentQuote({requestId,fingerprint,service,buyerSeat,price,memo}){
     const key=`payment_quote:${requestId}`,now=Date.now(),nowIso=new Date(now).toISOString(),expiresAt=new Date(now+PAYMENT_QUOTE_TTL_MS).toISOString();
@@ -166,7 +167,7 @@ export class ArenaStore{
     const through=Number(throughSequence),retain=Math.max(0,Math.min(100_000,Number(retainSequences)||0));
     if(!Number.isSafeInteger(through)||through<0)throw new Error('invalid_room_prune_sequence');
     const cutoff=Math.max(0,through-retain);
-    return this.db.prepare("DELETE FROM room_messages WHERE sequence IS NOT NULL AND sequence<=? AND status IN ('completed','dead_letter')").run(cutoff).changes;
+    return this.db.prepare("DELETE FROM room_messages WHERE ((sequence IS NOT NULL AND sequence<=?) OR (sequence IS NULL AND ?>0)) AND status IN ('completed','dead_letter')").run(cutoff,through).changes;
   }
   markRoomMessage(id,status='completed',error=null){if(!id)return;this.db.prepare(`INSERT INTO room_messages(message_id,status,attempts,error,processed_at) VALUES(?,?,1,?,?) ON CONFLICT(message_id) DO UPDATE SET status=excluded.status,error=excluded.error,processed_at=excluded.processed_at`).run(id,status,error,new Date().toISOString());}
   markRoomMessageFailed(id,error,{maxAttempts=5}={}){
