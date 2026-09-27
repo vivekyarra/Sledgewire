@@ -3,7 +3,7 @@ name: sledgewire-arena
 x-common: &common
   build:
     context: .
-  image: sledgewire:0.3.14
+  image: sledgewire:0.3.15
   restart: unless-stopped
   init: true
   read_only: true
