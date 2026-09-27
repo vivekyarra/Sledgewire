@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import {readArenaBudgetStateFile,writeArenaBudgetStateFile} from '../src/sharednet/budget-state-file.mjs';
 import {SharedNetApi,ROOM} from '../src/sharednet/api.mjs';
 import {eventBudgetStatus,planArenaSpend,resolveArenaBudgetState} from '../src/sharednet/spend-plan.mjs';
 
@@ -15,22 +16,10 @@ if(!Number.isInteger(eventBudget)||eventBudget<1||eventBudget>1000)throw new Err
 const api=new SharedNetApi(),credits=await api.credits(),purse=credits?.credits??{};
 for(const k of ['balance','sent','received','granted'])if(!Number.isFinite(Number(purse[k])))throw new Error(`credits_${k}_missing`);
 fs.mkdirSync(path.dirname(statePath),{recursive:true,mode:0o700});
-let existing=null;
-try{
-  const st=fs.lstatSync(statePath);if(st.isSymbolicLink()||!st.isFile())throw new Error('arena_budget_state_unsafe_path');
-  const raw=fs.readFileSync(statePath,'utf8');try{existing=JSON.parse(raw);}catch{throw new Error('arena_budget_state_corrupt');}
-}catch(e){if(e?.code!=='ENOENT')throw e;}
+const existing=readArenaBudgetStateFile(statePath);
 const resolved=resolveArenaBudgetState({existing,init,room,eventBudget,purse});
 const state=resolved.state,initialization=resolved.initialization;
-if(initialization==='initialized'){
-  const tmp=statePath+`.tmp-${process.pid}`,payload=JSON.stringify(state,null,2)+'\n';
-  let fd=null;
-  try{
-    fd=fs.openSync(tmp,'wx',0o600);fs.writeFileSync(fd,payload);fs.fsyncSync(fd);fs.closeSync(fd);fd=null;
-    fs.renameSync(tmp,statePath);fs.chmodSync(statePath,0o600);
-    const dirfd=fs.openSync(path.dirname(statePath),'r');try{fs.fsyncSync(dirfd);}finally{fs.closeSync(dirfd);}
-  }finally{if(fd!==null)try{fs.closeSync(fd);}catch{};try{fs.unlinkSync(tmp);}catch{}}
-}
+if(initialization==='initialized')writeArenaBudgetStateFile(statePath,state);
 const budget=eventBudgetStatus({event_budget:eventBudget,baseline_sent:state.baseline_sent,current_sent:Number(purse.sent)});
 let plan=null;
 if(offersPath){
