@@ -28,6 +28,17 @@ for(let i=0;i<quoteFlood;i++){
 const quoteMs=Date.now()-t0,quoteStats=store.paymentQuoteStats();
 if(quoteStats.total>PAYMENT_QUOTE_MAX_GLOBAL||quoteStats.max_per_buyer>PAYMENT_QUOTE_MAX_PER_BUYER)throw new Error(`quote_bounds_failed:${JSON.stringify(quoteStats)}`);
 
+let missingLedgerReads=0,rateLimited=0;
+const missGate=new PaymentGate({ledger:{async get(){missingLedgerReads++;return null;}},store,prices,payee,ledgerMissPerBuyer:16,ledgerMissGlobal:64,ledgerMissWindowMs:60_000});
+const missReq={roomId:room,buyerSeat:seat(999),requestId:'missing-ledger-storm',service,input:{endpoint:'https://missing.example/mcp'},txnId:null};
+const missQuote=missGate.issueQuote(missReq);if(missQuote.reason!=='payment_required')throw new Error('missing_storm_quote_failed');
+for(let i=0;i<100;i++){
+  const out=await missGate.authorize({...missReq,txnId:`txn_${String(i).padStart(10,'0')}`});
+  if(out.reason==='payment_verification_rate_limited')rateLimited++;
+  else if(out.reason!=='transaction_not_found')throw new Error(`unexpected_missing_txn_result:${i}:${out.reason}`);
+}
+if(missingLedgerReads!==16||rateLimited!==84)throw new Error(`ledger_miss_breaker_failed:reads=${missingLedgerReads}:limited=${rateLimited}`);
+
 const paidReq={roomId:room,buyerSeat:paidBuyer,requestId:paidRequestId,service,input:{endpoint:`https://target.example/mcp?case=${paidIndex}`},txnId:paidTxn};
 const auth=await gate.authorize(paidReq);if(!auth.ok||auth.replay)throw new Error(`post_flood_payment_failed:${auth.reason}`);
 store.complete(auth.storageKey,auth.fingerprint,{state:'DELIVERED',case:paidIndex});
@@ -71,6 +82,9 @@ const result={
   oversized_executions:executions,
   paid_after_quote_flood:true,
   payment_ledger_reads:ledgerReads,
+  bogus_payment_attempts:100,
+  bogus_payment_ledger_reads:missingLedgerReads,
+  bogus_payment_rate_limited:rateLimited,
   durable_restart_replay:true,
   quotes_after_restart:postRestartQuotes,
   planner_offers:offers.length,
