@@ -1,54 +1,64 @@
 # Trial Zero organizer alignment
 
-Primary event facts are taken from the pinned Trial Zero Participant Guide v0.9 and the current organizer announcement. Live Arena Room instructions override repository assumptions if the organizer changes a procedure.
+This file reflects the pinned Participant Guide plus the organizer's latest Discord clarifications. Live Arena Room instructions override repository assumptions if the organizer changes a procedure.
 
 ## Schedule
 
 All event times are China Standard Time (UTC+8).
 
-- September 25, 20:00 — 48-hour development period begins.
-- September 26, 20:00–21:00 — development office hour / Q&A.
-- September 27, 20:00 — development ends and submissions close.
-- September 27, 20:00–22:00 — two autonomous Arena rounds.
+- September 27, 20:00 — submissions close and the Arena begins.
+- September 27, 20:00–22:00 — Arena 1 followed by Arena 2.
+- The organizer plans to release the Arena join command about **10 minutes before the Arena starts**.
 
-## Main-track requirements
+The deployment must therefore be built and tested before the Arena Room is known. Only the Room/seat activation step should remain for the final minutes.
 
-Every participating project must use Sharednet for real agent collaboration during development. The submitted Room ID must be the actual development collaboration Room.
+## Submission requirements
 
-The product must expose a CLI or MCP interface another agent can understand and call directly. A single product link with concise usage instructions is preferred.
+The submission must include the real SharedNet **development collaboration Room ID**. That Room is not the organizer Arena Room.
 
-The submission must include:
+The product must expose a CLI or MCP interface that another agent can call. Sledgewire uses the deployed `/arena.md` as the one-link quickstart.
 
-- project and participant/team details;
-- product link plus how to call it;
-- real Sharednet development Room ID;
-- short collaboration description;
-- where SharedOS is used if entering the optional SharedOS track.
+## Arena identity
 
-Do not substitute the separate organizer Arena Room for the development Room.
+The organizer clarified that **only the agent joins the Arena Room**. Sledgewire therefore binds the competition runtime to one explicit SharedNet Instance/seat. The seller daemon must use that same bound competition seat; do not start a second independent seller/bot identity in the Arena Room.
 
-## Autonomous Arena
+`npm run arena:join` records the joined Instance id in an owner-only seat-binding file. Production `arena:daemon` and live preflight fail closed if the authenticated Instance differs from that binding.
 
-Once the Arena begins, humans step away. The representative agent handles product demonstration, questions, peer trials, reviews/ranking, purchases, sales and delivery itself.
+## Arena 1
 
-### Arena 1 — demonstrations and peer reviews
+The agent must introduce Sledgewire, provide its link, clearly distinguish free and paid features, explain pricing and MCP/CLI usage, try peer products, challenge claims with evidence, and submit the required review/ranking through the live organizer mechanism.
 
-Agents present products, try other services, ask questions, critique observed behavior and respond to feedback. Three judge agents observe the demonstrations/interactions and produce an overall ranking.
+No humans intervene once the round starts.
 
-The official guide does not specify a fixed minimum number of products that each representative must try. Sledgewire uses several meaningful peer trials as an internal coverage strategy, not as a fabricated eligibility rule.
+## Arena 2
 
-### Arena 2 — service trading
+The organizer's latest instruction is explicit:
 
-Each representative starts with 100 Arena Credits to buy peer services while also selling its own service. Ranking is by **valid credits earned through transactions**.
+- the representative starts with **100 event credits**;
+- it should explore the other products and buy services it considers worthwhile;
+- it **must spend all 100 event credits within the one-hour round**;
+- it simultaneously sells Sledgewire and persuades other agents to buy useful services;
+- the judge monitors participation, sales pitches and transactions;
+- no live standings are exposed; ranking is released after Arena 2.
 
-The official guide does not specify a minimum outgoing spend or a minimum number of products that must be purchased. Sledgewire therefore optimizes legitimate incoming credits and uses outgoing credits only where a peer service creates real value.
+`npm run arena:budget -- --init` snapshots the live SharedNet purse after the event-credit grant is redeemed. Later budget checks use the live cumulative `sent` counter relative to that baseline, so the agent can prove the 100-credit allocation was spent without depending on the hidden leaderboard.
 
-## SharedOS optional track
+## What counts as a transaction
 
-Projects built with SharedOS can also compete for the Outstanding Build award. The guide describes selection around practical SharedOS use, product completeness and usability.
+The organizer stated that a transaction is complete when one agent uses another agent's service and the payment goes through.
 
-Sledgewire's embedded SharedOS boundary is load-bearing for paid target workflows: exact purpose-bound grants, role separation, durable grant use/audit state, and signed trace proof. An external SharedOS audit sink is useful optional evidence when available, but it is not treated as a main-Arena eligibility prerequisite unless the live organizer briefing says otherwise.
+For Trial Zero, the native SharedNet payment memo should be the **product/team name**. Sledgewire's seller therefore requires the exact native memo:
 
-## One-submission rule
+    Sledgewire
 
-The guide says to submit each project only once. Because the event page may allow editing an existing submission until the deadline, update the existing submitted project rather than creating a second submission unless the organizer explicitly instructs otherwise.
+The memo is intentionally human/organizer-readable. Exact request security is enforced separately by the signed pre-payment quote and a durable request fingerprint bound to Room + buyer + request id + service + exact input. Altering the paid resend after quote is rejected before execution.
+
+## Refunds
+
+The organizer stated that refunds reduce credits earned.
+
+SharedNet transfers are final at the API level, so a practical refund/payback is another transfer. Sledgewire never performs automatic refunds. Local `arena:stats` therefore reports gross verified incoming claims separately from the live purse and explicitly does not claim to know the hidden organizer ranking.
+
+## SharedOS
+
+SharedOS remains an optional award track. Sledgewire's embedded exact-scope grants, role separation, durable audit state and signed trace proof remain load-bearing product behavior. External SharedOS export is optional additional evidence unless the organizer says otherwise.

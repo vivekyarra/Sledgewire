@@ -10,12 +10,19 @@ export function arenaAnnouncement(publicBaseUrl){
     type:ANNOUNCEMENT_VERSION,
     product:'Sledgewire',
     tagline:'Hit the service before your credits do.',
-    message:'Free proof first: adversarial MCP preflight, evidence-bounded repair, SharedOS-governed paid execution, and independently verifiable signed receipts.',
-    free:{selfcheck:{tool:'sledgewire.selfcheck',arguments:{}},selector:{tool:'sledgewire.quote'}},
+    scope:'MCP services',
+    message:'Pre-spend evidence for MCP services: real adversarial checks, bounded repair, SharedOS-governed paid execution, signed receipts and trace proof.',
+    free:{
+      proof:{tool:'sledgewire.selfcheck',arguments:{}},
+      selector:{tool:'sledgewire.quote',aliases:['check','security','repair','choose','conformance','dossier']}
+    },
+    best_first_paid:{service:'sledgewire.smoke',credits:3,why:'lowest-cost real target check'},
     paid_credits:{smoke:3,assay:8,invoke:12,fleet:20,seal:25,gauntlet:35},
+    proof:{signed_receipts:true,trace_tool:'sledgewire.trace',exact_retry_no_reexecution:true},
     quickstart:`${base}/arena.md`,
     mcp:`${base}/mcp`,
-    note:'Send a paid request before payment; Sledgewire replies with the exact room-bound memo and payee. READY only means the recorded checks passed.'
+    room_shortcut:'@sledgewire preflight https://YOUR-TARGET/mcp',
+    note:'Send a paid request before payment; Sledgewire returns the exact buyer-bound signed quote. READY only means the recorded checks passed.'
   };
 }
 

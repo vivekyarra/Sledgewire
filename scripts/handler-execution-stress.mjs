@@ -35,7 +35,7 @@ const ledger={
       payee_ok:true,
       amount:price,
       room_id:room,
-      memo:paymentMemo(`exec-${i}`,service)
+      memo:paymentMemo({roomId:room,buyerSeat:buyer,requestId:`exec-${i}`,service,input:{endpoint:`https://example.com/mcp?case=${i}`}})
     };
   }
 };
@@ -72,6 +72,9 @@ try{
       input:{endpoint:`https://example.com/mcp?case=${i}`},
       payment_txn_id:`txn_${i}`
     };
+    const unpaid={...request};delete unpaid.payment_txn_id;
+    const quote=await handle({sender_instance_id:buyer,content:JSON.stringify(unpaid)});
+    if(quote?.type!=='sledgewire.payment_required.v1'||quote?.memo!=='Sledgewire')throw new Error(`handler_quote_failed:${i}:${quote?.reason}`);
     const message={sender_instance_id:buyer,content:JSON.stringify(request)};
     const wave=await Promise.all(Array.from({length:fanout},()=>handle(message)));
     const delivered=wave.filter(x=>x?.state==='DELIVERED');
@@ -98,7 +101,7 @@ try{
   const missingExecutions=groups-counts.length;
   const result={
     groups,fanout,delay_ms:delayMs,
-    handler_requests:groups*(fanout*2+1),
+    handler_requests:groups*(fanout*2+2),
     first_wave_delivered:firstWaveDelivered,
     first_wave_inflight_refusals:firstWaveInflight,
     cached_replays:cachedReplays,

@@ -8,6 +8,8 @@ import {McpSession,MODERN_PROTOCOL_VERSION} from '../src/mcp/client.mjs';
 import {validateLiveRehearsalEvidence,validateRestartReplayEvidence} from '../src/ops/live-evidence.mjs';
 import {publicBaseOrigin} from '../src/ops/config.mjs';
 import {auditSinkUrl} from '../src/ops/audit-sink.mjs';
+import {VERSION} from '../src/version.mjs';
+import {readExpectedArenaSeat} from '../src/sharednet/seat-binding.mjs';
 
 const live=process.argv.includes('--live'),submission=process.argv.includes('--submission'),checks=[];
 const add=(name,ok,detail='')=>checks.push({name,ok,detail});
@@ -52,7 +54,7 @@ if(live){
   if(normalizedBase){
     try{
       const health=await fetchJsonBounded(`${normalizedBase}/health`,64_000);
-      add('public_health',health.response.ok&&health.json?.ok===true,`status=${health.response.status};version=${health.json?.version??'unknown'}`);
+      add('public_health',health.response.ok&&health.json?.ok===true&&health.json?.version===VERSION,`status=${health.response.status};version=${health.json?.version??'unknown'};expected=${VERSION}`);
 
       const ready=await fetchJsonBounded(`${normalizedBase}/ready`,64_000);
       currentBootId=ready.json?.arena_daemon?.boot_id??null;
@@ -60,9 +62,10 @@ if(live){
       add('public_arena_daemon_fresh',ready.json?.arena_daemon?.required===true&&ready.json?.arena_daemon?.ready===true&&typeof currentBootId==='string',`age_ms=${ready.json?.arena_daemon?.age_ms??'unknown'};boot_id=${currentBootId??'missing'}`);
 
       const arena=await fetchTextBounded(`${normalizedBase}/arena.md`,128_000);
-      add('public_arena_card',arena.response.ok&&arena.text.includes(`${normalizedBase}/mcp`)&&arena.text.includes('sledgewire.selfcheck'),`status=${arena.response.status};bytes=${Buffer.byteLength(arena.text)}`);
+      add('public_arena_card',arena.response.ok&&arena.text.includes(`${normalizedBase}/mcp`)&&arena.text.includes('sledgewire.selfcheck')&&arena.text.includes('30-second judge path')&&arena.text.includes('Fast buyer path'),`status=${arena.response.status};bytes=${Buffer.byteLength(arena.text)}`);
 
       const machineCard=await fetchJsonBounded(`${normalizedBase}/arena.json`,128_000),authority=machineCard.json?.sharedos_authority;
+      add('public_competition_card',machineCard.response.ok&&machineCard.json?.version===VERSION&&machineCard.json?.arena1_judge_path?.[1]?.tool==='sledgewire.selfcheck'&&Number(machineCard.json?.arena2_buyer_path?.best_first_paid?.price_credits)===3&&machineCard.json?.proofs?.paid_trace?.includes('sledgewire.trace'),`status=${machineCard.response.status};version=${machineCard.json?.version??'missing'}`);
       add('public_sharedos_authority_card',machineCard.response.ok&&authority?.purpose==='sledgewire.test-repair-and-invoke-agent-services'&&String(authority?.roles?.dispatcher??'').includes('no target execution grant')&&authority?.proof?.tool==='sledgewire.trace',`status=${machineCard.response.status};purpose=${authority?.purpose??'missing'};trace=${authority?.proof?.tool??'missing'}`);
 
       const pub=await fetchTextBounded(`${normalizedBase}/public-key`,16_384);remotePublicKeyPem=pub.text;
@@ -78,7 +81,7 @@ if(live){
 
       const route=(await mcp.callTool('sledgewire.smoke',{endpoint:'https://example.com/mcp'}))?.structuredContent;
       const routeSig=remotePublicKeyPem?verifyReceipt(route,remotePublicKeyPem):{ok:false,reason:'missing_public_key'};
-      add('public_paid_mcp_route',route?.state==='PAYMENT_REQUIRED'&&Number(route?.price_credits)===3&&route?.arena_room_id===room&&routeSig.ok,`state=${route?.state??'missing'};price=${route?.price_credits??'missing'};room=${route?.arena_room_id??'missing'};signature=${routeSig.ok?'ok':routeSig.reason}`);
+      add('public_paid_mcp_route',route?.state==='PAYMENT_REQUIRED'&&Number(route?.price_credits)===3&&typeof route?.deliverable==='string'&&route.deliverable.length>0&&route?.verification?.exact_retry_no_reexecution===true&&route?.arena_room_id===room&&routeSig.ok,`state=${route?.state??'missing'};price=${route?.price_credits??'missing'};room=${route?.arena_room_id??'missing'};signature=${routeSig.ok?'ok':routeSig.reason}`);
     }catch(e){add('public_live_surface',false,String(e.message||e));}
   }
 
@@ -86,10 +89,12 @@ if(live){
   if(ROOM.test(buildRoom))add('build_and_arena_rooms_are_distinct',buildRoom!==room,`build=${buildRoom};arena=${room}`);
   add('sharednet_payee',ADDRESS.test(payee),payee||'missing');
   add('sharednet_member_or_instance_token',INSTANCE_TOKEN.test(token),'present-but-redacted');
+  let expectedSeat=null;try{expectedSeat=readExpectedArenaSeat({required:true});add('single_arena_agent_seat',true,expectedSeat);}catch(e){add('single_arena_agent_seat',false,String(e.message||e));}
   if(INSTANCE_TOKEN.test(token)&&ROOM.test(room)){
     try{
-      const api=new SharedNetApi({token}),identity=await api.current();
-      add('sharednet_authenticated',Boolean(identity?.instance?.id??identity?.instance_id),'current Instance resolved');
+      const api=new SharedNetApi({token}),identity=await api.current(),identitySeat=identity?.instance?.id??identity?.instance_id??null;
+      add('sharednet_authenticated',Boolean(identitySeat),'current Instance resolved');
+      add('arena_identity_matches_bound_seat',Boolean(expectedSeat)&&identitySeat===expectedSeat,`current=${identitySeat??'missing'};expected=${expectedSeat??'missing'}`);
       add('payee_owned_by_current_identity',payeeBelongsToIdentity(payee,identity),'must be current Principal/Agent/Instance');
       await api.join(room);
       const detail=await api.request(`/api/v1/rooms/${room}`);

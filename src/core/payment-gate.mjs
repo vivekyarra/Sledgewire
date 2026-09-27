@@ -1,7 +1,8 @@
 import {sha256} from '../receipts/receipt.mjs';
 
-export function paymentMemo(requestId,service){return `sledgewire:${requestId}:${service}`;}
+export const ARENA_PAYMENT_MEMO='Sledgewire';
 export function requestFingerprint({roomId,buyerSeat,requestId,service,input}){return sha256({roomId,buyerSeat,requestId,service,input});}
+export function paymentMemo(){return ARENA_PAYMENT_MEMO;}
 export function requestStorageKey({roomId,buyerSeat,requestId}){return `rqk_${sha256({roomId,buyerSeat,requestId})}`;}
 function principalAddress(x){return typeof x==='string'&&(x.startsWith('p_')||x.startsWith('pri_'));}
 
@@ -10,6 +11,16 @@ export class PaymentGate{
     this.ledger=ledger;this.store=store;this.prices=prices;this.payee=payee;this.uncertainAfterMs=uncertainAfterMs;
     this.ledgerPositiveTtlMs=ledgerPositiveTtlMs;this.ledgerNegativeTtlMs=ledgerNegativeTtlMs;this.ledgerCacheMax=ledgerCacheMax;
     this.txCache=new Map();this.txInflight=new Map();
+  }
+  issueQuote(req){
+    const price=this.prices[req.service];
+    if(!Number.isInteger(price)||price<=0)return {ok:false,reason:'unknown_or_free_service'};
+    const fingerprint=requestFingerprint(req),storageKey=requestStorageKey(req),memo=paymentMemo();
+    if(typeof this.store?.bindPaymentQuote!=='function')throw new Error('payment_quote_store_binding_required');
+    const binding=this.store.bindPaymentQuote({requestId:storageKey,fingerprint,service:req.service,buyerSeat:req.buyerSeat,price,memo});
+    if(binding.status==='corrupt')return {ok:false,reason:'payment_quote_state_corrupt'};
+    if(binding.status==='conflict')return {ok:false,reason:'payment_quote_request_conflict'};
+    return {ok:false,reason:'payment_required',price,memo,fingerprint,storageKey,quote_replay:binding.status==='replay'};
   }
   async lookupTransaction(txnId,signal){
     const now=Date.now(),cached=this.txCache.get(txnId);
@@ -27,9 +38,9 @@ export class PaymentGate{
   async authorize(req,signal){
     const price=this.prices[req.service];
     if(!Number.isInteger(price)||price<=0)return {ok:false,reason:'unknown_or_free_service'};
-    if(!req.txnId)return {ok:false,reason:'payment_required',price,memo:paymentMemo(req.requestId,req.service)};
+    if(!req.txnId)return this.issueQuote(req);
 
-    const fp=requestFingerprint(req),storageKey=requestStorageKey(req);
+    const fp=requestFingerprint(req),memo=paymentMemo(),storageKey=requestStorageKey(req);
     const prior=this.store.inspectClaim?.({requestId:storageKey,txnId:req.txnId,fingerprint:fp,service:req.service,buyerSeat:req.buyerSeat});
     if(prior&&prior.status!=='missing'&&prior.status!=='unattributed'){
       if(prior.status==='wrong_buyer')return {ok:false,reason:'wrong_buyer'};
@@ -42,11 +53,21 @@ export class PaymentGate{
       if(prior.status==='replay')return {ok:true,replay:true,fingerprint:fp,storageKey,cached:prior.response,price};
     }
 
+    // Trial Zero organizer requires the native transfer memo to be the product/team
+    // name ("Sledgewire"). Exact request binding therefore lives in the signed
+    // pre-payment quote + durable quote record, not in the public memo.
+    if(prior?.status==='missing'){
+      const quote=this.store.getPaymentQuote?.(storageKey);
+      if(!quote)return {ok:false,reason:'payment_quote_required'};
+      if(quote.corrupt)return {ok:false,reason:'payment_quote_state_corrupt'};
+      const exact=quote.fingerprint===fp&&quote.service===req.service&&quote.buyer_seat===req.buyerSeat&&Number(quote.price_credits)===price&&quote.memo===memo;
+      if(!exact)return {ok:false,reason:'payment_quote_request_mismatch'};
+    }
+
     const tx=await this.lookupTransaction(req.txnId,signal);
     if(!tx)return {ok:false,reason:'transaction_not_found'};
     if(tx.id!==undefined&&tx.id!==null&&tx.id!==req.txnId)return {ok:false,reason:'wrong_transaction_id'};
 
-    const memo=paymentMemo(req.requestId,req.service);
     const buyer=tx.buyer_instance_id??tx.by_instance_id??tx.sender_instance_id??tx.from_instance_id;
     if(buyer!==req.buyerSeat)return {ok:false,reason:'wrong_buyer'};
 

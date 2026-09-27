@@ -6,7 +6,7 @@ import {announceArenaOnce,arenaAnnouncement} from '../src/sharednet/announcement
 const room='rom_ABCDEFGHIJ';
 test('Arena availability announcement is concise and points to free proof first',()=>{
   const x=arenaAnnouncement('https://sledgewire.example/');
-  assert.equal(x.type,'sledgewire.available.v1');assert.equal(x.free.selfcheck.tool,'sledgewire.selfcheck');assert.equal(x.paid_credits.smoke,3);assert.equal(x.quickstart,'https://sledgewire.example/arena.md');
+  assert.equal(x.type,'sledgewire.available.v1');assert.equal(x.free.proof.tool,'sledgewire.selfcheck');assert.equal(x.best_first_paid.credits,3);assert.equal(x.proof.exact_retry_no_reexecution,true);assert.equal(x.paid_credits.smoke,3);assert.equal(x.quickstart,'https://sledgewire.example/arena.md');
   assert.ok(Buffer.byteLength(JSON.stringify(x))<2000);
 });
 test('Arena availability announcement is durable one-shot across daemon restarts',async()=>{

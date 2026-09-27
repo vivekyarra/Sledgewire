@@ -24,6 +24,25 @@ export class ArenaStore{
     // accepted only after the column is visible on this connection.
     ensureColumn(this.db,'requests','buyer_seat','buyer_seat TEXT');
   }
+  bindPaymentQuote({requestId,fingerprint,service,buyerSeat,price,memo}){
+    const key=`payment_quote:${requestId}`;
+    const value={version:1,request_id:requestId,fingerprint,service,buyer_seat:buyerSeat,price_credits:Number(price),memo,issued_at:new Date().toISOString()};
+    this.db.exec('BEGIN IMMEDIATE');try{
+      const existing=this.db.prepare('SELECT value FROM metadata WHERE key=?').get(key)?.value??null;
+      if(existing!==null){
+        let parsed;try{parsed=JSON.parse(existing);}catch{this.db.exec('COMMIT');return {status:'corrupt'};}
+        const exact=parsed?.fingerprint===fingerprint&&parsed?.service===service&&parsed?.buyer_seat===buyerSeat&&Number(parsed?.price_credits)===Number(price)&&parsed?.memo===memo;
+        this.db.exec('COMMIT');
+        return exact?{status:'replay',quote:parsed}:{status:'conflict',quote:parsed};
+      }
+      this.db.prepare('INSERT INTO metadata(key,value) VALUES(?,?)').run(key,JSON.stringify(value));
+      this.db.exec('COMMIT');return {status:'bound',quote:value};
+    }catch(e){this.db.exec('ROLLBACK');throw e;}
+  }
+  getPaymentQuote(requestId){
+    const raw=this.getMeta(`payment_quote:${requestId}`);if(raw===null)return null;
+    try{return JSON.parse(raw);}catch{return {corrupt:true};}
+  }
   inspectClaim({requestId,txnId,fingerprint,service,buyerSeat=null}){
     const byReq=this.db.prepare('SELECT * FROM requests WHERE request_id=?').get(requestId),byTxn=this.db.prepare('SELECT * FROM requests WHERE txn_id=?').get(txnId),existing=byReq??byTxn;
     if(!existing)return {status:'missing'};
@@ -90,7 +109,7 @@ export class ArenaStore{
   }
   arenaStats({prices={}}={}){
     const rows=this.db.prepare('SELECT service,txn_id,buyer_seat,status,response_json,started_at,completed_at FROM requests ORDER BY rowid ASC').all();
-    const paidBuyers=new Set(),completedBuyers=new Set(),txns=new Set(),paidServiceMix={},serviceMix={},outcomeMix={},latencies=[],smokeBuyers=new Set(),premiumBuyers=new Set();
+    const paidBuyers=new Set(),completedBuyers=new Set(),txns=new Set(),paidServiceMix={},serviceMix={},creditsByService={},outcomeMix={},latencies=[],smokeBuyers=new Set(),premiumBuyers=new Set();
     let earned=0,unknownPrice=0,legacyUnattributed=0,malformed=0,signedDeliveries=0,traceDeliveries=0,completed=0,failed=0,inflight=0;
     for(const row of rows){
       if(row.txn_id)txns.add(row.txn_id);
@@ -104,7 +123,7 @@ export class ArenaStore{
       }else legacyUnattributed++;
       const configuredPrice=Number(prices?.[row.service]),receiptPrice=Number(receipt?.payment?.price_credits);
       const price=Number.isInteger(configuredPrice)&&configuredPrice>0?configuredPrice:(Number.isInteger(receiptPrice)&&receiptPrice>0?receiptPrice:null);
-      if(price===null)unknownPrice++;else earned+=price;
+      if(price===null)unknownPrice++;else{earned+=price;creditsByService[row.service]=(creditsByService[row.service]??0)+price;}
       if(row.status==='inflight'){inflight++;continue;}
       if(row.status==='failed'){failed++;continue;}
       if(row.status!=='completed')continue;
@@ -120,6 +139,8 @@ export class ArenaStore{
     latencies.sort((a,b)=>a-b);const percentile=p=>latencies.length?latencies[Math.min(latencies.length-1,Math.max(0,Math.ceil(latencies.length*p)-1))]:null;
     let converted=0;for(const b of smokeBuyers)if(premiumBuyers.has(b))converted++;
     const rejects=this.counterMap('arena.reject.'),rejections={};for(const [k,v] of Object.entries(rejects))rejections[k.slice('arena.reject.'.length)]=v;
+    const engagementRaw=this.counterMap('arena.'),engagement={};for(const [k,v] of Object.entries(engagementRaw))if(!k.startsWith('arena.reject.'))engagement[k.slice('arena.'.length)]=v;
+    const revenueLeaders=Object.entries(creditsByService).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]));
     return {
       schema:'sledgewire.arena.stats.v2',
       earned_credits:earned,
@@ -132,6 +153,8 @@ export class ArenaStore{
       inflight_requests:inflight,
       credits_per_unique_buyer:paidBuyers.size?Number((earned/paidBuyers.size).toFixed(2)):0,
       paid_service_mix:paidServiceMix,
+      credits_by_service:creditsByService,
+      top_revenue_service:revenueLeaders[0]?.[0]??null,
       service_mix:serviceMix,
       outcome_mix:outcomeMix,
       payment_rejections:rejections,
@@ -139,6 +162,8 @@ export class ArenaStore{
       smoke_buyers:smokeBuyers.size,
       smoke_to_premium_buyers:converted,
       smoke_to_premium_conversion:smokeBuyers.size?Number((converted/smokeBuyers.size).toFixed(4)):0,
+      delivery_success_rate:(completed+failed)?Number((completed/(completed+failed)).toFixed(4)):null,
+      engagement,
       integrity:{signed_deliveries:signedDeliveries,trace_bound_deliveries:traceDeliveries,malformed_completed_rows:malformed,unknown_price_claims:unknownPrice,legacy_unattributed_claims:legacyUnattributed}
     };
   }

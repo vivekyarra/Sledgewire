@@ -1,6 +1,15 @@
 import catalog from '../../catalog.json' with {type:'json'};
 import {validateServiceInput} from './service-input.mjs';
 
+export const QUOTE_INTENTS=['preflight','adversarial','repair_execute','compare','certify','full_dossier'];
+export const QUOTE_INTENT_ALIASES={
+  preflight:'preflight',check:'preflight',test:'preflight',smoke:'preflight',
+  adversarial:'adversarial',security:'adversarial',assay:'adversarial',attack:'adversarial',
+  repair_execute:'repair_execute',repair:'repair_execute',invoke:'repair_execute',execute:'repair_execute',
+  compare:'compare',fleet:'compare',choose:'compare',
+  certify:'certify',seal:'certify',conformance:'certify',
+  full_dossier:'full_dossier',dossier:'full_dossier',gauntlet:'full_dossier',review:'full_dossier'
+};
 const ROUTES={
   preflight:'sledgewire.smoke',
   adversarial:'sledgewire.assay',
@@ -10,10 +19,16 @@ const ROUTES={
   full_dossier:'sledgewire.gauntlet'
 };
 
+export function normalizeQuoteIntent(value='preflight'){
+  const key=String(value??'preflight').trim().toLowerCase().replace(/[\s-]+/g,'_');
+  const intent=QUOTE_INTENT_ALIASES[key];
+  if(!intent)throw new Error('unsupported_quote_intent');
+  return {requested_intent:key,intent};
+}
+
 export function quote({intent='preflight',endpoint=null,targets=null,tool=null}={}){
-  const service=ROUTES[intent];
-  if(!service)throw new Error('unsupported_quote_intent');
-  const price=catalog.services[service].price;
+  const normalized=normalizeQuoteIntent(intent),canonicalIntent=normalized.intent;
+  const service=ROUTES[canonicalIntent],price=catalog.services[service].price;
   let input;
   if(service==='sledgewire.fleet')input={targets:Array.isArray(targets)?targets:[]};
   else if(service==='sledgewire.invoke')input={endpoint,request:{name:tool??'<tool>',arguments:{},evidence:{}}};
@@ -25,7 +40,9 @@ export function quote({intent='preflight',endpoint=null,targets=null,tool=null}=
   const validation=missing_fields.length?{ok:false,reason:'missing_required_quote_context'}:validateServiceInput(service,input);
   return {
     service:'sledgewire.quote',
-    intent,
+    requested_intent:normalized.requested_intent,
+    intent:canonicalIntent,
+    matched_rule:normalized.requested_intent===canonicalIntent?'canonical_intent':'intent_alias',
     recommended_service:service,
     price_credits:price,
     request_ready:validation.ok,
@@ -38,7 +55,8 @@ export function quote({intent='preflight',endpoint=null,targets=null,tool=null}=
       compare:'Use when choosing among several candidate services.',
       certify:'Use when a seller wants a portable reproducible conformance packet.',
       full_dossier:'Use when a seller wants the strongest one-purchase dossier for peer review and buyer confidence.'
-    }[intent],
+    }[canonicalIntent],
+    value_proof:{signed_receipt:true,sharedos_trace:true,exact_retry_no_reexecution:true},
     request_template:{type:'sledgewire.service.request.v1',request_id:'<buyer-unique-id>',service,input}
   };
 }

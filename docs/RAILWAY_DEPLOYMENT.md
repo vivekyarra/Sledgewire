@@ -45,12 +45,15 @@ Set these as service variables/secrets:
     SHAREDNET_ARENA_ROOM_ID=rom_...
     SHAREDNET_PAYEE_ADDRESS=pri_...
     SHAREDNET_MEMBER_TOKEN=sni_...
+    SHAREDNET_ARENA_EXPECTED_SEAT=i_...
     SLEDGEWIRE_PRIVATE_KEY_PEM=<multiline Ed25519 private PEM>
     SLEDGEWIRE_PUBLIC_KEY_PEM=<multiline Ed25519 public PEM>
 
 Railway mounts persistent volumes as root. Set:
 
     RAILWAY_RUN_UID=0
+
+The Arena Room/token/expected-seat values are intentionally last-minute values: obtain them from the organizer join flow, set all three consistently, then redeploy/restart the single Railway service. Do not put the invite token in the long-running Railway environment; only the resulting member token and expected seat belong there.
 
 The `arena:all` launcher uses that root phase only to prepare/chown the database directory and hydrate root-readable file secrets if any are configured. It then drops supplementary groups and switches to:
 
@@ -92,7 +95,7 @@ That no-secret probe verifies:
 
 It never pays or executes paid work. `/ready` is intentionally stricter than `/health`: it becomes green only after the Arena daemon has authenticated to SharedNet and confirmed access to the configured Arena Room.
 
-Then perform the real buyer path from a different SharedNet seat:
+Before any paid rehearsal, confirm `/ready` reports the daemon bound to the expected official Arena seat. Then perform the real buyer path from a different SharedNet seat:
 
     npm run arena:rehearse
 
@@ -113,7 +116,7 @@ Finally run:
     npm run public:probe -- https://YOUR-RAILWAY-DOMAIN --arena
     npm run preflight -- --live
 
-Do not replace the submission product link with the Railway `/arena.md` URL until both commands are green.
+Do not replace the submission product link with the Railway `/arena.md` URL until both commands are green. After the 100-credit grant is redeemed, also run `npm run arena:budget -- --init` from the representative seat and keep `remaining_to_spend` under active control during Arena 2.
 
 ## Failure behavior
 

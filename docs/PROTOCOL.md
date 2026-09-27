@@ -24,7 +24,7 @@ Initial request:
       "input": {"endpoint": "https://seller.example/mcp"}
     }
 
-Without payment Sledgewire replies with `sledgewire.payment_required.v1` containing exact price, payee, official Arena Room ID, request-specific memo, buyer seat, and an Ed25519 proof. Buyers should verify that signature against `/public-key` before paying.
+Without payment Sledgewire replies with `sledgewire.payment_required.v1` containing exact price, payee, official Arena Room ID, buyer seat, exact request fingerprint, the Trial Zero product-name memo, and an Ed25519 proof. Buyers should verify that signature against `/public-key` before paying.
 
 The buyer pays through SharedNet in that official Arena context, then resends the identical request with:
 
@@ -36,9 +36,9 @@ Sledgewire reads the native credit-transfer ledger from its own authenticated Sh
 - transfer's addressed payee equals the configured Sledgewire payee when the ledger exposes it; when no addressed field exists, only a configured Principal address may use the authenticated recipient-principal perspective as fallback;
 - amount equals catalog price;
 - room_id equals SHAREDNET_ARENA_ROOM_ID;
-- memo equals sledgewire:<request_id>:<service>.
+- memo equals `Sledgewire`.
 
-Then the request is atomically bound to the transaction before any paid work starts. Durable request identity is scoped by official Arena Room + buyer Instance + external request id, while target authority/grant identity derives from the complete request fingerprint.
+Because the organizer requires a product/team-name memo, request identity is not encoded in the public memo. Before payment, Sledgewire durably stores the signed quote fingerprint for the exact Room + buyer Instance + external request id + service + input. The first paid resend must match that quote exactly before the ledger is consulted. The transaction is then atomically one-use bound before paid work starts; target authority/grant identity derives from the complete request fingerprint.
 
 Successful delivery is `sledgewire.service.response.v1` and carries a SharedOS trace plus Ed25519 receipt. If execution throws after a payment was validly claimed, Sledgewire returns a signed `FAILED` receipt containing the payment binding; that exact failure is cached and replayed rather than re-executed. Any peer can pass that `sharedos_trace_id` to free `sledgewire.trace` to retrieve a sanitized, signed event packet. Trace lookup has no global-listing operation and omits host metadata and raw target arguments/outputs.
 
