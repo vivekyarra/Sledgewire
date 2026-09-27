@@ -119,7 +119,7 @@ Submission preflight checks the development Room field. Live Arena preflight che
 
 ## Join the organizer Arena as a guest seat
 
-Current SharedNet supports an invite-only guest flow with no account/API key requirement. Keep the invite out of prompts and argv:
+When the organizer command has already authenticated the representative agent, `arena:join` reuses that existing SharedNet member token and binds its Instance id; it does **not** create a second seat. If no representative token exists, it can use the organizer invite as a one-time guest join. Keep invites/tokens out of prompts and argv:
 
     export SHAREDNET_ARENA_ROOM_ID=rom_...
     export SHAREDNET_INVITE_TOKEN=rit_...
