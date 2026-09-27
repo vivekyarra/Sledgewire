@@ -74,3 +74,17 @@ test('bogus unique payment ids hit the ledger only up to the per-buyer miss budg
   assert.equal(reasons.filter(x=>x==='transaction_not_found').length,4);
   assert.equal(reasons.filter(x=>x==='payment_verification_rate_limited').length,6);
 });
+
+test('global bogus-payment breaker caps aggregate ledger misses across many seats',async()=>{
+  const store=new ArenaStore(':memory:');let reads=0;
+  const gate=new PaymentGate({ledger:{async get(){reads++;return null;}},store,prices,payee,ledgerMissPerBuyer:100,ledgerMissGlobal:5,ledgerMissWindowMs:60_000});
+  const reasons=[];
+  for(let i=0;i<12;i++){
+    const buyerSeat='i_'+String(i).padStart(10,'0');
+    const req={...base,buyerSeat,requestId:`global-miss-${i}`,txnId:null};gate.issueQuote(req);
+    reasons.push((await gate.authorize({...req,txnId:`txn_${String(i).padStart(10,'0')}`})).reason);
+  }
+  assert.equal(reads,5);
+  assert.equal(reasons.filter(x=>x==='transaction_not_found').length,5);
+  assert.equal(reasons.filter(x=>x==='payment_verification_rate_limited').length,7);
+});
