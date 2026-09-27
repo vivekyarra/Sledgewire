@@ -4,18 +4,40 @@ export const PAYMENT_QUOTE_TTL_MS=4*60*60*1000;
 export const PAYMENT_QUOTE_MAX_GLOBAL=20_000;
 export const PAYMENT_QUOTE_MAX_PER_BUYER=256;
 
-function hasColumn(db,table,column){return db.prepare(`PRAGMA table_info(${table})`).all().some(r=>r.name===column);}
+const SQLITE_BUSY_DELAYS_MS=[10,25,50,100,200,400,800,1200];
+const SQLITE_BUSY_SLEEP=new Int32Array(new SharedArrayBuffer(4));
+function sqliteBusy(error){
+  const message=String(error?.message??'').toLowerCase();
+  return error?.errcode===5||error?.errcode===6||message.includes('database is locked')||message.includes('database table is locked')||message.includes('database is busy');
+}
+function retrySqliteBusySync(fn){
+  let last;
+  for(let attempt=0;attempt<=SQLITE_BUSY_DELAYS_MS.length;attempt++){
+    try{return fn();}
+    catch(error){
+      if(!sqliteBusy(error)||attempt===SQLITE_BUSY_DELAYS_MS.length)throw error;
+      last=error;Atomics.wait(SQLITE_BUSY_SLEEP,0,0,SQLITE_BUSY_DELAYS_MS[attempt]);
+    }
+  }
+  throw last;
+}
+function hasColumn(db,table,column){return retrySqliteBusySync(()=>db.prepare(`PRAGMA table_info(${table})`).all().some(r=>r.name===column));}
 function ensureColumn(db,table,column,definition){
   if(hasColumn(db,table,column))return false;
-  try{db.exec(`ALTER TABLE ${table} ADD COLUMN ${definition}`);}
+  try{retrySqliteBusySync(()=>db.exec(`ALTER TABLE ${table} ADD COLUMN ${definition}`));}
   catch(e){if(!hasColumn(db,table,column))throw e;return false;}
   return true;
 }
 
 export class ArenaStore{
   constructor(path=':memory:'){
-    this.db=new DatabaseSync(path);this.db.exec('PRAGMA journal_mode=WAL');this.db.exec('PRAGMA busy_timeout=5000');
-    this.db.exec(`
+    this.db=new DatabaseSync(path);
+    // Install the connection wait policy before any operation that can need an
+    // exclusive lock. Multiple production processes may cold-open the same
+    // database at exactly the same time.
+    this.db.exec('PRAGMA busy_timeout=5000');
+    retrySqliteBusySync(()=>this.db.exec('PRAGMA journal_mode=WAL'));
+    retrySqliteBusySync(()=>this.db.exec(`
       CREATE TABLE IF NOT EXISTS requests(request_id TEXT PRIMARY KEY,txn_id TEXT NOT NULL UNIQUE,fingerprint TEXT NOT NULL,service TEXT NOT NULL,buyer_seat TEXT,status TEXT NOT NULL CHECK(status IN ('inflight','completed','failed')),response_json TEXT,error_json TEXT,started_at TEXT NOT NULL,execution_started_at TEXT,completed_at TEXT);
       CREATE TABLE IF NOT EXISTS grants(namespace_id TEXT NOT NULL,grant_id TEXT NOT NULL,grant_json TEXT NOT NULL,revoked_at TEXT,PRIMARY KEY(namespace_id,grant_id));
       CREATE TABLE IF NOT EXISTS grant_usage(namespace_id TEXT NOT NULL,grant_id TEXT NOT NULL,used INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(namespace_id,grant_id));
@@ -29,15 +51,15 @@ export class ArenaStore{
       CREATE INDEX IF NOT EXISTS idx_payment_quotes_issued ON payment_quotes(issued_at);
       CREATE TABLE IF NOT EXISTS metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS counters(key TEXT PRIMARY KEY,value INTEGER NOT NULL DEFAULT 0);
-    `);
+    `));
     // Online migration for pre-v0.3.9 databases. Duplicate-column races are
     // accepted only after the column is visible on this connection.
     ensureColumn(this.db,'requests','buyer_seat','buyer_seat TEXT');
     const executionBoundaryAdded=ensureColumn(this.db,'requests','execution_started_at','execution_started_at TEXT');
-    if(executionBoundaryAdded)this.db.prepare("UPDATE requests SET execution_started_at=started_at WHERE status='inflight' AND execution_started_at IS NULL").run();
+    if(executionBoundaryAdded)retrySqliteBusySync(()=>this.db.prepare("UPDATE requests SET execution_started_at=started_at WHERE status='inflight' AND execution_started_at IS NULL").run());
     ensureColumn(this.db,'room_messages','sequence','sequence INTEGER');
-    this.db.exec('CREATE INDEX IF NOT EXISTS idx_room_messages_sequence ON room_messages(sequence)');
-    this.db.prepare('DELETE FROM audit_outbox WHERE sent_at IS NOT NULL').run();
+    retrySqliteBusySync(()=>this.db.exec('CREATE INDEX IF NOT EXISTS idx_room_messages_sequence ON room_messages(sequence)'));
+    retrySqliteBusySync(()=>this.db.prepare('DELETE FROM audit_outbox WHERE sent_at IS NOT NULL').run());
   }
   bindPaymentQuote({requestId,fingerprint,service,buyerSeat,price,memo}){
     const key=`payment_quote:${requestId}`,now=Date.now(),nowIso=new Date(now).toISOString(),expiresAt=new Date(now+PAYMENT_QUOTE_TTL_MS).toISOString();
