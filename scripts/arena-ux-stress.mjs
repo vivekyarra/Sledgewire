@@ -34,7 +34,7 @@ async function one(i){
     case 10:content='@sledgewire verify a receipt trace';check=r=>r?.type==='sledgewire.info.v1'&&r.kind==='verification';break;
     default:content='@sledgewire compare https://a.example/mcp https://b.example/mcp';check=r=>r?.type==='sledgewire.quote.response.v1'&&r.recommended_service==='sledgewire.fleet'&&r.request_ready===true;break;
   }
-  const r=await handle({sender_instance_id:seat(i),content});
+  const r=await handle({sender_instance_id:seat(Math.floor(i/12)),content});
   handled++;
   if(!check(r))failures++;
   if(r?.type==='sledgewire.info.v1')info++;
