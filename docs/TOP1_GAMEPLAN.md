@@ -1,128 +1,78 @@
-# Trial Zero competition game plan
+# Trial Zero top-score game plan
 
-Winning cannot be guaranteed because rankings and other agents' buying behavior are external. The engineering objective is to remove avoidable failure modes and maximize the evidence that judge agents and buyers can observe.
+No code change can guarantee first place because Arena 1 rankings and Arena 2 buyer demand are external. The goal is to remove avoidable losses.
 
-## Main-track P0: be callable
+## Arena 1: judge-agent confidence
 
-The official guide requires a CLI or MCP interface another agent can understand and use, ideally from one link. Sledgewire's deployed `/arena.md` must therefore be the primary entry point and must be reachable without repository archaeology.
+The first 30 seconds should prove the product:
 
-The product loses before judging starts if:
+    problem -> free selfcheck -> signed proof -> real target quote -> smallest useful paid check -> trace verification
 
-- the public link is docs-only;
-- `/ready` is red;
-- the seller daemon is not consuming the Arena Room;
-- payment routing points to the wrong Room/payee;
-- receipts cannot be verified;
-- restart loses DB/key state.
+Keep architecture behind the proof. A judge should quickly understand:
 
-## Arena 1 strategy: maximize judge-agent confidence
+- what Sledgewire does;
+- what is free;
+- what each paid tier costs;
+- how to call it;
+- what READY does and does not mean;
+- how to verify a receipt.
 
-Three judge agents produce the overall ranking. Optimize for fast comprehension and independently testable evidence.
+Use peer trials to produce specific critiques and improve interaction quality.
 
-Strong sequence:
+## Arena 2: two simultaneous score obligations
 
-    one-line problem
-    -> free selfcheck
-    -> signed proof
-    -> quote against a real peer MCP
-    -> smallest useful paid test
-    -> trace / receipt verification
+### Earn
 
-Key behaviors:
+Maximize legitimate incoming credits by minimizing purchase friction:
 
-- keep the pitch under a few lines;
-- make the free proof runnable immediately;
-- test several peer services so critiques are grounded in real interactions;
-- ask targeted questions instead of assuming ambiguous failures are product faults;
-- use factual states rather than a made-up trust score;
-- show SharedOS authority separation only when it strengthens the evaluation;
-- submit the required ranking/review before time expires.
+- free quote/selfcheck;
+- 3-credit Smoke as the first paid step;
+- upsell only when the cheaper result leaves a real unresolved need;
+- fast signed delivery;
+- exact replay without duplicate charge/execution.
 
-Three peer trials is a useful internal coverage target when the field permits it, but it is not an organizer-published eligibility threshold.
+### Spend
 
-## Arena 2 strategy: maximize valid credits earned
+The organizer now explicitly requires the representative to spend all **100 event credits within one hour**.
 
-The scoreboard is valid incoming credits earned through service transactions.
+Initialize the live baseline with `npm run arena:budget -- --init`. Track cumulative `sent`, not wallet balance, because incoming sales can increase the purse. Use the exact-spend planner on discovered worthwhile offers. Prioritize seller diversity and real utility, then close the denomination gap before the deadline.
 
-Commercial ladder:
+Do not wait for a live ranking; none is provided.
 
-- Smoke 3 — low-friction pre-spend reality check.
-- Assay 8 — deeper adversarial protocol/safety check.
-- Invoke 12 — evidence-backed repair + independent inspection + bounded execution.
-- Fleet 20 — compare up to six candidates.
-- Seal 25 — portable conformance evidence.
-- Gauntlet 35 — strongest one-shot dossier.
+## Payment compatibility
 
-Conversion policy:
+Incoming Sledgewire payments must use native memo `Sledgewire`, matching the organizer's product/team-name instruction.
 
-- start uncertain buyers with free quote;
-- prove the product with free selfcheck;
-- default to the cheapest service that resolves the need;
-- upsell only when a concrete unresolved need remains;
-- deliver fast and invite receipt/trace verification;
-- never double-charge or re-execute exact retries.
+Security remains strong because request identity is not delegated to that public memo. The pre-payment signed quote and durable quote record bind:
 
-Track:
+    Arena Room
+    buyer seat
+    request id
+    service
+    exact input fingerprint
+    price
+    payee
 
-    earned_credits
-    unique_buyers
-    paid_transactions
-    paid service mix
-    completed delivery mix
-    credits / unique buyer
-    smoke-to-premium conversion
-    delivery p50 / p95
-    payment rejection reasons
-    signed receipt coverage
-    SharedOS trace coverage
-    duplicate paid executions
+A changed paid resend is rejected before ledger-backed execution.
 
-There is no official minimum outgoing spend in the pinned guide. Spend event credits only where a peer service creates real value.
+## Refund discipline
 
-## Sharednet Collaboration award
+Refunds reduce earned credits. Sledgewire does not automatically refund successful or idempotent work. Exact retries replay the original outcome. Genuine paybacks, if ever required, are deliberate and visible; local gross claims are not presented as the hidden organizer score.
 
-The submitted development Room is evidence. Preserve concrete message IDs showing agents exchanging information, handing off tasks, reviewing failures and dividing work.
+## One-seat rule
 
-A strong collaboration submission should make it easy to see:
+Only the official competition agent seat joins. The daemon must authenticate as that bound seat. A second independent seller/bot seat is a launch blocker.
 
-- who identified requirements;
-- who implemented;
-- who red-teamed;
-- what failure was found;
-- who patched it;
-- who independently verified the patch.
+## Final sequence
 
-## SharedOS Outstanding Build award
-
-The pinned guide describes this award in terms of practical SharedOS use, product completeness and usability.
-
-Sledgewire should expose:
-
-- purpose string `sledgewire.test-repair-and-invoke-agent-services`;
-- deny-by-default exact-scope grants;
-- one use by default;
-- Dispatcher with no target execution grant;
-- Scout exact discovery;
-- Mechanic local repair only;
-- Inspector independent validation only;
-- Breaker exact target/workflow execution;
-- explicit active/destructive authority;
-- durable grant use/audit state;
-- paid `sharedos_trace_id` and free signed `sledgewire.trace`.
-
-External audit export is a useful additional proof if available, not a main-Arena prerequisite unless the organizer explicitly requires it.
-
-## Final proof sequence
-
-    exact green main
-    -> persistent public deployment
-    -> public:probe --arena
-    -> different-seat 3-credit purchase
-    -> verify signed receipt + trace
-    -> restart with same DB/key
-    -> replay with zero second payment
+    exact green branch
+    -> merge main
+    -> deploy exact main
+    -> organizer Room released
+    -> bind single seat
+    -> public probe
+    -> second-seat Smoke purchase
+    -> restart replay
     -> preflight --live
-    -> one-hour no-human rehearsal
-    -> freeze
-
-Do not replace deployment proof with documentation claims.
+    -> initialize 100-credit budget
+    -> autonomous Arena
