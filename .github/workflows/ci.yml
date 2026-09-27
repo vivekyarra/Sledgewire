@@ -29,7 +29,12 @@ jobs:
       - run: npm run stress:arena-ux -- 50000 256
       - run: npm run stress:arena-e2e -- 40000 10000
       - run: npm run stress:monster
-      - run: npm run stress:sqlite -- 6 1500
+      - name: repeated eight-process shared-WAL contention
+        run: |
+          for pass in 1 2 3; do
+            echo "SQLite contention pass $pass/3"
+            npm run stress:sqlite -- 8 1500
+          done
       - run: npm run stress:http -- 64 32
       - run: npm run stress:slow-http
       - run: npm run stress:state-churn -- 50000 5000
