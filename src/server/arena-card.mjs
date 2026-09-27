@@ -24,7 +24,7 @@ export function arenaCard(baseUrl){
     arena2_buyer_path:{
       safest_entry:{tool:'sledgewire.quote',price_credits:0},
       best_first_paid:{service:'sledgewire.smoke',price_credits:3,why:'lowest-cost real target check before spending more'},
-      purchase_flow:['check /ready','send paid request without payment','receive buyer-bound signed quote','pay exact native SharedNet credits to quoted payee/memo','resend identical request with payment_txn_id','verify signed delivery and trace']
+      purchase_flow:['check /ready','send paid request without payment','receive buyer-bound signed quote with exact request fingerprint','pay exact native SharedNet credits to quoted payee with memo Sledgewire','resend identical request with payment_txn_id','verify signed delivery and trace']
     },
     fastest_demo:{tool:'sledgewire.selfcheck',price_credits:0,arguments:{}},
     free_selector:{tool:'sledgewire.quote',price_credits:0,intents:['preflight','adversarial','repair_execute','compare','certify','full_dossier'],aliases:['check','security','repair','choose','conformance','dossier'],note:'Only send/pay the returned request when request_ready is true; otherwise fill missing_fields and quote again.'},
@@ -34,6 +34,12 @@ export function arenaCard(baseUrl){
       paid_authority:'exact-scope purpose-bound SharedOS grants',
       replay:'exact completed retries return the durable cached result without second execution',
       paid_trace:'receipt sharedos_trace_id -> free sledgewire.trace'
+    },
+    payment:{
+      native_sharednet_memo:'Sledgewire',
+      memo_policy:'Trial Zero organizer product/team-name memo',
+      request_binding:'signed buyer-bound quote + durable exact request fingerprint',
+      note:'The public memo is intentionally not the request fingerprint; altered paid resends are rejected against the stored signed-quote binding before ledger execution.'
     },
     limits:{
       ready_semantics:'READY means only the recorded checks passed for that target at that time.',
@@ -102,9 +108,9 @@ export function arenaMarkdown(baseUrl){
     '',
     '## Purchase safely',
     '',
-    'Paid requests use `sledgewire.service.request.v1`. Send the request **without payment first**. Sledgewire returns a buyer-bound signed quote containing the exact price, payee, Room-bound memo, exact request fingerprint, deliverable and verification path. Pay that native SharedNet transfer, then resend the identical request with `payment_txn_id`.',
+    'Paid requests use `sledgewire.service.request.v1`. Send the request **without payment first**. Sledgewire returns a buyer-bound signed quote containing the exact price, payee, exact request fingerprint, deliverable and verification path. For Trial Zero, the native SharedNet memo is the product name `Sledgewire`. Pay that transfer, then resend the identical request with `payment_txn_id`.',
     '',
-    'The payment-v2 memo is bound to Room + buyer + request id + service + exact input. Changing the endpoint/input after the signed quote makes the payment invalid for that altered request.',
+    'Request security does not depend on putting secrets or fingerprints in the public memo: the signed quote plus durable seller binding locks Room + buyer + request id + service + exact input. Changing the endpoint/input after quote is rejected before ledger-backed execution.',
     '',
     'Exact completed retries return the durable cached delivery and never execute twice. A crash with uncertain target side effects never triggers a blind retry.',
     '',
