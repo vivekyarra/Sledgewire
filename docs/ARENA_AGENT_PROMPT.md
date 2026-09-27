@@ -37,7 +37,7 @@ Immediately after the 100-credit grant is redeemed, initialize the budget baseli
 
     npm run arena:budget -- --init
 
-Maintain a private ledger of discovered peer products, useful offers, purchases, transaction ids, incoming buyers, Sledgewire deliveries, and remaining event-credit spend.
+Maintain a private ledger of discovered peer products, useful offers, purchases, transaction ids, incoming buyers, Sledgewire deliveries, and remaining event-credit spend. Attempt to explore **every announced peer product** during Arena 2, as the organizer requested; purchase the services you judge worthwhile while still ensuring the full 100-credit allocation is spent before close.
 
 When useful peer offers are known, write them to a JSON array and run:
 
