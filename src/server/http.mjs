@@ -14,7 +14,7 @@ const port=boundedInteger(process.env.PORT,{name:'port',defaultValue:8787,min:1,
 const production=process.env.NODE_ENV==='production',paidBypass=process.env.SLEDGEWIRE_PUBLIC_PAID_EXECUTION==='1';
 const base=publicBaseOrigin(process.env.PUBLIC_BASE_URL||`http://127.0.0.1:${port}`,{production});
 if(production&&paidBypass)throw new Error('production_paid_execution_bypass_forbidden');
-let active=0;const maxActive=boundedInteger(process.env.SLEDGEWIRE_HTTP_CONCURRENCY,{name:'http_concurrency',defaultValue:64,min:4,max:256}),maxConnections=boundedInteger(process.env.SLEDGEWIRE_HTTP_MAX_CONNECTIONS,{name:'http_max_connections',defaultValue:512,min:32,max:4096});
+let active=0,bodyReaders=0;const maxActive=boundedInteger(process.env.SLEDGEWIRE_HTTP_CONCURRENCY,{name:'http_concurrency',defaultValue:64,min:4,max:256}),maxBodyReaders=boundedInteger(process.env.SLEDGEWIRE_HTTP_BODY_READERS,{name:'http_body_readers',defaultValue:256,min:16,max:1024}),maxConnections=boundedInteger(process.env.SLEDGEWIRE_HTTP_MAX_CONNECTIONS,{name:'http_max_connections',defaultValue:512,min:32,max:4096}),requestTimeoutMs=boundedInteger(process.env.SLEDGEWIRE_HTTP_REQUEST_TIMEOUT_MS,{name:'http_request_timeout_ms',defaultValue:10_000,min:1_000,max:60_000}),headersTimeoutMs=boundedInteger(process.env.SLEDGEWIRE_HTTP_HEADERS_TIMEOUT_MS,{name:'http_headers_timeout_ms',defaultValue:5_000,min:500,max:30_000}),socketIdleMs=boundedInteger(process.env.SLEDGEWIRE_HTTP_SOCKET_IDLE_MS,{name:'http_socket_idle_ms',defaultValue:12_000,min:500,max:60_000});
 const publicArena=!paidBypass;
 const arenaRoomId=process.env.SHAREDNET_ARENA_ROOM_ID??null;
 const dbPath=process.env.SLEDGEWIRE_DB??'.sledgewire/arena.db';fs.mkdirSync(path.dirname(path.resolve(dbPath)),{recursive:true});const traceStore=new ArenaStore(dbPath);
@@ -22,10 +22,11 @@ const allowedOrigins=new Set([new URL(base).origin,...String(process.env.SLEDGEW
 const allowedHosts=allowedHostSet(base,process.env.SLEDGEWIRE_ALLOWED_HOSTS??'');
 
 const server=http.createServer(async(req,res)=>{
+  try{
   res.setHeader('x-content-type-options','nosniff');res.setHeader('referrer-policy','no-referrer');res.setHeader('cache-control','no-store');
   if(req.method==='GET'&&req.url==='/health'){
     const daemon=readArenaDaemonReadiness(traceStore,arenaRoomId);
-    return json(res,200,{ok:true,name:'sledgewire',version:VERSION,key_id:PUBLIC_KEY_ID,active_requests:active,paid_execution:publicArena?'sharednet-payment-required':'direct-enabled',arena_daemon:daemon});
+    return json(res,200,{ok:true,name:'sledgewire',version:VERSION,key_id:PUBLIC_KEY_ID,active_requests:active,body_readers:bodyReaders,paid_execution:publicArena?'sharednet-payment-required':'direct-enabled',arena_daemon:daemon});
   }
   if(req.method==='GET'&&req.url==='/ready'){
     const daemon=readArenaDaemonReadiness(traceStore,arenaRoomId),ready=daemon.ready;
@@ -39,10 +40,11 @@ const server=http.createServer(async(req,res)=>{
   if(req.method!=='POST'||req.url!=='/mcp'){res.statusCode=404;return res.end('not found');}
   if(production&&!hostHeaderAllowed(req.headers.host,allowedHosts))return json(res,403,{jsonrpc:'2.0',id:null,error:{code:-32000,message:'Host not allowed'}});
   const origin=String(req.headers.origin??'');if(origin&&!allowedOrigins.has(origin))return json(res,403,{jsonrpc:'2.0',id:null,error:{code:-32000,message:'Origin not allowed'}});
-  if(active>=maxActive)return json(res,503,{error:'server_busy'});
   const contentLength=req.headers['content-length'];if(contentLength!==undefined&&Number(contentLength)>1_000_000){req.resume();return json(res,413,{error:'request_too_large'});}
   if(!isJsonContentType(req.headers['content-type']))return json(res,415,{error:'application_json_required'});
-  active++;
+  if(bodyReaders>=maxBodyReaders){req.resume();return json(res,503,{error:'body_reader_busy'});}
+  bodyReaders++;
+  let msg;
   try{
     const chunks=[];let bytes=0;
     for await(const c of req){
@@ -50,12 +52,27 @@ const server=http.createServer(async(req,res)=>{
       if(bytes>1_000_000){req.resume();res.statusCode=413;return res.end();}
       chunks.push(b);
     }
-    let msg;try{msg=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{return json(res,400,{error:'invalid_json'});}
-    const validation=validateHttpMcp(msg,req.headers);if(!validation.ok)return json(res,validation.status,validation.body);
+    try{msg=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{return json(res,400,{error:'invalid_json'});}
+  }finally{bodyReaders--;}
+  const validation=validateHttpMcp(msg,req.headers);if(!validation.ok)return json(res,validation.status,validation.body);
+  if(active>=maxActive)return json(res,503,{error:'server_busy'});
+  active++;
+  try{
     const out=await handleRpc(msg,{publicArena,publicBaseUrl:base,arenaRoomId,traceStore});if(out===null){res.statusCode=202;return res.end();}
     return json(res,200,out);
   }finally{active--;}
+  }catch(e){
+    if(isClientDisconnect(e))return;
+    console.error(`http-request:${String(e?.message??e).slice(0,500)}`);
+    if(!res.headersSent&&!res.writableEnded&&!res.destroyed)return json(res,500,{error:'internal_error'});
+    try{res.destroy();}catch{}
+  }
 });
-server.requestTimeout=15_000;server.headersTimeout=10_000;server.keepAliveTimeout=5_000;server.maxConnections=maxConnections;server.maxRequestsPerSocket=100;
+server.requestTimeout=requestTimeoutMs;server.headersTimeout=Math.min(headersTimeoutMs,requestTimeoutMs);server.keepAliveTimeout=3_000;server.maxConnections=maxConnections;server.maxRequestsPerSocket=100;server.maxHeadersCount=64;server.setTimeout(socketIdleMs,socket=>socket.destroy());
 server.listen(port,()=>console.error(`sledgewire http listening on ${port}`));
+function isClientDisconnect(error){
+  const code=String(error?.code??'');
+  const message=String(error?.message??'').toLowerCase();
+  return code==='ECONNRESET'||code==='ECONNABORTED'||code==='ERR_STREAM_PREMATURE_CLOSE'||message==='aborted';
+}
 function json(res,status,value){res.statusCode=status;res.setHeader('content-type','application/json');res.end(JSON.stringify(value));}

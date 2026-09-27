@@ -73,6 +73,12 @@ test('arena handler answers value authority verification scope and quickstart qu
     const r=await handle({sender_instance_id:'i_ZYXWVUTSRQ',content:text});assert.equal(r.type,'sledgewire.info.v1');assert.equal(r.kind,kind);assert.equal(r.quickstart,'https://sledgewire.example/arena.md');
   }
 });
+test('typed quote rejects oversized reflected request ids without ledger or service work',async()=>{
+  const store=new ArenaStore(':memory:'),kp=generateSigningKeypair();let reads=0,executions=0;
+  const handle=createArenaHandler({store,ledger:{async get(){reads++;return null;}},room:'rom_ABCDEFGHIJ',payee:'p_ABCDEFGHIJ',signing:{privateKeyPem:kp.privateKeyPem},publicBaseUrl:'https://sledgewire.example',runService:async()=>{executions++;}});
+  const r=await handle({sender_instance_id:'i_ZYXWVUTSRQ',content:JSON.stringify({type:'sledgewire.quote.request.v1',request_id:'x'.repeat(20_000),intent:'preflight',endpoint:'https://example.com/mcp'})});
+  assert.equal(r.state,'FAILED');assert.equal(r.reason,'invalid_request_id');assert.equal(r.request_id,null);assert.equal(reads,0);assert.equal(executions,0);
+});
 test('arena typed quote accepts buyer-friendly aliases and malformed quote fails without poisoning handler',async()=>{
   const store=new ArenaStore(':memory:');const kp=generateSigningKeypair();const handle=createArenaHandler({store,ledger:{get:async()=>null},room:'rom_ABCDEFGHIJ',payee:'p_ABCDEFGHIJ',signing:{privateKeyPem:kp.privateKeyPem},publicBaseUrl:'https://sledgewire.example'});
   const ok=await handle({sender_instance_id:'i_ZYXWVUTSRQ',content:JSON.stringify({type:'sledgewire.quote.request.v1',request_id:'q1',intent:'dossier',endpoint:'https://example.com/mcp'})});

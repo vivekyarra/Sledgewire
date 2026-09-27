@@ -42,10 +42,10 @@ child.stderr.on('data',c=>{stderr=(stderr+c.toString()).slice(-20000);});
 const started=Date.now();
 try{
   await waitReady(port,child);
-  const health=JSON.parse((await req(port,{path:'/health'})).text);if(health.ok!==true||health.version!=='0.3.14')throw new Error('health_contract_failed');
+  const health=JSON.parse((await req(port,{path:'/health'})).text);if(health.ok!==true||health.version!=='0.3.15')throw new Error('health_contract_failed');
   const ready=await req(port,{path:'/ready'}),readyJson=JSON.parse(ready.text);if(ready.status!==200||readyJson.ready!==true)throw new Error('ready_contract_failed');
   const md=await req(port,{path:'/arena.md'});if(md.status!==200||!/30-second judge path/.test(md.text)||!/Fast buyer path/.test(md.text))throw new Error('arena_markdown_failed');
-  const card=JSON.parse((await req(port,{path:'/arena.json'})).text);if(card.version!=='0.3.14'||card.payment?.native_sharednet_memo!=='Sledgewire')throw new Error('arena_card_failed');
+  const card=JSON.parse((await req(port,{path:'/arena.json'})).text);if(card.version!=='0.3.15'||card.payment?.native_sharednet_memo!=='Sledgewire')throw new Error('arena_card_failed');
 
   const sc=modernCall('sledgewire.selfcheck',{},1),t1=Date.now();
   const selfchecks=await Promise.all(Array.from({length:selfcheckN},(_,i)=>{const call=modernCall('sledgewire.selfcheck',{},i+1);return req(port,{path:'/mcp',method:'POST',headers:call.headers,body:call.body,label:`selfcheck-${i}`});}));
@@ -63,7 +63,7 @@ try{
   const oversizedBody='x'.repeat(1_000_001);const oversized=await req(port,{path:'/mcp',method:'POST',headers:{'Content-Type':'application/json','Content-Length':String(Buffer.byteLength(oversizedBody))},body:oversizedBody,label:'oversized-body'});if(oversized.status!==413)throw new Error(`oversized_expected_413_got_${oversized.status}`);
 
   const finalHealth=await req(port,{path:'/health',label:'final-health'});if(finalHealth.status!==200)throw new Error('server_not_healthy_after_stress');
-  console.log(JSON.stringify({type:'sledgewire.http.arena-stress.v1',version:'0.3.14',selfchecks:selfcheckN,selfcheck_ms:selfcheckMs,paid_routes:paidRouteN,paid_route_ms:routeMs,host_guard:true,origin_guard:true,oversized_early_reject:true,healthy_after_stress:true,total_ms:Date.now()-started},null,2));
+  console.log(JSON.stringify({type:'sledgewire.http.arena-stress.v1',version:'0.3.15',selfchecks:selfcheckN,selfcheck_ms:selfcheckMs,paid_routes:paidRouteN,paid_route_ms:routeMs,host_guard:true,origin_guard:true,oversized_early_reject:true,healthy_after_stress:true,total_ms:Date.now()-started},null,2));
 }finally{
   child.kill('SIGTERM');await new Promise(resolve=>{if(child.exitCode!==null)return resolve();child.once('exit',resolve);setTimeout(()=>{child.kill('SIGKILL');resolve();},3000).unref();});
   fs.rmSync(dir,{recursive:true,force:true});

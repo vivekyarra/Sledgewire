@@ -8,6 +8,7 @@ import {SEAT,TXN} from './api.mjs';
 import {PAYMENT_QUOTE_TTL_MS} from '../store/arena-store.mjs';
 
 const REQUEST_ID=/^[A-Za-z0-9][A-Za-z0-9._-]{2,95}$/;
+const QUOTE_REQUEST_ID=/^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/;
 const ROOM_MESSAGE_MAX_BYTES=32_768;
 const TOOL_TOKEN=/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
@@ -134,8 +135,13 @@ export function createArenaHandler({store,ledger,room,payee,signing,publicBaseUr
     if(req?.type==='sledgewire.service.request.v1')return serve(req,buyerSeat);
     if(req?.type==='sledgewire.quote.request.v1'){
       store.incrementCounter('arena.quote.typed');
-      try{return {type:'sledgewire.quote.response.v1',request_id:req.request_id??null,...quote(req)};}
-      catch(e){return {type:'sledgewire.quote.response.v1',request_id:req.request_id??null,state:'FAILED',reason:String(e.message||e)};}
+      const quoteRequestId=req.request_id===undefined||req.request_id===null?null:req.request_id;
+      if(quoteRequestId!==null&&(typeof quoteRequestId!=='string'||!QUOTE_REQUEST_ID.test(quoteRequestId))){
+        store.incrementCounter('arena.reject.invalid_quote_request_id');
+        return {type:'sledgewire.quote.response.v1',request_id:null,state:'FAILED',reason:'invalid_request_id'};
+      }
+      try{return {type:'sledgewire.quote.response.v1',request_id:quoteRequestId,...quote(req)};}
+      catch(e){return {type:'sledgewire.quote.response.v1',request_id:quoteRequestId,state:'FAILED',reason:String(e.message||e)};}
     }
 
     const text=content.trim();
