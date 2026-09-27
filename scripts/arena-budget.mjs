@@ -17,7 +17,7 @@ fs.mkdirSync(path.dirname(statePath),{recursive:true,mode:0o700});
 let state=null;try{state=JSON.parse(fs.readFileSync(statePath,'utf8'));}catch{}
 if(init||!state){
   state={version:1,room_id:room,event_budget:eventBudget,baseline_sent:Number(purse.sent),baseline_received:Number(purse.received),baseline_balance:Number(purse.balance),initialized_at:new Date().toISOString()};
-  fs.writeFileSync(statePath,JSON.stringify(state,null,2)+'\n',{mode:0o600});
+  fs.writeFileSync(statePath,JSON.stringify(state,null,2)+'\n',{mode:0o600});fs.chmodSync(statePath,0o600);
 }
 if(state.room_id!==room||Number(state.event_budget)!==eventBudget)throw new Error('arena_budget_state_scope_mismatch');
 const budget=eventBudgetStatus({event_budget:eventBudget,baseline_sent:state.baseline_sent,current_sent:Number(purse.sent)});
