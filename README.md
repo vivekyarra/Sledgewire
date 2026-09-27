@@ -197,7 +197,7 @@ Large signed deliveries are uploaded as Room-addressed SharedNet artifacts and r
     npm run stress:arena-ux -- 50000 256
     npm run stress:arena-e2e -- 40000 10000
     npm run stress:monster
-    npm run stress:sqlite -- 6 1500
+    npm run stress:sqlite -- 8 1500
     npm run stress:http -- 64 32
     npm run stress:slow-http
     npm run stress:state-churn -- 50000 5000
