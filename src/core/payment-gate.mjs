@@ -42,7 +42,11 @@ export class PaymentGate{
     let buyer=this.ledgerMissesByBuyer.get(buyerSeat);
     if(!buyer||now-buyer.startedAt>=windowMs){buyer={startedAt:now,count:0};this.ledgerMissesByBuyer.set(buyerSeat,buyer);}
     buyer.count++;this.ledgerMissesGlobal.count++;
-    if(this.ledgerMissesByBuyer.size>2048)for(const [seat,state] of this.ledgerMissesByBuyer)if(now-state.startedAt>=windowMs)this.ledgerMissesByBuyer.delete(seat);
+    this.ledgerMissesByBuyer.delete(buyerSeat);this.ledgerMissesByBuyer.set(buyerSeat,buyer);
+    if(this.ledgerMissesByBuyer.size>2048){
+      for(const [seat,state] of this.ledgerMissesByBuyer)if(now-state.startedAt>=windowMs)this.ledgerMissesByBuyer.delete(seat);
+      while(this.ledgerMissesByBuyer.size>2048)this.ledgerMissesByBuyer.delete(this.ledgerMissesByBuyer.keys().next().value);
+    }
   }
   peekTransaction(txnId){
     const now=Date.now(),cached=this.txCache.get(txnId);
