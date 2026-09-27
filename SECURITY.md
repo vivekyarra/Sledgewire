@@ -12,9 +12,9 @@ Sledgewire processes hostile service descriptions, schemas, URLs, tool outputs, 
 - Active probes require explicit caller safety attestation; target-supplied readOnly/idempotent annotations do not independently create execution authority.
 - Destructive probes and invocations require separate explicit destructive authority.
 - Repairs are structural and evidence-backed; missing semantic data is not invented.
-- Arena payment binds buyer Instance, strict payee evidence, integer exact price, official Arena Room, request and memo, then atomically one-use binds the transaction to a Room/buyer-scoped request fingerprint. The pre-payment Room quote is Ed25519-signed and bound to that buyer seat.
+- Arena payment requires the organizer-specified native memo `Sledgewire`, strict buyer/payee/amount/Room verification, and an Ed25519-signed pre-payment quote. The quote fingerprint is durably bound to Room + buyer + request id + service + exact input before payment, so the human-readable product memo cannot be used to substitute a different first request. The transaction remains atomically one-use.
 - Public production MCP cannot bypass Arena payment for paid services; startup fails if the bypass flag is enabled in production.
-- Development and competition Rooms use separate configuration.
+- Development and competition Rooms use separate configuration. Production competition runtime also requires one recorded official Arena Instance/seat and fails closed if the daemon authenticates as a different seat.
 - SharedNet invite/member/Instance tokens stay in environment or owner-only ignored files; they are never printed, sent to a Room, placed on argv, or committed.
 - SharedNet JSON responses are streamed with hard byte ceilings before parsing; ledger lookup bursts are coalesced/cached; oversized signed deliveries use Room-addressed artifacts and compact hash pointers.
 - Every paid target workflow runs under an exact-target SharedOS grant. The dispatcher has no direct target-service authority. Invoke and Gauntlet's optional real invocation use Scout -> Mechanic -> Inspector -> Breaker separation.
