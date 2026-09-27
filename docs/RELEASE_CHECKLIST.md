@@ -1,6 +1,6 @@
 # Trial Zero release checklist
 
-## Static code gates — v0.3.13
+## Static code gates — v0.3.14
 
 - [x] CLI and MCP with current 2026-07-28 stateless `server/discover` plus bounded legacy fallback.
 - [x] Official `@modelcontextprotocol/client` v2 Streamable HTTP integration test negotiates 2026-07-28 and calls Sledgewire.
@@ -24,16 +24,16 @@
 - [x] Paid receipts carry a SharedOS trace id; free `sledgewire.trace` returns a sanitized signed trace proof with no global listing.
 - [x] Native SharedNet credit verification requires buyer, exact/fallback-safe payee evidence, integer amount, Arena Room, organizer memo `Sledgewire`, and a one-use transaction; exact request identity is separately locked by the signed quote + durable fingerprint. Outstanding quotes expire after 4 hours, are capped at 256 per buyer / 20,000 globally, and are reclaimed after terminal paid outcomes.
 - [x] Request storage/grant identity is scoped by Room + buyer + request fingerprint, preventing cross-buyer request-label collisions.
-- [x] Concurrent duplicate ledger checks are coalesced; positive/negative lookups are bounded in-memory cached; unique nonexistent transaction floods are circuit-broken at 16 misses per buyer / 64 globally per 60-second window.
-- [x] Exact completed retries are cached from the previously verified durable payment binding without requiring the transfer to remain in remote ledger history; legacy unattributed rows re-verify before buyer backfill; stale uncertain paid executions never blindly re-execute.
+- [x] Concurrent duplicate ledger checks are coalesced; positive/negative lookups are bounded in-memory cached; unique nonexistent transaction floods are circuit-broken at 16 misses per buyer / 64 globally per 60-second window, while each fresh buyer retains protected verification slots and in-memory miss state is hard-capped.
+- [x] Exact completed retries are cached from the previously verified durable payment binding without requiring the transfer to remain in remote ledger history; legacy unattributed rows re-verify before buyer backfill. A durable execution-start marker permits recovery only for stale paid claims proven never to have begun execution; ambiguous started work never blindly re-executes, and old inflight rows migrate conservatively.
 - [x] Separate development and Arena Rooms.
-- [x] Arena cursor/message persistence, bounded retries, poison-message dead-letter, and 32-KiB Room-message rejection before parsing or service work.
+- [x] Arena cursor/message persistence, bounded retries, poison-message dead-letter, 32-KiB Room-message rejection before parsing/service work, one in-flight message per sender for fairness, and terminal dedupe pruning only behind the durable cursor.
 - [x] Watch compatibility validates active payee ownership, requires one reply event, and uses artifact fallback for oversized signed deliveries.
 - [x] SharedNet page bodies remain bounded while allowing legitimate Room pages above the generic API-response ceiling.
 - [x] SharedNet artifact URLs are required to remain HTTPS on the configured SharedNet origin.
 - [x] Unused legacy child-process SharedNet adapter removed from production tree.
 - [x] SharedNet secrets excluded from git and Docker context.
-- [x] SQLite close/reopen replay and two-connection one-use tests green.
+- [x] SQLite close/reopen replay and two-connection one-use tests green; v0.3.14 adds a mandatory six-process shared-WAL contention/integrity gate plus a file-backed crash-boundary recovery stress.
 - [x] **287 / 287** automated tests passed on the v0.3.13 code/evidence run, 0 failures.
 - [x] **25,000 / 25,000** MCP Smoke workflows at concurrency **192**, 0 failures; CI-fixture p50 **225 ms**, p95 **240 ms**, p99 **249 ms**.
 - [x] **25,000** Arena paid claims + **25,000** cached retries with **0 duplicate paid authorizations**; 500 wrong-buyer attempts and 5,000 altered post-quote inputs rejected.
