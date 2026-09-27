@@ -1,5 +1,5 @@
 import catalog from '../../catalog.json' with {type:'json'};
-import {PaymentGate,paymentMemo,requestFingerprint} from '../core/payment-gate.mjs';
+import {PaymentGate} from '../core/payment-gate.mjs';
 import {quote} from '../core/quote.mjs';
 import {validateServiceInput} from '../core/service-input.mjs';
 import {runPaidService} from '../sharedos/host.mjs';
@@ -50,26 +50,31 @@ export function createArenaHandler({store,ledger,room,payee,signing,publicBaseUr
     if(!validation.ok){store.incrementCounter('arena.reject.invalid_input');return failure(req,'invalid_input',{detail:validation.reason});}
 
     if(!req.payment_txn_id){
-      const price=prices[req.service],bound={roomId:room,buyerSeat,requestId:req.request_id,service:req.service,input:req.input};
-      const requestFingerprintHex=requestFingerprint(bound),memo=paymentMemo(bound);
+      const bound={roomId:room,buyerSeat,requestId:req.request_id,service:req.service,input:req.input};
+      const q=gate.issueQuote(bound);
+      if(q.reason!=='payment_required'){
+        store.incrementCounter(`arena.reject.${String(q.reason).replace(/[^a-z0-9_.-]/gi,'_').slice(0,80)}`);
+        return failure(req,q.reason,q);
+      }
       store.incrementCounter('arena.payment_quote.issued');
       return signReceipt({
         type:'sledgewire.payment_required.v1',
         request_id:req.request_id,
         service:req.service,
-        request_fingerprint:requestFingerprintHex,
-        price_credits:price,
+        request_fingerprint:q.fingerprint,
+        price_credits:q.price,
         deliverable:catalog.services[req.service].description,
         payee,
-        memo,
-        memo_version:'sledgewire.payment.v2',
+        memo:q.memo,
+        memo_version:'trial-zero-product-name.v1',
+        request_binding:'signed_quote+durable_fingerprint.v1',
         room_id:room,
         buyer_seat:buyerSeat,
         issued_at:new Date().toISOString(),
         quickstart_url:quickstart,
-        next_action:{type:'sharednet.credit.transfer',amount_credits:price,payee,room_id:room,memo,after_payment:'resend identical request with payment_txn_id'},
-        verification:{receipt_tool:'sledgewire.verify',trace_tool:'sledgewire.trace',exact_retry_no_reexecution:true},
-        note:'This signed quote is bound to the exact Room, buyer, request id, service and input fingerprint. Pay it, then resend the identical request with payment_txn_id.'
+        next_action:{type:'sharednet.credit.transfer',amount_credits:q.price,payee,room_id:room,memo:q.memo,after_payment:'resend identical request with payment_txn_id'},
+        verification:{receipt_tool:'sledgewire.verify',trace_tool:'sledgewire.trace',exact_retry_no_reexecution:true,request_fingerprint:q.fingerprint},
+        note:'Trial Zero native memo is the product name Sledgewire. The signed quote and durable quote binding separately lock Room, buyer, request id, service and exact input; altered paid resends are rejected.'
       },signing.privateKeyPem);
     }
 
