@@ -63,3 +63,14 @@ test('Arena budget exposes overspend and planner bounds hostile offer files',()=
   assert.deepEqual(eventBudgetStatus({event_budget:100,baseline_sent:5,current_sent:108}),{event_budget:100,arena_sent_delta:103,remaining_to_spend:0,overspent_credits:3,spent_all_event_credits:true});
   assert.throws(()=>planArenaSpend({remaining_credits:100,offers:Array.from({length:5001},(_,i)=>({seller:`s${i}`,service:'x',price_credits:1}))}),/arena_offers_limit/);
 });
+
+test('bogus unique payment ids hit the ledger only up to the per-buyer miss budget',async()=>{
+  const store=new ArenaStore(':memory:');let reads=0;
+  const gate=new PaymentGate({ledger:{async get(){reads++;return null;}},store,prices,payee,ledgerMissPerBuyer:4,ledgerMissGlobal:100,ledgerMissWindowMs:60_000});
+  const req={...base,requestId:'miss-budget',txnId:null};gate.issueQuote(req);
+  const reasons=[];
+  for(let i=0;i<10;i++)reasons.push((await gate.authorize({...req,txnId:`txn_${String(i).padStart(10,'0')}`})).reason);
+  assert.equal(reads,4);
+  assert.equal(reasons.filter(x=>x==='transaction_not_found').length,4);
+  assert.equal(reasons.filter(x=>x==='payment_verification_rate_limited').length,6);
+});
