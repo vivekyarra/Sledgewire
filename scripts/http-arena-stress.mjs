@@ -31,7 +31,7 @@ async function waitReady(port,child){
 }
 function modernCall(name,args,id){
   const body=JSON.stringify({jsonrpc:'2.0',id,method:'tools/call',params:{name,arguments:args,_meta:{'io.modelcontextprotocol/protocolVersion':'2026-07-28','io.modelcontextprotocol/clientCapabilities':{}}}});
-  return {body,headers:{'Content-Type':'application/json','Content-Length':Buffer.byteLength(body),'Mcp-Protocol-Version':'2026-07-28','Mcp-Method':'tools/call','Mcp-Name':name}};
+  return {body,headers:{'Content-Type':'application/json','Mcp-Protocol-Version':'2026-07-28','Mcp-Method':'tools/call','Mcp-Name':name}};
 }
 
 const dir=fs.mkdtempSync(path.join(os.tmpdir(),'sledgewire-http-stress-')),db=path.join(dir,'arena.db'),kp=generateSigningKeypair(),port=await freePort();
