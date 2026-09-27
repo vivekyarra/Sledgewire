@@ -11,6 +11,7 @@ import {announceArenaOnce} from './announcement.mjs';
 import {boundedInteger,publicBaseOrigin} from '../ops/config.mjs';
 import {VERSION} from '../version.mjs';
 import {readExpectedArenaSeat} from './seat-binding.mjs';
+import {mapLimitFair} from './fair-map.mjs';
 
 const room=process.env.SHAREDNET_ARENA_ROOM_ID??'',payee=process.env.SHAREDNET_PAYEE_ADDRESS??'';
 if(!ROOM.test(room)||!ADDRESS.test(payee))throw new Error('arena_environment_incomplete');
@@ -49,14 +50,15 @@ for(;;){
   try{
     const page=await api.wait(room,cursor);backoff=500;
     const items=(page?.items??[]).filter(x=>sequenceOf(x)!==null).sort((a,b)=>sequenceOf(a)-sequenceOf(b));
-    await mapLimit(items,concurrency,async message=>{
+    const cursorBefore=cursor;
+    await mapLimitFair(items,concurrency,(message,index)=>SEAT.test(message?.sender_instance_id??'')?message.sender_instance_id:'__invalid_'+(sequenceOf(message)??index),async message=>{
       if(!MESSAGE.test(message?.id??'')){
         console.error(`protocol-invalid Room message id at sequence ${sequenceOf(message)}; advancing because no valid reply target exists`);
         return {ok:true,message,protocolInvalid:true};
       }
       if(message.sender_instance_id===selfSeat){store.markRoomMessage(message.id,'completed');return {ok:true,message};}
       if(store.roomMessageTerminal(message.id))return {ok:true,message};
-      if(!store.claimRoomMessage(message.id,{maxAttempts}))return {ok:store.roomMessageTerminal(message.id),message,reason:'claimed_elsewhere_or_terminal'};
+      if(!store.claimRoomMessage(message.id,{sequence:sequenceOf(message),maxAttempts}))return {ok:store.roomMessageTerminal(message.id),message,reason:'claimed_elsewhere_or_terminal'};
       try{
         const response=await handle(message);if(response)await deliverArenaResponse(api,room,message.id,response);
         store.markRoomMessage(message.id,'completed');return {ok:true,message};
@@ -71,6 +73,6 @@ for(;;){
       const terminal=!MESSAGE.test(message?.id??'')||store.roomMessageTerminal(message.id);
       if(terminal){cursor=Math.max(cursor,seq);store.setMeta(key,String(cursor));}else break;
     }
+    if(cursor>cursorBefore)store.pruneRoomMessages({throughSequence:cursor,retainSequences:2000});
   }catch(e){console.error(`arena-loop:${e.message}`);await new Promise(r=>setTimeout(r,backoff));backoff=Math.min(backoff*2,10_000);}
 }
-async function mapLimit(items,limit,fn){const out=new Array(items.length);let next=0;async function worker(){for(;;){const i=next++;if(i>=items.length)return;out[i]=await fn(items[i]);}}await Promise.all(Array.from({length:Math.min(limit,items.length)},worker));return out;}

@@ -36,6 +36,17 @@ test('SharedNet API ledger lookup uses bearer token and caller identity',async()
   };
   const api=new SharedNetApi({token,fetchImpl});const tx=await api.get('txn_ABCDEFGHIJ');assert.equal(tx.payee_ok,true);assert.equal(tx.buyer_instance_id,'i_ZYXWVUTSRQ');assert.ok(calls.every(x=>x.auth===`Bearer ${token}`));
 });
+test('SharedNet payment scans reuse stable authenticated identity instead of refetching it per transaction',async()=>{
+  const token='sni_'+ 'A'.repeat(43);let identityCalls=0,transferCalls=0;
+  const fetchImpl=async(url)=>{
+    if(url.endsWith('/api/v1/instances/current')){identityCalls++;return new Response(JSON.stringify({principal:{id:'p_ABCDEFGHIJ'},instance:{id:'i_ABCDEFGHIJ'},agent:null}),{status:200});}
+    if(url.includes('/api/v1/credits/transfers')){transferCalls++;const id=transferCalls===1?'txn_ABCDEFGHIJ':'txn_ZYXWVUTSRQ';return new Response(JSON.stringify({items:[{id,sender_instance_id:'i_BUYERAAAA',recipient_principal_id:'p_ABCDEFGHIJ',amount:3,room_id:'rom_ABCDEFGHIJ',memo:'Sledgewire'}],has_more:false,next_cursor:null}),{status:200});}
+    throw new Error('unexpected_url');
+  };
+  const api=new SharedNetApi({token,fetchImpl});
+  assert.ok(await api.get('txn_ABCDEFGHIJ'));assert.ok(await api.get('txn_ZYXWVUTSRQ'));
+  assert.equal(identityCalls,1);assert.equal(transferCalls,2);
+});
 test('watch batch parses current SharedNet message fields',()=>{
   const raw=JSON.stringify({room_id:'rom_ABCDEFGHIJ',messages:[{id:'msg_ABCDEFGHIJ',room_id:'rom_ABCDEFGHIJ',sender_instance_id:'i_ZYXWVUTSRQ',content:'@sledgewire demo'}]});
   const b=parseWatchBatch(raw);assert.equal(b.messages.length,1);assert.equal(senderInstance(b.messages[0]),'i_ZYXWVUTSRQ');
@@ -73,6 +84,12 @@ test('arena handler returns signed buyer-bound payment requirement before execut
   const store=new ArenaStore(':memory:');const kp=generateSigningKeypair();const handle=createArenaHandler({store,ledger:{get:async()=>null},room:'rom_ABCDEFGHIJ',payee:'p_ABCDEFGHIJ',signing:{privateKeyPem:kp.privateKeyPem},publicBaseUrl:'https://sledgewire.example'});
   const r=await handle({sender_instance_id:'i_ZYXWVUTSRQ',content:JSON.stringify({type:'sledgewire.service.request.v1',request_id:'req-abc',service:'sledgewire.smoke',input:{endpoint:'https://example.com/mcp'}})});
   const bound={roomId:'rom_ABCDEFGHIJ',buyerSeat:'i_ZYXWVUTSRQ',requestId:'req-abc',service:'sledgewire.smoke',input:{endpoint:'https://example.com/mcp'}};assert.equal(r.type,'sledgewire.payment_required.v1');assert.equal(r.price_credits,3);assert.match(r.deliverable,/smoke test/i);assert.equal(r.verification.exact_retry_no_reexecution,true);assert.equal(r.room_id,'rom_ABCDEFGHIJ');assert.equal(r.memo,paymentMemo(bound));assert.equal(r.request_fingerprint,requestFingerprint(bound));assert.equal(r.memo,'Sledgewire');assert.equal(r.memo_version,'trial-zero-product-name.v1');assert.equal(r.request_binding,'signed_quote+durable_fingerprint.v1');assert.equal(r.next_action.memo,r.memo);assert.equal(r.buyer_seat,'i_ZYXWVUTSRQ');assert.equal(verifyReceipt(r,kp.publicKeyPem).ok,true);
+});
+test('malformed payment transaction id is rejected before ledger verification budget or execution',async()=>{
+  const store=new ArenaStore(':memory:'),kp=generateSigningKeypair();let reads=0,executions=0;
+  const handle=createArenaHandler({store,ledger:{async get(){reads++;return null;}},room:'rom_ABCDEFGHIJ',payee:'p_ABCDEFGHIJ',signing:{privateKeyPem:kp.privateKeyPem},publicBaseUrl:'https://sledgewire.example',runService:async()=>{executions++;}});
+  const r=await handle({sender_instance_id:'i_ZYXWVUTSRQ',content:JSON.stringify({type:'sledgewire.service.request.v1',request_id:'req-bad-txn',service:'sledgewire.smoke',input:{endpoint:'https://example.com/mcp'},payment_txn_id:'not-a-sharednet-transaction'})});
+  assert.equal(r.state,'FAILED');assert.equal(r.reason,'invalid_payment_txn_id');assert.equal(reads,0);assert.equal(executions,0);
 });
 test('Room payment quote cannot authorize changed target input on first paid resend',async()=>{
   const store=new ArenaStore(':memory:'),kp=generateSigningKeypair();let executions=0,reads=0,quotedMemo=null;

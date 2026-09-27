@@ -7,10 +7,10 @@ export function requestStorageKey({roomId,buyerSeat,requestId}){return `rqk_${sh
 function principalAddress(x){return typeof x==='string'&&(x.startsWith('p_')||x.startsWith('pri_'));}
 
 export class PaymentGate{
-  constructor({ledger,store,prices,payee,uncertainAfterMs=120_000,ledgerPositiveTtlMs=30_000,ledgerNegativeTtlMs=500,ledgerCacheMax=2048,ledgerMissWindowMs=60_000,ledgerMissPerBuyer=16,ledgerMissGlobal=64}){
-    this.ledger=ledger;this.store=store;this.prices=prices;this.payee=payee;this.uncertainAfterMs=uncertainAfterMs;
+  constructor({ledger,store,prices,payee,uncertainAfterMs=120_000,unstartedRecoveryAfterMs=30_000,ledgerPositiveTtlMs=30_000,ledgerNegativeTtlMs=500,ledgerCacheMax=2048,ledgerMissWindowMs=60_000,ledgerMissPerBuyer=16,ledgerMissGlobal=64,ledgerMissReservedPerBuyer=2}){
+    this.ledger=ledger;this.store=store;this.prices=prices;this.payee=payee;this.uncertainAfterMs=uncertainAfterMs;this.unstartedRecoveryAfterMs=unstartedRecoveryAfterMs;
     this.ledgerPositiveTtlMs=ledgerPositiveTtlMs;this.ledgerNegativeTtlMs=ledgerNegativeTtlMs;this.ledgerCacheMax=ledgerCacheMax;
-    this.ledgerMissWindowMs=ledgerMissWindowMs;this.ledgerMissPerBuyer=ledgerMissPerBuyer;this.ledgerMissGlobal=ledgerMissGlobal;
+    this.ledgerMissWindowMs=ledgerMissWindowMs;this.ledgerMissPerBuyer=ledgerMissPerBuyer;this.ledgerMissGlobal=ledgerMissGlobal;this.ledgerMissReservedPerBuyer=Math.max(1,Math.min(ledgerMissPerBuyer,ledgerMissReservedPerBuyer));
     this.txCache=new Map();this.txInflight=new Map();this.ledgerMissesByBuyer=new Map();this.ledgerMissesGlobal={startedAt:0,count:0};
   }
   issueQuote(req){
@@ -29,7 +29,12 @@ export class PaymentGate{
     if(now-this.ledgerMissesGlobal.startedAt>=windowMs)this.ledgerMissesGlobal={startedAt:now,count:0};
     const buyer=this.ledgerMissesByBuyer.get(buyerSeat);
     const buyerCount=buyer&&now-buyer.startedAt<windowMs?buyer.count:0;
-    return buyerCount<this.ledgerMissPerBuyer&&this.ledgerMissesGlobal.count<this.ledgerMissGlobal;
+    if(buyerCount>=this.ledgerMissPerBuyer)return false;
+    // Preserve a small per-seat verification reserve even when other seats have
+    // exhausted the shared miss budget. This prevents one noisy buyer from
+    // globally denying a fresh legitimate payer while still bounding sybil cost.
+    if(buyerCount<this.ledgerMissReservedPerBuyer)return true;
+    return this.ledgerMissesGlobal.count<this.ledgerMissGlobal;
   }
   recordLedgerMiss(buyerSeat){
     const now=Date.now(),windowMs=this.ledgerMissWindowMs;
@@ -37,12 +42,20 @@ export class PaymentGate{
     let buyer=this.ledgerMissesByBuyer.get(buyerSeat);
     if(!buyer||now-buyer.startedAt>=windowMs){buyer={startedAt:now,count:0};this.ledgerMissesByBuyer.set(buyerSeat,buyer);}
     buyer.count++;this.ledgerMissesGlobal.count++;
-    if(this.ledgerMissesByBuyer.size>2048)for(const [seat,state] of this.ledgerMissesByBuyer)if(now-state.startedAt>=windowMs)this.ledgerMissesByBuyer.delete(seat);
+    this.ledgerMissesByBuyer.delete(buyerSeat);this.ledgerMissesByBuyer.set(buyerSeat,buyer);
+    if(this.ledgerMissesByBuyer.size>2048){
+      for(const [seat,state] of this.ledgerMissesByBuyer)if(now-state.startedAt>=windowMs)this.ledgerMissesByBuyer.delete(seat);
+      while(this.ledgerMissesByBuyer.size>2048)this.ledgerMissesByBuyer.delete(this.ledgerMissesByBuyer.keys().next().value);
+    }
+  }
+  peekTransaction(txnId){
+    const now=Date.now(),cached=this.txCache.get(txnId);
+    if(cached&&cached.expiresAt>now){this.txCache.delete(txnId);this.txCache.set(txnId,cached);return {hit:true,value:cached.value};}
+    if(cached)this.txCache.delete(txnId);
+    return {hit:false,value:null};
   }
   async lookupTransaction(txnId,signal){
-    const now=Date.now(),cached=this.txCache.get(txnId);
-    if(cached&&cached.expiresAt>now){this.txCache.delete(txnId);this.txCache.set(txnId,cached);return cached.value;}
-    if(cached)this.txCache.delete(txnId);
+    const cached=this.peekTransaction(txnId);if(cached.hit)return cached.value;
     if(this.txInflight.has(txnId))return this.txInflight.get(txnId);
     const pending=Promise.resolve().then(()=>this.ledger.get(txnId,signal)).then(value=>{
       const ttl=value?this.ledgerPositiveTtlMs:this.ledgerNegativeTtlMs;
@@ -63,8 +76,13 @@ export class PaymentGate{
       if(prior.status==='wrong_buyer')return {ok:false,reason:'wrong_buyer'};
       if(prior.status==='conflict')return {ok:false,reason:'transaction_or_request_reused'};
       if(prior.status==='inflight'){
-        if((prior.ageMs??0)>=this.uncertainAfterMs)return {ok:false,reason:'execution_outcome_unknown_no_retry',fingerprint:fp,storageKey,started_at:prior.startedAt,age_ms:prior.ageMs};
-        return {ok:false,reason:'request_already_inflight',fingerprint:fp,storageKey,started_at:prior.startedAt,age_ms:prior.ageMs};
+        const age=prior.ageMs??0;
+        if(!prior.executionStartedAt&&age>=this.unstartedRecoveryAfterMs&&typeof this.store?.recoverUnstartedClaim==='function'){
+          const recovered=this.store.recoverUnstartedClaim({requestId:storageKey,txnId:req.txnId,fingerprint:fp,service:req.service,buyerSeat:req.buyerSeat,staleMs:this.unstartedRecoveryAfterMs});
+          if(recovered.status==='reclaimed')return {ok:true,replay:false,recovered_pre_execution:true,fingerprint:fp,storageKey,price};
+        }
+        if(prior.executionStartedAt&&age>=this.uncertainAfterMs)return {ok:false,reason:'execution_outcome_unknown_no_retry',fingerprint:fp,storageKey,started_at:prior.startedAt,execution_started_at:prior.executionStartedAt,age_ms:age};
+        return {ok:false,reason:'request_already_inflight',fingerprint:fp,storageKey,started_at:prior.startedAt,execution_started_at:prior.executionStartedAt??null,age_ms:age};
       }
       if(prior.status==='failed')return {ok:false,reason:'previous_attempt_failed',fingerprint:fp,storageKey,error:prior.error};
       if(prior.status==='replay')return {ok:true,replay:true,fingerprint:fp,storageKey,cached:prior.response,price};
@@ -81,9 +99,10 @@ export class PaymentGate{
       if(!exact)return {ok:false,reason:'payment_quote_request_mismatch'};
     }
 
-    if(!this.ledgerMissAllowed(req.buyerSeat))return {ok:false,reason:'payment_verification_rate_limited',retry_after_ms:this.ledgerMissWindowMs};
-    const tx=await this.lookupTransaction(req.txnId,signal);
-    if(!tx){this.recordLedgerMiss(req.buyerSeat);return {ok:false,reason:'transaction_not_found'};}
+    const cached=this.peekTransaction(req.txnId),joinedInflight=!cached.hit&&this.txInflight.has(req.txnId);
+    if(!cached.hit&&!joinedInflight&&!this.ledgerMissAllowed(req.buyerSeat))return {ok:false,reason:'payment_verification_rate_limited',retry_after_ms:this.ledgerMissWindowMs};
+    const tx=cached.hit?cached.value:await this.lookupTransaction(req.txnId,signal);
+    if(!tx){if(!cached.hit&&!joinedInflight)this.recordLedgerMiss(req.buyerSeat);return {ok:false,reason:'transaction_not_found'};}
     if(tx.id!==undefined&&tx.id!==null&&tx.id!==req.txnId)return {ok:false,reason:'wrong_transaction_id'};
 
     const buyer=tx.buyer_instance_id??tx.by_instance_id??tx.sender_instance_id??tx.from_instance_id;
@@ -103,8 +122,8 @@ export class PaymentGate{
     const claim=this.store.claim({requestId:storageKey,txnId:req.txnId,fingerprint:fp,service:req.service,buyerSeat:req.buyerSeat});
     if(claim.status==='conflict')return {ok:false,reason:'transaction_or_request_reused'};
     if(claim.status==='inflight'){
-      if((claim.ageMs??0)>=this.uncertainAfterMs)return {ok:false,reason:'execution_outcome_unknown_no_retry',fingerprint:fp,storageKey,started_at:claim.startedAt,age_ms:claim.ageMs};
-      return {ok:false,reason:'request_already_inflight',fingerprint:fp,storageKey,started_at:claim.startedAt,age_ms:claim.ageMs};
+      if(claim.executionStartedAt&&(claim.ageMs??0)>=this.uncertainAfterMs)return {ok:false,reason:'execution_outcome_unknown_no_retry',fingerprint:fp,storageKey,started_at:claim.startedAt,execution_started_at:claim.executionStartedAt,age_ms:claim.ageMs};
+      return {ok:false,reason:'request_already_inflight',fingerprint:fp,storageKey,started_at:claim.startedAt,execution_started_at:claim.executionStartedAt??null,age_ms:claim.ageMs};
     }
     if(claim.status==='failed')return {ok:false,reason:'previous_attempt_failed',fingerprint:fp,storageKey,error:claim.error};
     if(claim.status==='replay')return {ok:true,replay:true,fingerprint:fp,storageKey,cached:claim.response,price};

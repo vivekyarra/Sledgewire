@@ -16,7 +16,7 @@ const groups=boundedArg(process.argv[2],{name:'groups',min:1,max:20_000,defaultV
 const fanout=boundedArg(process.argv[3],{name:'fanout',min:2,max:128,defaultValue:16});
 const delayMs=boundedArg(process.argv[4],{name:'delay_ms',min:0,max:100,defaultValue:1});
 
-const room='rom_ABCDEFGHIJ',buyer='i_ABCDEFGHIJ',payee='p_ABCDEFGHIJ',service='sledgewire.smoke',price=3;
+const room='rom_ABCDEFGHIJ',buyer='i_ABCDEFGHIJ',payee='p_ABCDEFGHIJ',service='sledgewire.smoke',price=3,txn=i=>'txn_'+String(i).padStart(10,'0');
 const dir=fs.mkdtempSync(path.join(os.tmpdir(),'sledgewire-handler-stress-'));
 const file=path.join(dir,'arena.db');
 const store=new ArenaStore(file),kp=generateSigningKeypair();
@@ -70,7 +70,7 @@ try{
       request_id:`exec-${i}`,
       service,
       input:{endpoint:`https://example.com/mcp?case=${i}`},
-      payment_txn_id:`txn_${i}`
+      payment_txn_id:txn(i)
     };
     const unpaid={...request};delete unpaid.payment_txn_id;
     const quote=await handle({sender_instance_id:buyer,content:JSON.stringify(unpaid)});

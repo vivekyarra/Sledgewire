@@ -75,10 +75,19 @@ test('fresh inflight exact retry does not reexecute',async()=>{
   const s=new ArenaStore(),g=new PaymentGate({ledger:ledger(),store:s,prices,payee,uncertainAfterMs:60_000});
   await authorizeQuoted(g);const b=await g.authorize(base);assert.equal(b.reason,'request_already_inflight');
 });
-test('stale inflight paid request becomes explicit unknown outcome and is never blindly reexecuted',async()=>{
-  const s=new ArenaStore(),g=new PaymentGate({ledger:ledger(),store:s,prices,payee,uncertainAfterMs:1}),a=await authorizeQuoted(g);
+test('stale inflight request that definitely started execution remains unknown and is never blindly reexecuted',async()=>{
+  const s=new ArenaStore(),g=new PaymentGate({ledger:ledger(),store:s,prices,payee,uncertainAfterMs:1,unstartedRecoveryAfterMs:1}),a=await authorizeQuoted(g);
+  const started=s.markExecutionStarted(a.storageKey,a.fingerprint);assert.equal(started.status,'started');
   s.db.prepare('UPDATE requests SET started_at=? WHERE request_id=?').run(new Date(Date.now()-60_000).toISOString(),a.storageKey);
-  const b=await g.authorize(base);assert.equal(b.ok,false);assert.equal(b.reason,'execution_outcome_unknown_no_retry');assert.equal(requestFingerprint(base),a.fingerprint);
+  const b=await g.authorize(base);assert.equal(b.ok,false);assert.equal(b.reason,'execution_outcome_unknown_no_retry');assert.equal(requestFingerprint(base),a.fingerprint);assert.ok(b.execution_started_at);
+});
+test('stale paid claim that never crossed execution boundary is safely recovered without another ledger read',async()=>{
+  let reads=0;const s=new ArenaStore(),g1=new PaymentGate({ledger:{async get(){reads++;return ledger().get();}},store:s,prices,payee,unstartedRecoveryAfterMs:1}),a=await authorizeQuoted(g1);
+  s.db.prepare('UPDATE requests SET started_at=? WHERE request_id=?').run(new Date(Date.now()-60_000).toISOString(),a.storageKey);
+  const g2=new PaymentGate({ledger:{async get(){reads++;throw new Error('ledger_must_not_be_called_for_recovery');}},store:s,prices,payee,unstartedRecoveryAfterMs:1});
+  const b=await g2.authorize(base);assert.equal(b.ok,true);assert.equal(b.replay,false);assert.equal(b.recovered_pre_execution,true);assert.equal(reads,1);
+  const started=s.markExecutionStarted(b.storageKey,b.fingerprint);assert.equal(started.status,'started');
+  const c=await g2.authorize(base);assert.equal(c.reason,'request_already_inflight');assert.ok(c.execution_started_at);
 });
 test('same txn cannot buy different request and is rejected from durable binding without another ledger read',async()=>{
   let reads=0;const s=new ArenaStore(),l={async get(){reads++;return ledger().get();}},g=new PaymentGate({ledger:l,store:s,prices,payee});

@@ -1,6 +1,6 @@
 # Trial Zero release checklist
 
-## Static code gates — v0.3.13
+## Static code gates — v0.3.14
 
 - [x] CLI and MCP with current 2026-07-28 stateless `server/discover` plus bounded legacy fallback.
 - [x] Official `@modelcontextprotocol/client` v2 Streamable HTTP integration test negotiates 2026-07-28 and calls Sledgewire.
@@ -24,22 +24,26 @@
 - [x] Paid receipts carry a SharedOS trace id; free `sledgewire.trace` returns a sanitized signed trace proof with no global listing.
 - [x] Native SharedNet credit verification requires buyer, exact/fallback-safe payee evidence, integer amount, Arena Room, organizer memo `Sledgewire`, and a one-use transaction; exact request identity is separately locked by the signed quote + durable fingerprint. Outstanding quotes expire after 4 hours, are capped at 256 per buyer / 20,000 globally, and are reclaimed after terminal paid outcomes.
 - [x] Request storage/grant identity is scoped by Room + buyer + request fingerprint, preventing cross-buyer request-label collisions.
-- [x] Concurrent duplicate ledger checks are coalesced; positive/negative lookups are bounded in-memory cached; unique nonexistent transaction floods are circuit-broken at 16 misses per buyer / 64 globally per 60-second window.
-- [x] Exact completed retries are cached from the previously verified durable payment binding without requiring the transfer to remain in remote ledger history; legacy unattributed rows re-verify before buyer backfill; stale uncertain paid executions never blindly re-execute.
+- [x] Concurrent duplicate ledger checks are coalesced; positive/negative lookups are bounded in-memory cached; unique nonexistent transaction floods are circuit-broken at 16 misses per buyer / 64 globally per 60-second window, while each fresh buyer retains protected verification slots and in-memory miss state is hard-capped.
+- [x] Exact completed retries are cached from the previously verified durable payment binding without requiring the transfer to remain in remote ledger history; legacy unattributed rows re-verify before buyer backfill. A durable execution-start marker permits recovery only for stale paid claims proven never to have begun execution; ambiguous started work never blindly re-executes, and old inflight rows migrate conservatively.
 - [x] Separate development and Arena Rooms.
-- [x] Arena cursor/message persistence, bounded retries, poison-message dead-letter, and 32-KiB Room-message rejection before parsing or service work.
+- [x] Arena cursor/message persistence, bounded retries, poison-message dead-letter, 32-KiB Room-message rejection before parsing/service work, one in-flight message per sender for fairness, and terminal dedupe pruning only behind the durable cursor.
 - [x] Watch compatibility validates active payee ownership, requires one reply event, and uses artifact fallback for oversized signed deliveries.
 - [x] SharedNet page bodies remain bounded while allowing legitimate Room pages above the generic API-response ceiling.
 - [x] SharedNet artifact URLs are required to remain HTTPS on the configured SharedNet origin.
 - [x] Unused legacy child-process SharedNet adapter removed from production tree.
 - [x] SharedNet secrets excluded from git and Docker context.
-- [x] SQLite close/reopen replay and two-connection one-use tests green.
-- [x] **287 / 287** automated tests passed on the v0.3.13 code/evidence run, 0 failures.
-- [x] **25,000 / 25,000** MCP Smoke workflows at concurrency **192**, 0 failures; CI-fixture p50 **225 ms**, p95 **240 ms**, p99 **249 ms**.
+- [x] SQLite close/reopen replay and two-connection one-use tests green; v0.3.14 adds a mandatory six-process shared-WAL contention/integrity gate plus a file-backed crash-boundary recovery stress.
+- [x] **296 / 296** automated tests passed on the v0.3.14 code/evidence run, 0 failures.
+- [x] **25,000 / 25,000** MCP Smoke workflows at concurrency **192**, 0 failures; CI-fixture p50 **214 ms**, p95 **235 ms**, p99 **264 ms**.
 - [x] **25,000** Arena paid claims + **25,000** cached retries with **0 duplicate paid authorizations**; 500 wrong-buyer attempts and 5,000 altered post-quote inputs rejected.
 - [x] Duplicate authorization storm: **122,500 authorization attempts**, 2,500 unique claims, 57,500 in-flight duplicates refused, 60,000 cached replays, 2,500 transaction-reuse attempts refused and only **2,500 ledger reads**.
 - [x] Handler-level execution storm on file-backed SQLite/WAL: **125,000 handler requests**, **2,500 actual service executions**, **0 duplicate service executions**, **0 missing executions**, 60,000 cached replays and 2,500 ledger reads.
 - [x] Mixed Arena judge/buyer UX storm: **50,000 requests** at concurrency **256**, **0 failures**, including 20,833 info answers, 16,667 quote responses, 4,167 signed payment quotes, 4,167 rejected invalid requests and 4,166 irrelevant messages; **0 ledger reads and 0 paid executions** on every pre-payment path.
+- [x] Monster sender fairness: **20,000** tasks with **18,000** from one dominant sender and 2,000 from 200 other senders held global concurrency at 8 and per-sender concurrency at **1**; **994** of the first 1,000 completions were non-dominant-sender work.
+- [x] Monster payment fairness: after an abusive buyer exhausted the shared miss budget, **100 / 100** fresh legitimate buyers still verified successfully.
+- [x] Monster crash boundary: **500 / 500** stale pre-execution paid claims recovered after reopen with **0** recovery ledger reads, while **500 / 500** execution-may-have-started claims were refused automatic re-execution.
+- [x] Six-process shared-WAL stress: **9,000** mixed operations preserved exact counters and exact one-use grant consumption; 9,000 Room rows pruned to 1,000, 900 quote rows and 180 audit events matched expectation, acknowledged outbox rows fell to 0, and `PRAGMA integrity_check` returned **ok**.
 - [x] SharedOS deny / allow / maxUses / durable-audit check green.
 - [x] Static preflight green; hardened live preflight additionally requires production mode, disabled paid bypass, public modern MCP negotiation, signed selfcheck/payment route, authenticated seller identity/payee, cryptographically validated second-seat rehearsal evidence, and restart-replay evidence matching the current daemon boot. Optional external SharedOS proof is enforced only when explicitly enabled.
 - [x] Production MCP Host/authority guard rejects unlisted Host headers.

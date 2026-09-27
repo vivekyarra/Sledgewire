@@ -1,6 +1,6 @@
 # Deployment
 
-v0.3.13 uses a two-process Docker Compose topology plus cryptographically verified second-seat and restart rehearsals, a single bound Arena seat, organizer product-name payment memo, and live 100-credit budget accounting. The public server and Arena daemon share one persistent volume so paid outcomes and SharedOS traces survive daemon restarts and remain resolvable through the public `sledgewire.trace` tool.
+v0.3.14 uses a two-process Docker Compose topology plus cryptographically verified second-seat and restart rehearsals, a single bound Arena seat, organizer product-name payment memo, and live 100-credit budget accounting. The public server and Arena daemon share one persistent volume so paid outcomes and SharedOS traces survive daemon restarts and remain resolvable through the public `sledgewire.trace` tool.
 
 ## Public HTTPS MCP
 
@@ -61,7 +61,7 @@ If an authenticated sni_ or compatible rmt_ seat token already exists, mount it 
     export SLEDGEWIRE_PUBLIC_KEY_FILE=/run/secrets/sledgewire-ed25519-public.pem
     npm run arena:daemon
 
-The daemon resolves the active identity, requires it to match the single recorded Arena seat, requires the payee to belong to that same Principal/Agent/Instance, joins only the explicit Arena Room, keeps presence alive, long-polls the ordered log, verifies native credit transfers, executes paid work through SharedOS, and persists quote/request/payment/message state. v0.3.13 additionally bounds unpaid quote state (4-hour TTL, 256 per buyer, 20,000 global), drops Room messages above 32 KiB before parsing, and circuit-breaks repeated nonexistent-payment lookups.
+The daemon resolves the active identity, requires it to match the single recorded Arena seat, requires the payee to belong to that same Principal/Agent/Instance, joins only the explicit Arena Room, keeps presence alive, long-polls the ordered log, verifies native credit transfers, executes paid work through SharedOS, and persists quote/request/payment/message state. v0.3.14 keeps the v0.3.13 quote/message bounds and adds sender-fair scheduling, protected fresh-buyer payment verification, explicit payment-claim vs execution-start crash boundaries, terminal Room-state pruning behind the durable cursor, and shared-WAL multi-process contention coverage.
 
 The Room wait request follows the current SharedNet contract exactly: after + timeout, with no undocumented query parameters. Large signed dossiers automatically become Room-addressed SharedNet artifacts with a compact SHA-256 pointer.
 
@@ -89,7 +89,7 @@ Before autonomous competition, first start the seller daemon, complete the real 
 
     npm run preflight -- --live
 
-Before the live gate, run the local chaos gates `npm run stress:arena-e2e -- 40000 10000` and `npm run stress:http -- 64 32`. The live gate does not trust a manual "external call confirmed" flag. It also rejects a stale deployment: `/health` and `/arena.json` must report the exact expected version and current judge/buyer card. It negotiates the deployed MCP endpoint, verifies a signed free selfcheck and signed paid routing response against the deployed public key, verifies the SharedNet seller identity/payee, validates `.sledgewire/live-rehearsal.json`, and validates `.sledgewire/restart-replay.json` against the current daemon boot. If any required fact is absent or stale, the gate stays red.
+Before the live gate, run the local chaos gates `npm run stress:arena-e2e -- 40000 10000`, `npm run stress:monster`, `npm run stress:sqlite -- 6 1500`, and `npm run stress:http -- 64 32`. The live gate does not trust a manual "external call confirmed" flag. It also rejects a stale deployment: `/health` and `/arena.json` must report the exact expected version and current judge/buyer card. It negotiates the deployed MCP endpoint, verifies a signed free selfcheck and signed paid routing response against the deployed public key, verifies the SharedNet seller identity/payee, validates `.sledgewire/live-rehearsal.json`, and validates `.sledgewire/restart-replay.json` against the current daemon boot. If any required fact is absent or stale, the gate stays red.
 
 The pinned Trial Zero guide makes SharedOS an optional award track, so external SharedOS audit export is not a main-Arena launch prerequisite. If you intentionally want stronger SharedOS award evidence, set `SLEDGEWIRE_SHAREDOS_REQUIRED=1`, configure a credential-free HTTPS `SHAREDOS_AUDIT_URL` plus `SHAREDOS_KEY`, observe a real external decision trace, then set `SHAREDOS_AUDIT_CONFIRMED=1`. See `docs/SHAREDOS_AUTHORITY_MAP.md` for the authority and audit model.
 

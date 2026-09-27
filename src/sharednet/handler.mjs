@@ -4,7 +4,7 @@ import {quote} from '../core/quote.mjs';
 import {validateServiceInput} from '../core/service-input.mjs';
 import {runPaidService} from '../sharedos/host.mjs';
 import {signReceipt} from '../receipts/receipt.mjs';
-import {SEAT} from './api.mjs';
+import {SEAT,TXN} from './api.mjs';
 import {PAYMENT_QUOTE_TTL_MS} from '../store/arena-store.mjs';
 
 const REQUEST_ID=/^[A-Za-z0-9][A-Za-z0-9._-]{2,95}$/;
@@ -50,6 +50,9 @@ export function createArenaHandler({store,ledger,room,payee,signing,publicBaseUr
     if(!catalog.services[req.service]||catalog.services[req.service].price<=0){store.incrementCounter('arena.reject.unknown_or_free_service');return failure(req,'unknown_or_free_service');}
     const validation=validateServiceInput(req.service,req.input);
     if(!validation.ok){store.incrementCounter('arena.reject.invalid_input');return failure(req,'invalid_input',{detail:validation.reason});}
+    if(req.payment_txn_id!==undefined&&req.payment_txn_id!==null&&!TXN.test(req.payment_txn_id)){
+      store.incrementCounter('arena.reject.invalid_payment_txn_id');return failure(req,'invalid_payment_txn_id');
+    }
 
     if(!req.payment_txn_id){
       const bound={roomId:room,buyerSeat,requestId:req.request_id,service:req.service,input:req.input};
@@ -86,6 +89,11 @@ export function createArenaHandler({store,ledger,room,payee,signing,publicBaseUr
     if(!auth.ok){store.incrementCounter(`arena.reject.${String(auth.reason).replace(/[^a-z0-9_.-]/gi,'_').slice(0,80)}`);if(auth.reason==='previous_attempt_failed'&&auth.error?.response)return auth.error.response;return failure(req,auth.reason,auth);}
     if(auth.replay){store.incrementCounter('arena.delivery.replay');return auth.cached;}
 
+    const executionStart=store.markExecutionStarted?.(auth.storageKey,auth.fingerprint);
+    if(executionStart&&executionStart.status!=='started'){
+      store.incrementCounter('arena.reject.execution_start_race');
+      return failure(req,'request_already_inflight',{execution_started_at:executionStart.at??null});
+    }
     try{
       // SharedOS grant ids are derived from the request fingerprint, not the buyer-supplied
       // request_id, so two different buyers can safely choose the same request label.
