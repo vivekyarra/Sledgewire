@@ -39,9 +39,9 @@
 - [x] Typed free quotes reject invalid/oversized reflected request IDs before ledger, service or artifact work.
 - [x] Raw slow-header and incomplete-body sockets are forcibly reclaimed while concurrent signed MCP selfchecks remain responsive.
 - [x] Long-run file-backed state churn proves 50,000 terminal Room messages stay bounded behind the cursor, acknowledged audit outbox state returns to zero, canonical audit evidence survives reopen, and SQLite integrity remains `ok`.
-- [x] **296 / 296** automated tests passed on the v0.3.14 code/evidence run, 0 failures.
-- [x] **25,000 / 25,000** MCP Smoke workflows at concurrency **192**, 0 failures; CI-fixture p50 **214 ms**, p95 **235 ms**, p99 **264 ms**.
-- [x] **25,000** Arena paid claims + **25,000** cached retries with **0 duplicate paid authorizations**; 500 wrong-buyer attempts and 5,000 altered post-quote inputs rejected.
+- [x] **303 / 303** automated tests passed on the v0.3.15 code/evidence run, 0 failures.
+- [x] **25,000 / 25,000** MCP Smoke workflows at concurrency **192**, 0 failures; CI-fixture p50 **80 ms**, p95 **98 ms**, p99 **123 ms**.
+- [x] **25,000** Arena paid claims + **25,000** cached retries with **0 duplicate paid authorizations**; 500 wrong-buyer attempts and 5,000 altered post-quote inputs rejected before ledger work.
 - [x] Duplicate authorization storm: **122,500 authorization attempts**, 2,500 unique claims, 57,500 in-flight duplicates refused, 60,000 cached replays, 2,500 transaction-reuse attempts refused and only **2,500 ledger reads**.
 - [x] Handler-level execution storm on file-backed SQLite/WAL: **125,000 handler requests**, **2,500 actual service executions**, **0 duplicate service executions**, **0 missing executions**, 60,000 cached replays and 2,500 ledger reads.
 - [x] Mixed Arena judge/buyer UX storm: **50,000 requests** at concurrency **256**, **0 failures**, including 20,833 info answers, 16,667 quote responses, 4,167 signed payment quotes, 4,167 rejected invalid requests and 4,166 irrelevant messages; **0 ledger reads and 0 paid executions** on every pre-payment path.
@@ -53,7 +53,7 @@
 - [x] Static preflight green; hardened live preflight additionally requires production mode, disabled paid bypass, public modern MCP negotiation, signed selfcheck/payment route, authenticated seller identity/payee, cryptographically validated second-seat rehearsal evidence, and restart-replay evidence matching the current daemon boot. Optional external SharedOS proof is enforced only when explicitly enabled.
 - [x] Production MCP Host/authority guard rejects unlisted Host headers.
 - [x] Two-process Docker Compose topology shares the same persistent SQLite/WAL volume between public MCP and Arena daemon.
-- [x] Public `/ready` fails closed when the Arena daemon readiness pulse is missing, stopped or stale; after startup the pulse refreshes only after successful SharedNet presence plus configured Arena Room access; live preflight checks readiness and deployed signing-key identity.
+- [x] Public `/ready` fails closed when the Arena daemon readiness pulse is missing, stopped, stale or materially future-dated; after startup the pulse refreshes only after successful SharedNet presence plus configured Arena Room access; live preflight checks readiness and deployed signing-key identity.
 - [x] Provider daemon posts one durable idempotent `sledgewire.available.v1` discovery message and will not repost it after restart.
 - [x] Durable `arena:stats` v2 reports verified gross incoming credits, all verified paid buyers, completed-delivery buyers, paid transaction count, paid/delivered service mix, rejection reasons, Smoke-to-premium conversion and latency without emitting buyer identities.
 - [x] Paid claims persist buyer seat before execution; pre-v0.3.9 Arena databases migrate online and exact legacy retries backfill buyer identity without changing replay semantics.
@@ -70,12 +70,15 @@
 - [x] `/arena.md`, `/arena.json` and `/.well-known/agent.json` expose explicit judge-first proof and buyer-first purchase paths.
 - [x] Public probe/live preflight reject stale deployments by checking exact runtime version plus current competition-card fields.
 - [x] One-seat invariant: `arena:join` records the exact joined Instance; production daemon and live preflight reject any authenticated Arena Instance that does not match that binding.
-- [x] Arena 2 budget controller snapshots live SharedNet sent totals exactly once, refuses silent rebasing, reports overspend, bounds offer files to 5,000 entries, and computes remaining spend against the organizer's 100-credit obligation; exact-spend planner prefers seller diversity and utility.
+- [x] Arena 2 budget controller snapshots live SharedNet sent totals exactly once, writes that baseline atomically, refuses corrupt/symlink state and silent rebasing, reports overspend, bounds offer files to 5,000 entries, deduplicates exact offer IDs, rejects conflicting IDs, excludes self-seller offers by default, and computes remaining spend against the organizer's 100-credit obligation.
 - [x] Arena stats separate gross locally verified incoming claims from the live SharedNet purse and do not mislabel either as the hidden organizer ranking.
 - [x] Paid execution failures are signed, durably cached and replayed exactly without duplicate execution or another ledger read.
-- [x] Public selfcheck uses single-flight + a short result cache; public trace lookups are indexed; production HTTP caps active requests/connections and rejects declared bodies over 1 MiB from headers, drains/discards the payload, and preserves socket/process health.
-- [x] Mandatory `stress:arena-e2e`: 40,000 quote flood held at 20,000 global cap; 10,000 oversized Room messages caused 0 ledger reads/executions; 100 bogus txns caused 16 ledger scans + 84 circuit breaks; durable restart replay passed; 5,000-offer planner found exact 100-credit spend.
-- [x] Mandatory `stress:http`: real production process handled 64 concurrent signed selfchecks in 216 ms + 32 signed paid routes in 50 ms; Host/Origin guards, malformed JSON, correctly framed 1,000,001-byte rejection and post-stress health all passed.
+- [x] Public selfcheck uses single-flight + a short result cache; public trace lookups are indexed; production HTTP caps body readers/RPC execution/connections, rejects declared bodies over 1 MiB, bounds header/request/idle lifetimes, contains client-abort exceptions, and preserves process health.
+- [x] Mandatory `stress:arena-e2e`: 40,000 quote flood held at 20,000 global cap; 10,000 oversized Room messages caused 0 ledger reads/executions; 100 bogus txns caused 16 ledger scans + 84 circuit breaks; durable restart replay passed; 5,000-offer planner found exact 100-credit spend in **136 ms**.
+- [x] Mandatory `stress:http`: real production process handled 64 concurrent signed selfchecks in **127 ms** + 32 signed paid routes in **34 ms**; Host/Origin guards, malformed JSON, oversized early rejection and post-stress health all passed.
+- [x] Mandatory `stress:slow-http`: **64 partial-header + 64 incomplete-body sockets** coexisted with **32 signed selfchecks in 99 ms**; all 128 stalled sockets were reclaimed, 64 body readers were observed, stalled bodies consumed **0 RPC slots**, and the process stayed healthy.
+- [x] Mandatory `stress:state-churn`: **50,000** terminal Room messages retained only **2,000** dedupe rows; **5,000** canonical audit events survived reopen, transient audit outbox returned to **0**, SQLite integrity was **ok**, and checkpointed state was **1,912,832 bytes**.
+- [x] Exact v0.3.15 code/evidence run: GitHub Actions **36299753997** on head `60e12115df6dd8572965937b35dcb97cdac36c62` — **SUCCESS**.
 
 ## Submission P0
 
