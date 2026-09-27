@@ -1,6 +1,6 @@
 # Trial Zero release checklist
 
-## Static code gates — v0.3.14
+## Static code gates — v0.3.15
 
 - [x] CLI and MCP with current 2026-07-28 stateless `server/discover` plus bounded legacy fallback.
 - [x] Official `@modelcontextprotocol/client` v2 Streamable HTTP integration test negotiates 2026-07-28 and calls Sledgewire.
@@ -34,6 +34,11 @@
 - [x] Unused legacy child-process SharedNet adapter removed from production tree.
 - [x] SharedNet secrets excluded from git and Docker context.
 - [x] SQLite close/reopen replay and two-connection one-use tests green; v0.3.14 adds a mandatory six-process shared-WAL contention/integrity gate plus a file-backed crash-boundary recovery stress.
+- [x] Arena-2 budget state uses atomic fsync+rename persistence; corrupt/non-regular/symlink state fails closed instead of silently rebasing the 100-credit baseline.
+- [x] Buyer planning collapses exact duplicate offer IDs, rejects conflicting duplicate IDs, and excludes self-seller offers by default.
+- [x] Typed free quotes reject invalid/oversized reflected request IDs before ledger, service or artifact work.
+- [x] Raw slow-header and incomplete-body sockets are forcibly reclaimed while concurrent signed MCP selfchecks remain responsive.
+- [x] Long-run file-backed state churn proves 50,000 terminal Room messages stay bounded behind the cursor, acknowledged audit outbox state returns to zero, canonical audit evidence survives reopen, and SQLite integrity remains `ok`.
 - [x] **296 / 296** automated tests passed on the v0.3.14 code/evidence run, 0 failures.
 - [x] **25,000 / 25,000** MCP Smoke workflows at concurrency **192**, 0 failures; CI-fixture p50 **214 ms**, p95 **235 ms**, p99 **264 ms**.
 - [x] **25,000** Arena paid claims + **25,000** cached retries with **0 duplicate paid authorizations**; 500 wrong-buyer attempts and 5,000 altered post-quote inputs rejected.
