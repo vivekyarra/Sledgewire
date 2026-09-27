@@ -3,7 +3,7 @@ name: sledgewire-arena
 x-common: &common
   build:
     context: .
-  image: sledgewire:0.3.11
+  image: sledgewire:0.3.12
   restart: unless-stopped
   init: true
   read_only: true
@@ -57,6 +57,7 @@ services:
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?set PUBLIC_BASE_URL}
       SHAREDNET_BASE_URL: ${SHAREDNET_BASE_URL:-https://www.sharednet.ai}
       SHAREDNET_MEMBER_TOKEN_FILE: /run/secrets/sharednet-seat
+      SHAREDNET_ARENA_SEAT_FILE: /run/secrets/sharednet-seat-id
       SHAREDNET_ARENA_ROOM_ID: ${SHAREDNET_ARENA_ROOM_ID:?set SHAREDNET_ARENA_ROOM_ID}
       SHAREDNET_PAYEE_ADDRESS: ${SHAREDNET_PAYEE_ADDRESS:?set SHAREDNET_PAYEE_ADDRESS}
       SLEDGEWIRE_ARENA_CONCURRENCY: ${SLEDGEWIRE_ARENA_CONCURRENCY:-4}
@@ -65,6 +66,7 @@ services:
       - ./.sledgewire/keys/ed25519-private.pem:/run/secrets/ed25519-private.pem:ro
       - ./.sledgewire/keys/ed25519-public.pem:/run/secrets/ed25519-public.pem:ro
       - ./.sharednet/sledgewire-arena-token:/run/secrets/sharednet-seat:ro
+      - ./.sharednet/sledgewire-arena-seat:/run/secrets/sharednet-seat-id:ro
 
 volumes:
   sledgewire-data:
