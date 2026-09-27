@@ -1,6 +1,6 @@
 # Trial Zero release checklist
 
-## Static code gates — v0.3.12
+## Static code gates — v0.3.13
 
 - [x] CLI and MCP with current 2026-07-28 stateless `server/discover` plus bounded legacy fallback.
 - [x] Official `@modelcontextprotocol/client` v2 Streamable HTTP integration test negotiates 2026-07-28 and calls Sledgewire.
@@ -22,12 +22,12 @@
 - [x] SharedOS bounded-use state and durable audit/outbox.
 - [x] External SharedOS audit export requires credential-free HTTPS, refuses redirects, bounds its bearer key, and live preflight validates the sink before handoff.
 - [x] Paid receipts carry a SharedOS trace id; free `sledgewire.trace` returns a sanitized signed trace proof with no global listing.
-- [x] Native SharedNet credit verification requires buyer, exact/fallback-safe payee evidence, integer amount, Arena Room, organizer memo `Sledgewire`, and a one-use transaction; exact request identity is separately locked by the signed quote + durable fingerprint.
+- [x] Native SharedNet credit verification requires buyer, exact/fallback-safe payee evidence, integer amount, Arena Room, organizer memo `Sledgewire`, and a one-use transaction; exact request identity is separately locked by the signed quote + durable fingerprint. Outstanding quotes expire after 4 hours, are capped at 256 per buyer / 20,000 globally, and are reclaimed after terminal paid outcomes.
 - [x] Request storage/grant identity is scoped by Room + buyer + request fingerprint, preventing cross-buyer request-label collisions.
-- [x] Concurrent duplicate ledger checks are coalesced; positive/negative lookups are bounded in-memory cached.
+- [x] Concurrent duplicate ledger checks are coalesced; positive/negative lookups are bounded in-memory cached; unique nonexistent transaction floods are circuit-broken at 16 misses per buyer / 64 globally per 60-second window.
 - [x] Exact completed retries are cached from the previously verified durable payment binding without requiring the transfer to remain in remote ledger history; legacy unattributed rows re-verify before buyer backfill; stale uncertain paid executions never blindly re-execute.
 - [x] Separate development and Arena Rooms.
-- [x] Arena cursor/message persistence, bounded retries, poison-message dead-letter.
+- [x] Arena cursor/message persistence, bounded retries, poison-message dead-letter, and 32-KiB Room-message rejection before parsing or service work.
 - [x] Watch compatibility validates active payee ownership, requires one reply event, and uses artifact fallback for oversized signed deliveries.
 - [x] SharedNet page bodies remain bounded while allowing legitimate Room pages above the generic API-response ceiling.
 - [x] SharedNet artifact URLs are required to remain HTTPS on the configured SharedNet origin.
@@ -61,9 +61,12 @@
 - [x] `/arena.md`, `/arena.json` and `/.well-known/agent.json` expose explicit judge-first proof and buyer-first purchase paths.
 - [x] Public probe/live preflight reject stale deployments by checking exact runtime version plus current competition-card fields.
 - [x] One-seat invariant: `arena:join` records the exact joined Instance; production daemon and live preflight reject any authenticated Arena Instance that does not match that binding.
-- [x] Arena 2 budget controller snapshots live SharedNet sent totals and computes remaining spend against the organizer's 100-credit obligation; exact-spend planner prefers seller diversity and utility.
+- [x] Arena 2 budget controller snapshots live SharedNet sent totals exactly once, refuses silent rebasing, reports overspend, bounds offer files to 5,000 entries, and computes remaining spend against the organizer's 100-credit obligation; exact-spend planner prefers seller diversity and utility.
 - [x] Arena stats separate gross locally verified incoming claims from the live SharedNet purse and do not mislabel either as the hidden organizer ranking.
 - [x] Paid execution failures are signed, durably cached and replayed exactly without duplicate execution or another ledger read.
+- [x] Public selfcheck uses single-flight + a short result cache; public trace lookups are indexed; production HTTP caps active requests/connections and rejects declared bodies over 1 MiB before reading them.
+- [x] Mandatory `stress:arena-e2e` covers quote floods, payment-miss storms, oversized Room traffic, exact 100-credit planning and file-backed restart replay.
+- [x] Mandatory `stress:http` launches the real production HTTP process and exercises judge selfcheck bursts, signed paid routes, Host/Origin guards, malformed JSON, oversized-body rejection and post-stress health.
 
 ## Submission P0
 
