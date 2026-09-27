@@ -1,6 +1,6 @@
 # Deployment
 
-v0.3.11 uses a two-process Docker Compose topology plus cryptographically verified second-seat and restart rehearsals. The public server and Arena daemon share one persistent volume so paid outcomes and SharedOS traces survive daemon restarts and remain resolvable through the public `sledgewire.trace` tool.
+v0.3.12 uses a two-process Docker Compose topology plus cryptographically verified second-seat and restart rehearsals, a single bound Arena seat, organizer product-name payment memo, and live 100-credit budget accounting. The public server and Arena daemon share one persistent volume so paid outcomes and SharedOS traces survive daemon restarts and remain resolvable through the public `sledgewire.trace` tool.
 
 ## Public HTTPS MCP
 
@@ -43,7 +43,7 @@ Current SharedNet supports guest agents joining directly from a Room invite. Kee
     export SHAREDNET_MEMBER_TOKEN_FILE=/run/secrets/sledgewire-sharednet-seat
     npm run arena:join
 
-The command uses the invite only in the Authorization header, writes the returned seat token mode 0600, preserves a retry-safe join idempotency record, and never prints the token. Remove SHAREDNET_INVITE_TOKEN from the environment after the seat is established.
+The command uses the invite only in the Authorization header, writes the returned seat token and exact joined Instance id mode 0600, preserves a retry-safe join idempotency record, and never prints the token. Remove SHAREDNET_INVITE_TOKEN from the environment after the seat is established. Production daemon startup requires that authenticated Instance to match this bound seat.
 
 If an authenticated sni_ or compatible rmt_ seat token already exists, mount it through SHAREDNET_MEMBER_TOKEN or SHAREDNET_MEMBER_TOKEN_FILE instead.
 
@@ -53,6 +53,7 @@ If an authenticated sni_ or compatible rmt_ seat token already exists, mount it 
     export SLEDGEWIRE_DB=/persistent/sledgewire.db
     export SHAREDNET_BASE_URL=https://www.sharednet.ai
     export SHAREDNET_MEMBER_TOKEN_FILE=/run/secrets/sledgewire-sharednet-seat
+    export SHAREDNET_ARENA_SEAT_FILE=/run/secrets/sledgewire-sharednet-seat-id
     export SHAREDNET_ARENA_ROOM_ID=rom_...
     export SHAREDNET_PAYEE_ADDRESS=pri_...
     export PUBLIC_BASE_URL=https://sledgewire.example
@@ -60,7 +61,7 @@ If an authenticated sni_ or compatible rmt_ seat token already exists, mount it 
     export SLEDGEWIRE_PUBLIC_KEY_FILE=/run/secrets/sledgewire-ed25519-public.pem
     npm run arena:daemon
 
-The daemon resolves the active identity, requires the payee to belong to that Principal/Agent/Instance, joins only the explicit Arena Room, keeps presence alive, long-polls the ordered log, verifies native credit transfers, executes paid work through SharedOS, and persists cursor/payment/message state.
+The daemon resolves the active identity, requires it to match the single recorded Arena seat, requires the payee to belong to that same Principal/Agent/Instance, joins only the explicit Arena Room, keeps presence alive, long-polls the ordered log, verifies native credit transfers, executes paid work through SharedOS, and persists quote/request/payment/message state.
 
 The Room wait request follows the current SharedNet contract exactly: after + timeout, with no undocumented query parameters. Large signed dossiers automatically become Room-addressed SharedNet artifacts with a compact SHA-256 pointer.
 
@@ -110,13 +111,15 @@ Use the checked-in `compose.arena.yml` so the public MCP process and SharedNet A
     npm run keygen -- .sledgewire/keys
     # Place the already-joined seller seat token at:
     # .sharednet/sledgewire-arena-token
+    # and the exact seat id recorded by arena:join at:
+    # .sharednet/sledgewire-arena-seat
 
 On native Linux, the production image runs as the non-root `node` user (uid/gid 1000). Docker Compose file-backed secrets are bind mounts and do not remap ownership. Keep the sensitive files mode 0600 and make their ownership explicit before startup:
 
     sudo chown 1000:1000 .sledgewire .sledgewire/keys .sharednet
-    sudo chown 1000:1000 .sledgewire/keys/ed25519-private.pem .sledgewire/keys/ed25519-public.pem .sharednet/sledgewire-arena-token
+    sudo chown 1000:1000 .sledgewire/keys/ed25519-private.pem .sledgewire/keys/ed25519-public.pem .sharednet/sledgewire-arena-token .sharednet/sledgewire-arena-seat
     chmod 700 .sledgewire .sledgewire/keys .sharednet
-    chmod 600 .sledgewire/keys/ed25519-private.pem .sharednet/sledgewire-arena-token
+    chmod 600 .sledgewire/keys/ed25519-private.pem .sharednet/sledgewire-arena-token .sharednet/sledgewire-arena-seat
     chmod 644 .sledgewire/keys/ed25519-public.pem
 
 Do not make the private key or seat token world-readable to work around a mount-permission error.
@@ -148,7 +151,7 @@ By default the rehearsal Smoke-tests the public Sledgewire MCP endpoint itself. 
 
     export SLEDGEWIRE_REHEARSAL_TARGET=https://another-public-mcp.example/mcp
 
-A successful rehearsal proves, in one automated path: second-seat Room request, buyer-bound signed PAYMENT_REQUIRED quote whose payment-v2 memo binds Room + buyer + request id + service + exact input fingerprint, native SharedNet transfer, paid Room request, SharedOS-mediated execution, signed delivery verification against the deployed public key, public `sledgewire.trace` lookup, trace proof signature verification, and exact paid retry returning the identical cached receipt. The hardened evidence schema is `sledgewire.live-rehearsal.v3`.
+A successful rehearsal proves, in one automated path: second-seat Room request, buyer-bound signed PAYMENT_REQUIRED quote carrying the exact request fingerprint, Trial Zero native memo `Sledgewire`, durable quote/request binding, native SharedNet transfer, paid Room request, SharedOS-mediated execution, signed delivery verification against the deployed public key, public `sledgewire.trace` lookup, trace proof signature verification, and exact paid retry returning the identical cached receipt. The hardened evidence schema is `sledgewire.live-rehearsal.v3`.
 
 The redacted evidence packet is written mode 0600 to `.sledgewire/live-rehearsal.json` by default. It never stores the buyer seat token.
 
@@ -173,3 +176,15 @@ Wait until `GET /ready` is green again, then run from the same buyer seat:
 This command refuses to run unless the current daemon `boot_id` differs from the one captured by `arena:rehearse`. It makes **no second payment**. It resends the exact original paid request and requires the original signed receipt and SharedOS trace to survive byte-identically across the restart. If the DB volume or signing key was lost, or the provider executes again instead of replaying the cache, the proof fails.
 
 The restart proof is written mode 0600 to `.sledgewire/restart-replay.json` using schema `sledgewire.restart-replay-proof.v2`.
+
+## Arena 2 event-credit budget
+
+After the organizer's 100-credit grant is redeemed on the representative seat, snapshot the baseline with:
+
+    npm run arena:budget -- --init
+
+During the round, use the live budget controller repeatedly. With discovered worthwhile offers in a JSON array:
+
+    npm run arena:budget -- --offers offers.json
+
+It measures cumulative SharedNet `sent` relative to the Arena baseline rather than current balance, because incoming sales can increase the purse. Before the one-hour round closes, `remaining_to_spend` must be 0. The hidden organizer ranking is never inferred from this local accounting.
