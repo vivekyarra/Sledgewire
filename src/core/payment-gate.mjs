@@ -7,10 +7,11 @@ export function requestStorageKey({roomId,buyerSeat,requestId}){return `rqk_${sh
 function principalAddress(x){return typeof x==='string'&&(x.startsWith('p_')||x.startsWith('pri_'));}
 
 export class PaymentGate{
-  constructor({ledger,store,prices,payee,uncertainAfterMs=120_000,ledgerPositiveTtlMs=30_000,ledgerNegativeTtlMs=500,ledgerCacheMax=2048}){
+  constructor({ledger,store,prices,payee,uncertainAfterMs=120_000,ledgerPositiveTtlMs=30_000,ledgerNegativeTtlMs=500,ledgerCacheMax=2048,ledgerMissWindowMs=60_000,ledgerMissPerBuyer=16,ledgerMissGlobal=64}){
     this.ledger=ledger;this.store=store;this.prices=prices;this.payee=payee;this.uncertainAfterMs=uncertainAfterMs;
     this.ledgerPositiveTtlMs=ledgerPositiveTtlMs;this.ledgerNegativeTtlMs=ledgerNegativeTtlMs;this.ledgerCacheMax=ledgerCacheMax;
-    this.txCache=new Map();this.txInflight=new Map();
+    this.ledgerMissWindowMs=ledgerMissWindowMs;this.ledgerMissPerBuyer=ledgerMissPerBuyer;this.ledgerMissGlobal=ledgerMissGlobal;
+    this.txCache=new Map();this.txInflight=new Map();this.ledgerMissesByBuyer=new Map();this.ledgerMissesGlobal={startedAt:0,count:0};
   }
   issueQuote(req){
     const price=this.prices[req.service];
@@ -21,6 +22,22 @@ export class PaymentGate{
     if(binding.status==='corrupt')return {ok:false,reason:'payment_quote_state_corrupt'};
     if(binding.status==='conflict')return {ok:false,reason:'payment_quote_request_conflict'};
     return {ok:false,reason:'payment_required',price,memo,fingerprint,storageKey,quote_replay:binding.status==='replay',quote_issued_at:binding.quote?.issued_at??null,quote_expires_at:binding.quote?.expires_at??null};
+  }
+  ledgerMissAllowed(buyerSeat){
+    const now=Date.now(),windowMs=this.ledgerMissWindowMs;
+    if(now-this.ledgerMissesGlobal.startedAt>=windowMs)this.ledgerMissesGlobal={startedAt:now,count:0};
+    const buyer=this.ledgerMissesByBuyer.get(buyerSeat);
+    if(!buyer||now-buyer.startedAt>=windowMs){this.ledgerMissesByBuyer.set(buyerSeat,{startedAt:now,count:0});}
+    const current=this.ledgerMissesByBuyer.get(buyerSeat);
+    return current.count<this.ledgerMissPerBuyer&&this.ledgerMissesGlobal.count<this.ledgerMissGlobal;
+  }
+  recordLedgerMiss(buyerSeat){
+    const now=Date.now(),windowMs=this.ledgerMissWindowMs;
+    if(now-this.ledgerMissesGlobal.startedAt>=windowMs)this.ledgerMissesGlobal={startedAt:now,count:0};
+    let buyer=this.ledgerMissesByBuyer.get(buyerSeat);
+    if(!buyer||now-buyer.startedAt>=windowMs){buyer={startedAt:now,count:0};this.ledgerMissesByBuyer.set(buyerSeat,buyer);}
+    buyer.count++;this.ledgerMissesGlobal.count++;
+    if(this.ledgerMissesByBuyer.size>2048)for(const [seat,state] of this.ledgerMissesByBuyer)if(now-state.startedAt>=windowMs)this.ledgerMissesByBuyer.delete(seat);
   }
   async lookupTransaction(txnId,signal){
     const now=Date.now(),cached=this.txCache.get(txnId);
@@ -64,8 +81,9 @@ export class PaymentGate{
       if(!exact)return {ok:false,reason:'payment_quote_request_mismatch'};
     }
 
+    if(!this.ledgerMissAllowed(req.buyerSeat))return {ok:false,reason:'payment_verification_rate_limited',retry_after_ms:this.ledgerMissWindowMs};
     const tx=await this.lookupTransaction(req.txnId,signal);
-    if(!tx)return {ok:false,reason:'transaction_not_found'};
+    if(!tx){this.recordLedgerMiss(req.buyerSeat);return {ok:false,reason:'transaction_not_found'};}
     if(tx.id!==undefined&&tx.id!==null&&tx.id!==req.txnId)return {ok:false,reason:'wrong_transaction_id'};
 
     const buyer=tx.buyer_instance_id??tx.by_instance_id??tx.sender_instance_id??tx.from_instance_id;
