@@ -21,6 +21,7 @@ export class PaymentGate{
     const binding=this.store.bindPaymentQuote({requestId:storageKey,fingerprint,service:req.service,buyerSeat:req.buyerSeat,price,memo});
     if(binding.status==='corrupt')return {ok:false,reason:'payment_quote_state_corrupt'};
     if(binding.status==='conflict')return {ok:false,reason:'payment_quote_request_conflict'};
+    if(binding.status==='capacity')return {ok:false,reason:'payment_quote_capacity_reached',scope:binding.scope,retry_after_ms:binding.retry_after_ms};
     return {ok:false,reason:'payment_required',price,memo,fingerprint,storageKey,quote_replay:binding.status==='replay',quote_issued_at:binding.quote?.issued_at??null,quote_expires_at:binding.quote?.expires_at??null};
   }
   ledgerMissAllowed(buyerSeat){
