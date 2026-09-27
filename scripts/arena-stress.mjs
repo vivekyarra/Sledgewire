@@ -2,15 +2,15 @@ import {ArenaStore} from '../src/store/arena-store.mjs';
 import {PaymentGate,paymentMemo} from '../src/core/payment-gate.mjs';
 
 const n=Number(process.argv[2]??1000);
-const room='rom_ABCDEFGHIJ',buyer='i_ABCDEFGHIJ',payee='p_ABCDEFGHIJ',service='sledgewire.smoke',price=3;
+const room='rom_ABCDEFGHIJ',buyer='i_ABCDEFGHIJ',payee='p_ABCDEFGHIJ',service='sledgewire.smoke',price=3,txn=i=>'txn_'+String(i).padStart(10,'0');
 const store=new ArenaStore(':memory:');
 let ledgerReads=0;
 const ledger={async get(txnId){ledgerReads++;const i=Number(txnId.split('_').at(-1));if(!Number.isInteger(i))return null;const requestId=`req-${i}`;return {id:txnId,buyer_instance_id:buyer,payee_ok:true,amount:price,room_id:room,memo:paymentMemo({roomId:room,buyerSeat:buyer,requestId,service,input:{endpoint:`https://example.com/${i}`}})};}};
 const gate=new PaymentGate({ledger,store,prices:{[service]:price},payee});
 const started=Date.now();let claimed=0,cached=0,rejected=0;
-for(let i=0;i<n;i++){const req={roomId:room,buyerSeat:buyer,requestId:`req-${i}`,service,input:{endpoint:`https://example.com/${i}`},txnId:`txn_${i}`};const q=gate.issueQuote(req);if(q.reason!=='payment_required'||q.memo!=='Sledgewire')throw new Error(`quote_failed_${i}:${q.reason}`);const a=await gate.authorize(req);if(!a.ok||a.replay)throw new Error(`claim_failed_${i}:${a.reason}`);claimed++;store.complete(a.storageKey,a.fingerprint,{ok:true,i});}
-for(let i=0;i<n;i++){const req={roomId:room,buyerSeat:buyer,requestId:`req-${i}`,service,input:{endpoint:`https://example.com/${i}`},txnId:`txn_${i}`};const a=await gate.authorize(req);if(!a.ok||!a.replay||a.cached.i!==i)throw new Error(`replay_failed_${i}`);cached++;}
-for(let i=0;i<Math.min(n,500);i++){const req={roomId:room,buyerSeat:'i_ZYXWVUTSRQ',requestId:`req-${i}`,service,input:{endpoint:`https://example.com/${i}`},txnId:`txn_${i}`};const a=await gate.authorize(req);if(a.ok||a.reason!=='wrong_buyer')throw new Error(`wrong_buyer_not_rejected_${i}`);rejected++;}
+for(let i=0;i<n;i++){const req={roomId:room,buyerSeat:buyer,requestId:`req-${i}`,service,input:{endpoint:`https://example.com/${i}`},txnId:txn(i)};const q=gate.issueQuote(req);if(q.reason!=='payment_required'||q.memo!=='Sledgewire')throw new Error(`quote_failed_${i}:${q.reason}`);const a=await gate.authorize(req);if(!a.ok||a.replay)throw new Error(`claim_failed_${i}:${a.reason}`);claimed++;store.complete(a.storageKey,a.fingerprint,{ok:true,i});}
+for(let i=0;i<n;i++){const req={roomId:room,buyerSeat:buyer,requestId:`req-${i}`,service,input:{endpoint:`https://example.com/${i}`},txnId:txn(i)};const a=await gate.authorize(req);if(!a.ok||!a.replay||a.cached.i!==i)throw new Error(`replay_failed_${i}`);cached++;}
+for(let i=0;i<Math.min(n,500);i++){const req={roomId:room,buyerSeat:'i_ZYXWVUTSRQ',requestId:`req-${i}`,service,input:{endpoint:`https://example.com/${i}`},txnId:txn(i)};const a=await gate.authorize(req);if(a.ok||a.reason!=='wrong_buyer')throw new Error(`wrong_buyer_not_rejected_${i}`);rejected++;}
 let substitutionRejected=0;const beforeSubstitutionReads=ledgerReads,attackSeat=i=>'i_'+String(i%64).padStart(10,'0');
 for(let i=0;i<Math.min(n,5000);i++){
   const original={roomId:room,buyerSeat:attackSeat(i),requestId:`bind-${i}`,service,input:{endpoint:`https://quoted.example.com/${i}`},txnId:`txn_bind_${i}`};
