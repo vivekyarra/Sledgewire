@@ -46,12 +46,12 @@ try{
   const card=JSON.parse((await req(port,{path:'/arena.json'})).text);if(card.version!=='0.3.13'||card.payment?.native_sharednet_memo!=='Sledgewire')throw new Error('arena_card_failed');
 
   const sc=modernCall('sledgewire.selfcheck',{},1),t1=Date.now();
-  const selfchecks=await Promise.all(Array.from({length:selfcheckN},(_,i)=>req(port,{path:'/mcp',method:'POST',headers:sc.headers,body:sc.body.replace('"id":1',`"id":${i+1}`)})));
+  const selfchecks=await Promise.all(Array.from({length:selfcheckN},(_,i)=>{const call=modernCall('sledgewire.selfcheck',{},i+1);return req(port,{path:'/mcp',method:'POST',headers:call.headers,body:call.body});}));
   const selfcheckMs=Date.now()-t1;
   for(const r of selfchecks){if(r.status!==200)throw new Error(`selfcheck_http_${r.status}`);const j=JSON.parse(r.text),receipt=j.result?.structuredContent;if(receipt?.verified!==true||verifyReceipt(receipt,kp.publicKeyPem).ok!==true)throw new Error('selfcheck_receipt_invalid');}
 
   const paid=modernCall('sledgewire.smoke',{endpoint:'https://target.example/mcp'},1000),t2=Date.now();
-  const routes=await Promise.all(Array.from({length:paidRouteN},(_,i)=>req(port,{path:'/mcp',method:'POST',headers:paid.headers,body:paid.body.replace('"id":1000',`"id":${1000+i}`)})));
+  const routes=await Promise.all(Array.from({length:paidRouteN},(_,i)=>{const call=modernCall('sledgewire.smoke',{endpoint:'https://target.example/mcp'},1000+i);return req(port,{path:'/mcp',method:'POST',headers:call.headers,body:call.body});}));
   const routeMs=Date.now()-t2;
   for(const r of routes){if(r.status!==200)throw new Error(`paid_route_http_${r.status}`);const x=JSON.parse(r.text).result?.structuredContent;if(x?.state!=='PAYMENT_REQUIRED'||x?.price_credits!==3||x?.arena_room_id!==room||verifyReceipt(x,kp.publicKeyPem).ok!==true)throw new Error('paid_route_invalid');}
 
