@@ -4,7 +4,7 @@
 
 Sledgewire is a permissioned adversarial execution rail for agent services. It discovers a real MCP surface, attacks bounded failure modes, repairs only evidence-backed structural mismatches, independently validates repair, executes paid work through SharedOS authority, and returns a signed receipt another agent can verify.
 
-Trial Zero v0.3.14 is aligned to the organizer's latest Arena instructions: one product link, one official Arena agent seat, a separate development Room, a last-minute Arena join command, a 100-credit one-hour spend obligation in Arena 2, and refund-sensitive earned credits. The Arena surface is judge-first and buyer-first: free signed proof, deterministic service selection, a 3-credit first paid check, and independently verifiable delivery evidence.
+Trial Zero v0.3.15 is aligned to the organizer's latest Arena instructions: one product link, one official Arena agent seat, a separate development Room, a last-minute Arena join command, a 100-credit one-hour spend obligation in Arena 2, and refund-sensitive earned credits. The Arena surface is judge-first and buyer-first: free signed proof, deterministic service selection, a 3-credit first paid check, and independently verifiable delivery evidence.
 
 ## Fastest judge path
 
@@ -182,7 +182,9 @@ Large signed deliveries are uploaded as Room-addressed SharedNet artifacts and r
 - Production requires persistent Ed25519 signing material.
 - `/ready` requires a fresh Arena-daemon readiness pulse from the same persistent database. That pulse is refreshed only after successful SharedNet presence plus access to the configured Arena Room, so a live local process with broken Arena connectivity cannot masquerade as ready.
 - Paid receipts are independently inspectable through the free, trace-id-scoped `sledgewire.trace` proof surface; trace lookup is indexed for sustained public verification load.
-- Public selfcheck uses single-flight + a short result cache, while production HTTP limits active requests, sockets, body bytes, header time and keepalive churn.
+- Public selfcheck uses single-flight + a short result cache, while production HTTP limits active requests, sockets, body bytes, total request time, header time, idle-socket occupancy and keepalive churn.
+- Arena-2 budget state is atomic and fail-closed: corrupt/non-regular/symlink state never silently rebases the 100-credit baseline; exact duplicate offers collapse, conflicting duplicate IDs fail, and self-purchase offers are excluded by default.
+- Free typed quote request IDs are bounded before reflection so hostile free traffic cannot force oversized artifact delivery.
 
 ## Verification
 
@@ -197,6 +199,8 @@ Large signed deliveries are uploaded as Room-addressed SharedNet artifacts and r
     npm run stress:monster
     npm run stress:sqlite -- 6 1500
     npm run stress:http -- 64 32
+    npm run stress:slow-http
+    npm run stress:state-churn -- 50000 5000
     npm run economy
     npm run sharedos:check
     npm run preflight
