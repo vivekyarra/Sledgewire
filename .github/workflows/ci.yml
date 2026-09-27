@@ -28,6 +28,7 @@ jobs:
       - run: npm run stress:handler -- 2500 24 1
       - run: npm run stress:arena-ux -- 50000 256
       - run: npm run stress:arena-e2e -- 40000 10000
+      - run: npm run stress:http -- 64 32
       - run: npm run economy
       - run: npm run sharedos:check
       - run: npm run preflight
