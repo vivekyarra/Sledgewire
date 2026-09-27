@@ -33,7 +33,7 @@
 - [x] SharedNet artifact URLs are required to remain HTTPS on the configured SharedNet origin.
 - [x] Unused legacy child-process SharedNet adapter removed from production tree.
 - [x] SharedNet secrets excluded from git and Docker context.
-- [x] SQLite close/reopen replay and two-connection one-use tests green; v0.3.14 adds a mandatory six-process shared-WAL contention/integrity gate plus a file-backed crash-boundary recovery stress.
+- [x] SQLite close/reopen replay and two-connection one-use tests green; the current pipeline runs an 8-process × 1,500-operation shared-WAL contention/integrity gate three consecutive times, plus a file-backed crash-boundary recovery stress.
 - [x] Arena-2 budget state uses atomic fsync+rename persistence; corrupt/non-regular/symlink state fails closed instead of silently rebasing the 100-credit baseline.
 - [x] Buyer planning collapses exact duplicate offer IDs, rejects conflicting duplicate IDs, and excludes self-seller offers by default.
 - [x] Typed free quotes reject invalid/oversized reflected request IDs before ledger, service or artifact work.
