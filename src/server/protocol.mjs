@@ -53,7 +53,7 @@ export async function handleTool(name,args={},internalOpts={}){
       quickstart_url:internalOpts.publicBaseUrl?`${String(internalOpts.publicBaseUrl).replace(/\/$/,'')}/arena.md`:null,
       request_template:{type:'sledgewire.service.request.v1',request_id:'<buyer-unique-id>',service:name,input:args},
       verification:{receipt_tool:'sledgewire.verify',trace_tool:'sledgewire.trace',exact_retry_no_reexecution:true},
-      note:'Paid Arena services execute only after native SharedNet payment verification. Send this request in the official Arena Room first without payment; Sledgewire returns the exact request-bound memo and payee.'},signing.privateKeyPem);
+      note:'Paid Arena services execute only after native SharedNet payment verification. Send this request in the official Arena Room first without payment; Sledgewire returns a signed buyer/request-bound quote. Trial Zero native transfer memo is the product name Sledgewire.'},signing.privateKeyPem);
   }
   const opts={...internalOpts,targetPolicy:internalOpts.targetPolicy??{allowHttp:false,allowPrivate:false}};
   let payload;
