@@ -20,6 +20,7 @@ export function readArenaDaemonReadiness(store,roomId,{now=Date.now(),maxAgeMs=4
   const bootId=typeof x?.boot_id==='string'&&x.boot_id?x.boot_id:null;
   if(x?.room_id!==String(roomId))return base(true,false,'room_mismatch',null,bootId);
   const at=Date.parse(x?.at);if(!Number.isFinite(at))return base(true,false,'invalid_time',null,bootId);
+  if(at>Number(now)+5_000)return base(true,false,'future_time',null,bootId);
   const age=Math.max(0,Number(now)-at),running=x?.status==='running';
   if(!running)return base(true,false,String(x?.status??'not_running'),age,bootId);
   if(age>maxAgeMs)return base(true,false,'stale',age,bootId);
