@@ -11,21 +11,28 @@ for(const dir of [dataDir,keyDir,sharednetDir,evidenceDir])fs.mkdirSync(dir,{rec
 
 const privateKey=path.join(keyDir,'ed25519-private.pem');
 const publicKey=path.join(keyDir,'ed25519-public.pem');
-const privateExists=regularNonempty(privateKey);
-const publicExists=regularNonempty(publicKey);
+const inlinePrivate=Boolean(String(process.env.SLEDGEWIRE_PRIVATE_KEY_PEM||'').trim());
+const inlinePublic=Boolean(String(process.env.SLEDGEWIRE_PUBLIC_KEY_PEM||'').trim());
+if(inlinePrivate!==inlinePublic)throw new Error('inline_signing_keypair_incomplete');
 
-if(privateExists!==publicExists)throw new Error('persistent_signing_keypair_incomplete');
-if(!privateExists){
-  const generated=spawnSync('npm',['run','keygen','--',keyDir],{stdio:'inherit',env:process.env});
-  if(generated.status!==0)throw new Error(`persistent_keygen_failed_${generated.status??'signal'}`);
+if(!inlinePrivate){
+  const privateExists=regularNonempty(privateKey);
+  const publicExists=regularNonempty(publicKey);
+  if(privateExists!==publicExists)throw new Error('persistent_signing_keypair_incomplete');
+  if(!privateExists){
+    const generated=spawnSync('npm',['run','keygen','--',keyDir],{stdio:'inherit',env:process.env});
+    if(generated.status!==0)throw new Error(`persistent_keygen_failed_${generated.status??'signal'}`);
+  }
+  fs.chmodSync(privateKey,0o600);
+  fs.chmodSync(publicKey,0o644);
 }
-fs.chmodSync(privateKey,0o600);
-fs.chmodSync(publicKey,0o644);
 
 process.env.NODE_ENV=process.env.NODE_ENV||'production';
 process.env.SLEDGEWIRE_DB=process.env.SLEDGEWIRE_DB||path.join(dataDir,'sledgewire.db');
-process.env.SLEDGEWIRE_PRIVATE_KEY_FILE=process.env.SLEDGEWIRE_PRIVATE_KEY_FILE||privateKey;
-process.env.SLEDGEWIRE_PUBLIC_KEY_FILE=process.env.SLEDGEWIRE_PUBLIC_KEY_FILE||publicKey;
+if(!inlinePrivate){
+  process.env.SLEDGEWIRE_PRIVATE_KEY_FILE=process.env.SLEDGEWIRE_PRIVATE_KEY_FILE||privateKey;
+  process.env.SLEDGEWIRE_PUBLIC_KEY_FILE=process.env.SLEDGEWIRE_PUBLIC_KEY_FILE||publicKey;
+}
 process.env.SHAREDNET_MEMBER_TOKEN_FILE=process.env.SHAREDNET_MEMBER_TOKEN_FILE||path.join(sharednetDir,'member-token');
 process.env.SHAREDNET_ARENA_SEAT_FILE=process.env.SHAREDNET_ARENA_SEAT_FILE||path.join(sharednetDir,'arena-seat');
 process.env.SHAREDNET_JOIN_STATE_FILE=process.env.SHAREDNET_JOIN_STATE_FILE||path.join(sharednetDir,'join-state.json');
@@ -68,6 +75,7 @@ console.error(JSON.stringify({
   db:process.env.SLEDGEWIRE_DB,
   public_base_url:process.env.PUBLIC_BASE_URL,
   persistent_signing_key:true,
+  signing_key_source:inlinePrivate?'environment':'disk',
   arena_identity_persisted:regularNonempty(process.env.SHAREDNET_MEMBER_TOKEN_FILE),
   arena_seat_persisted:regularNonempty(process.env.SHAREDNET_ARENA_SEAT_FILE)
 }));
