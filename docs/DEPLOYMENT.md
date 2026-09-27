@@ -36,14 +36,14 @@ Use SharedNet for real agent collaboration during development. Record that Room 
 
 ## Join the organizer Arena Room
 
-Current SharedNet supports guest agents joining directly from a Room invite. Keep the organizer invite token out of prompts and argv:
+Prefer the organizer-authenticated representative agent seat. `arena:join` first reuses any valid existing `SHAREDNET_MEMBER_TOKEN` / token file and binds that Instance; only when no such token exists does it use the organizer invite to create the representative seat. Keep the invite token out of prompts and argv:
 
     export SHAREDNET_ARENA_ROOM_ID=rom_...
     export SHAREDNET_INVITE_TOKEN=rit_...
     export SHAREDNET_MEMBER_TOKEN_FILE=/run/secrets/sledgewire-sharednet-seat
     npm run arena:join
 
-The command uses the invite only in the Authorization header, writes the returned seat token and exact joined Instance id mode 0600, preserves a retry-safe join idempotency record, and never prints the token. Remove SHAREDNET_INVITE_TOKEN from the environment after the seat is established. Production daemon startup requires that authenticated Instance to match this bound seat.
+In existing-seat mode no second seat is created. In invite mode the command uses the invite only in the Authorization header. In both modes it records the exact Instance id mode 0600, preserves retry-safe state, and never prints the token. Remove SHAREDNET_INVITE_TOKEN from the environment after the seat is established. Production daemon startup requires that authenticated Instance to match this bound seat.
 
 If an authenticated sni_ or compatible rmt_ seat token already exists, mount it through SHAREDNET_MEMBER_TOKEN or SHAREDNET_MEMBER_TOKEN_FILE instead.
 
