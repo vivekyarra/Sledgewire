@@ -1,77 +1,95 @@
 # Trial Zero Arena runbook
 
-## One sentence
+## Before the 10-minute join window
 
-Give Sledgewire the MCP service you are about to trust. It calls the real surface, attacks bounded failure modes, repairs only what evidence supports, executes paid work under SharedOS authority, and returns a receipt another agent can verify.
+Complete everything that does not depend on the organizer Arena Room:
 
-Do not lead with architecture. Lead with a runnable proof.
+1. Freeze the exact green commit.
+2. Verify the existing submission and real SharedNet development Room ID.
+3. Deploy the persistent public service and signing key/database.
+4. Prove `/health`, `/arena.md`, `/arena.json`, `/public-key` and modern `/mcp`.
+5. Keep the organizer invite/token out of prompts, shell argv and repository files.
+6. Have the representative-agent prompt ready.
+7. Redeem the 100-credit code when the organizer releases it; do not spend before the Arena instruction permits it.
 
-## Before humans step away
+## When the organizer releases the join command
 
-1. Freeze the exact green competition commit.
-2. Confirm the existing event submission is the one you intend to compete with; edit that submission rather than creating a duplicate.
-3. Record the real `SHAREDNET_BUILD_ROOM_ID` and concrete collaboration evidence.
-4. Run `npm run preflight -- --submission`.
-5. Deploy the persistent seller topology. For a one-service PaaS, use the checked-in Railway config and `npm run arena:all`; for a Docker host, use `compose.arena.yml`.
-6. Join the organizer-provided Arena Room with the competition seller Instance and verify the configured payee belongs to it.
-7. Start the seller against the persistent database and signing key. Wait for `/ready` to report a fresh daemon heartbeat.
-8. From outside the host, run `npm run public:probe -- https://YOUR-PUBLIC-HOST --arena`. It must confirm the exact v0.3.11 runtime and current judge/buyer competition card; do not enter the Arena with this red.
-9. From a genuinely different Sharednet buyer seat, run `npm run arena:rehearse`; preserve `.sledgewire/live-rehearsal.json`.
-10. Restart the seller/daemon while preserving DB and signing key, wait for a new `boot_id`, then run `npm run arena:replay-after-restart`.
-11. Run `npm run preflight -- --live`. External SharedOS audit evidence is checked only when `SLEDGEWIRE_SHAREDOS_REQUIRED=1` is intentionally enabled.
-12. Start the representative agent with `docs/ARENA_AGENT_PROMPT.md`.
+Extract/use the exact organizer Room and invite out of band:
 
-## Arena 1 — demonstrations and reviews
+    export SHAREDNET_ARENA_ROOM_ID=rom_...
+    export SHAREDNET_INVITE_TOKEN=rit_...
+    export SHAREDNET_PAYEE_ADDRESS=pri_...
+    npm run arena:join
 
-- Post one concise pitch and the single quickstart link.
-- Use free `sledgewire.selfcheck` as the first demonstration.
-- Let peers verify the signed proof.
-- Try several distinct peer products with real tasks when time permits; three meaningful trials is an internal coverage target, not an official minimum.
-- Record evidence from each trial, including concrete strengths and limitations/questions.
-- Post concise evidence-based critiques.
-- Respond to challenges with exact tests, receipts and traces.
-- Submit the required review/ranking before the round closes.
-- Keep Room noise low.
+The join command writes:
 
-## Arena 2 — service trading
+- the member token owner-only;
+- the exact joined Instance/seat id owner-only;
+- retry-safe join state.
 
-Paid menu: Smoke 3, Assay 8, Invoke 12, Fleet 20, Seal 25, Gauntlet 35. Free surfaces: `sledgewire.quote`, `sledgewire.selfcheck`, `sledgewire.trace`, `sledgewire.verify`.
+Remove `SHAREDNET_INVITE_TOKEN` immediately after join.
 
-Only sell the service justified by the buyer's unresolved problem. Free quote/selfcheck -> exact payment-v2 quote -> native transfer verification -> SharedOS -> signed delivery. The payment memo is bound to Room + buyer + request id + service + exact input; a post-quote input change must fail before execution. No valid payment means no paid execution.
+For a single-container host, the fastest cold-start path is:
 
-The ranking metric is valid credits earned. There is no repository-defined minimum outgoing spend. Use outgoing credits for peer services that genuinely improve evaluation, integration, research or operations; do not spend merely to create artificial reciprocal demand.
+    npm run arena:activate
 
-Use `npm run arena:stats` against the live `SLEDGEWIRE_DB` to inspect aggregate earned credits, credits by service, top revenue service, verified paid buyers, quote/info engagement, completed-delivery buyers, service mix, conversion, delivery success/p50/p95, failures and receipt/trace evidence coverage.
+which performs the same join and starts the public + daemon supervisor. Do not run a second Arena identity in parallel.
 
-## Internal latency targets
+## Final room-specific checks
 
-| Service | p95 target | hard deadline |
-|---|---:|---:|
-| Smoke | <25s | 40s |
-| Assay | <60s | 90s |
-| Invoke | <90s | 120s |
-| Fleet | <180s | 240s |
-| Seal | <150s | 180s |
-| Gauntlet | <210s | 270s |
+1. `/ready` shows a fresh daemon heartbeat.
+2. Daemon Instance equals the bound Arena seat.
+3. Configured payee belongs to that same SharedNet identity.
+4. `npm run public:probe -- https://PUBLIC-HOST --arena` is green.
+5. From a different buyer seat, `npm run arena:rehearse` completes one genuine Smoke purchase.
+6. Restart daemon with DB/key preserved; `npm run arena:replay-after-restart` proves identical replay with zero second payment.
+7. `npm run preflight -- --live` is green.
 
-These are internal targets, not organizer-published scoring thresholds.
+## Arena 1
+
+- Introduce Sledgewire once.
+- Provide the product link, free/paid split, prices and MCP calling instructions.
+- Lead with free selfcheck.
+- Try peers with real tasks.
+- Record concrete strengths and limitations.
+- Answer challenges with receipts/traces rather than slogans.
+- Submit the required review/ranking before close.
+
+## Arena 2
+
+After the 100-credit grant is present:
+
+    npm run arena:budget -- --init
+
+The organizer requires all 100 event credits to be spent in the one-hour round. Maintain discovered worthwhile peer offers and periodically run:
+
+    npm run arena:budget -- --offers offers.json
+
+Do not infer progress from current wallet balance alone because sales increase the purse. The budget controller uses cumulative SharedNet `sent` relative to the Arena baseline.
+
+Seller payment contract:
+
+- native memo: `Sledgewire`;
+- signed quote contains the exact request fingerprint;
+- durable quote binding rejects post-quote request changes;
+- valid payment -> SharedOS -> signed delivery;
+- exact retry -> cached result, no second execution;
+- no automatic refunds.
+
+No live scoreboard exists; optimize useful sales and finish the outgoing 100-credit obligation independently.
 
 ## Stop conditions
 
-Do not enter autonomous competition until all are true:
+Do not enter autonomous competition unless:
 
-- exact competition commit green;
-- no unauthorized target actions in the hostile suite;
-- zero duplicate paid executions in replay stress;
-- production signing key persistent;
-- public seller reachable by an unrelated client;
-- official Arena Room explicit and separate from build Room;
-- native Sharednet purse/ledger readable;
-- another seat can buy Smoke, verify the signed delivery, and retrieve its SharedOS trace proof;
-- restart replay preserves the exact receipt with zero second payment;
-- SharedOS deny / allow / maxUses check green;
-- representative agent can complete a no-human rehearsal;
-- `npm run public:probe -- https://YOUR-PUBLIC-HOST --arena` green;
-- `npm run preflight -- --live` green.
-
-For the optional SharedOS award, also capture strong evidence of practical SharedOS use, completeness and usability. If an external SharedOS audit sink is available, prove it separately without blocking the main Arena launch.
+- exact commit CI green;
+- public deployment exact-version green;
+- one Arena seat bound and authenticated;
+- payee/Room correct;
+- real second-seat paid rehearsal green;
+- restart replay green;
+- duplicate-execution stresses green;
+- payment memo is exactly `Sledgewire`;
+- changed request after quote is rejected before ledger execution;
+- budget controller initializes from live SharedNet purse;
+- representative agent can complete a no-human rehearsal.
