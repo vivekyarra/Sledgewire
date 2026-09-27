@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: sledgewire-arena-vivekyarra
+    runtime: node
+    plan: starter
+    region: singapore
+    branch: main
+    autoDeployTrigger: commit
+    buildCommand: npm ci --omit=dev --ignore-scripts
+    startCommand: node scripts/render-start.mjs
+    healthCheckPath: /ready
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 22.18.0
+      - key: SLEDGEWIRE_RENDER_DATA_DIR
+        value: /var/data/sledgewire
+      - key: SLEDGEWIRE_DB
+        value: /var/data/sledgewire/sledgewire.db
+      - key: SLEDGEWIRE_PRIVATE_KEY_FILE
+        value: /var/data/sledgewire/keys/ed25519-private.pem
+      - key: SLEDGEWIRE_PUBLIC_KEY_FILE
+        value: /var/data/sledgewire/keys/ed25519-public.pem
+      - key: SHAREDNET_BASE_URL
+        value: https://www.sharednet.ai
+      - key: SHAREDNET_MEMBER_TOKEN_FILE
+        value: /var/data/sledgewire/sharednet/member-token
+      - key: SHAREDNET_ARENA_SEAT_FILE
+        value: /var/data/sledgewire/sharednet/arena-seat
+      - key: SHAREDNET_JOIN_STATE_FILE
+        value: /var/data/sledgewire/sharednet/join-state.json
+      - key: SLEDGEWIRE_REHEARSAL_EVIDENCE
+        value: /var/data/sledgewire/evidence/live-rehearsal.json
+      - key: SLEDGEWIRE_RESTART_REPLAY_EVIDENCE
+        value: /var/data/sledgewire/evidence/restart-replay.json
+      - key: SLEDGEWIRE_ARENA_BUDGET_STATE
+        value: /var/data/sledgewire/evidence/arena-budget.json
+    disk:
+      name: sledgewire-persistent
+      mountPath: /var/data/sledgewire
+      sizeGB: 1
