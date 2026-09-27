@@ -19,6 +19,7 @@ export class ArenaStore{
       CREATE TABLE IF NOT EXISTS grants(namespace_id TEXT NOT NULL,grant_id TEXT NOT NULL,grant_json TEXT NOT NULL,revoked_at TEXT,PRIMARY KEY(namespace_id,grant_id));
       CREATE TABLE IF NOT EXISTS grant_usage(namespace_id TEXT NOT NULL,grant_id TEXT NOT NULL,used INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(namespace_id,grant_id));
       CREATE TABLE IF NOT EXISTS audit(event_id TEXT PRIMARY KEY,at TEXT NOT NULL,trace_id TEXT,event_json TEXT NOT NULL);
+      CREATE INDEX IF NOT EXISTS idx_audit_trace ON audit(trace_id);
       CREATE TABLE IF NOT EXISTS audit_outbox(event_id TEXT PRIMARY KEY,event_json TEXT NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,sent_at TEXT);
       CREATE TABLE IF NOT EXISTS room_messages(message_id TEXT PRIMARY KEY,status TEXT NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,error TEXT,processed_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS payment_quotes(request_id TEXT PRIMARY KEY,fingerprint TEXT NOT NULL,service TEXT NOT NULL,buyer_seat TEXT NOT NULL,price_credits INTEGER NOT NULL,memo TEXT NOT NULL,issued_at TEXT NOT NULL,last_seen_at TEXT NOT NULL);
